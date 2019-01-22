@@ -7,3 +7,12 @@ result/
 models/
 pretrained/
 *.ipynb
+*.h5
+__pycache__/*
+.idea/*
+/graph_viz*/*
+/results/*
+train_data
+test_data
+*.pyc
+*.m~
