@@ -16,8 +16,8 @@ def get_data_info(folder_list, seq_len_range, overlap, sample_times=1, pad_y=Fal
     X_len = []
     for folder in folder_list:
         start_t = time.time()
-        poses = np.load('{}{}.npy'.format(par.pose_dir, folder))  # (n_images, 6)
-        fpaths = glob.glob('{}{}/*.png'.format(par.image_dir, folder))
+        poses = np.load(os.path.join(par.pose_dir, folder + ".npy"))
+        fpaths = glob.glob(os.path.join(par.image_dir, folder, "*.png"))
         fpaths.sort()
         # Fixed seq_len
         if seq_len_range[0] == seq_len_range[1]:
@@ -50,7 +50,7 @@ def get_data_info(folder_list, seq_len_range, overlap, sample_times=1, pad_y=Fal
                 while True:
                     n = np.random.random_integers(min_len, max_len)
                     if start + n < n_frames:
-                        x_seg = fpaths[start:start+n] 
+                        x_seg = fpaths[start:start+n]
                         X_path.append(x_seg)
                         if not pad_y:
                             Y.append(poses[start:start+n])
@@ -64,7 +64,7 @@ def get_data_info(folder_list, seq_len_range, overlap, sample_times=1, pad_y=Fal
                     start += n - overlap
                     X_len.append(len(x_seg))
         print('Folder {} finish in {} sec'.format(folder, time.time()-start_t))
-    
+
     # Convert to pandas dataframes
     data = {'seq_len': X_len, 'image_path': X_path, 'pose': Y}
     df = pd.DataFrame(data, columns = ['seq_len', 'image_path', 'pose'])
@@ -86,8 +86,8 @@ def get_partition_data_info(partition, folder_list, seq_len_range, overlap, samp
     for part in range(2):
         for folder in folder_list:
             start_t = time.time()
-            poses = np.load('{}{}.npy'.format(par.pose_dir, folder))  # (n_images, 6)
-            fpaths = glob.glob('{}{}/*.png'.format(par.image_dir, folder))
+            poses = np.load(os.path.join(par.pose_dir, folder + ".npy"))
+            fpaths = glob.glob(os.path.join(par.image_dir, folder, "*.png"))
             fpaths.sort()
 
 
@@ -112,7 +112,7 @@ def get_partition_data_info(partition, folder_list, seq_len_range, overlap, samp
                 while True:
                     n = np.random.random_integers(min_len, max_len)
                     if start + n < n_frames:
-                        x_seg = fpaths[start:start+n] 
+                        x_seg = fpaths[start:start+n]
                         X_path[part].append(x_seg)
                         if not pad_y:
                             Y[part].append(poses[start:start+n])
@@ -126,7 +126,7 @@ def get_partition_data_info(partition, folder_list, seq_len_range, overlap, samp
                     start += n - overlap
                     X_len[part].append(len(x_seg))
             print('Folder {} finish in {} sec'.format(folder, time.time()-start_t))
-        
+
         # Convert to pandas dataframes
         data = {'seq_len': X_len[part], 'image_path': X_path[part], 'pose': Y[part]}
         df = pd.DataFrame(data, columns = ['seq_len', 'image_path', 'pose'])
@@ -156,7 +156,7 @@ class SortedRandomBatchSampler(Sampler):
             self.len += n_batch
 
     def __iter__(self):
-        
+
         # Calculate number of sameples in each group (grouped by seq_len)
         list_batch_indexes = []
         start_idx = 0
@@ -188,7 +188,7 @@ class ImageSequenceDataset(Dataset):
         self.transformer = transforms.Compose(transform_ops)
         self.minus_point_5 = minus_point_5
         self.normalizer = transforms.Normalize(mean=img_mean, std=img_std)
-        
+
         self.data_info = info_dataframe
         self.seq_len_list = list(self.data_info.seq_len)
         self.image_arr = np.asarray(self.data_info.image_path)  # image paths
@@ -197,11 +197,11 @@ class ImageSequenceDataset(Dataset):
     def __getitem__(self, index):
         groundtruth_sequence = self.groundtruth_arr[index]
         groundtruth_sequence = torch.FloatTensor(groundtruth_sequence)
-        groundtruth_sequence[1:] = groundtruth_sequence[1:] - groundtruth_sequence[0:-1]  # get relative pose w.r.t. previois frame 
-        
+        groundtruth_sequence[1:] = groundtruth_sequence[1:] - groundtruth_sequence[0:-1]  # get relative pose w.r.t. previois frame
+
         image_path_sequence = self.image_arr[index]
         sequence_len = torch.tensor(self.seq_len_list[index])  #sequence_len = torch.tensor(len(image_path_sequence))
-        
+
         image_sequence = []
         for img_path in image_path_sequence:
             img_as_img = Image.open(img_path)
@@ -243,7 +243,7 @@ if __name__ == '__main__':
         s, x, y = batch
         print('='*50)
         print('len:{}\nx:{}\ny:{}'.format(s, x.shape, y.shape))
-    
+
     print('Elapsed Time: {} sec'.format(time.time()-start_t))
     print('Number of workers = ', n_workers)
 
