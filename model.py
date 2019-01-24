@@ -98,7 +98,6 @@ class DeepVO(nn.Module):
         out, hc = self.rnn(x)
         out = self.rnn_drop_out(out)
         out = self.linear(out)
-        print("In Model, input_size: ", orig_x.size(), "output_size: ", out.size())
         return out
 
     def encode_image(self, x):

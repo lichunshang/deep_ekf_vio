@@ -49,9 +49,7 @@ logger.print('=' * 50)
 
 # Model
 e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)
-e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
 e2e_vio_model = e2e_vio_model.cuda()
-e2e_vio_trainer = trainer.Trainer(e2e_vio_model)
 
 # Load FlowNet weights pretrained with FlyingChairs
 # NOTE: the pretrained model assumes image rgb values in range [-0.5, 0.5]
@@ -83,6 +81,9 @@ if par.resume:
     logger.print('Load model from: %s' % par.load_model_path)
     logger.print('Load optimizer from: %s' % par.load_optimizer_path)
 
+e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
+e2e_vio_trainer = trainer.Trainer(e2e_vio_model)
+
 # Train
 min_loss_t = 1e10
 min_loss_v = 1e10
@@ -97,7 +98,6 @@ for epoch in range(par.epochs):
     for _, t_x, t_y in train_dl:
         t_x = t_x.cuda(non_blocking=par.pin_mem)
         t_y = t_y.cuda(non_blocking=par.pin_mem)
-        print("Out Model, input_size: ", t_x.size(), "output_size: ", t_y.size())
         ls = e2e_vio_trainer.step(t_x, t_y, optimizer).data.cpu().numpy()
         t_loss_list.append(float(ls))
         loss_mean += float(ls)
