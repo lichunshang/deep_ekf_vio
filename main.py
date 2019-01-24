@@ -99,8 +99,8 @@ for epoch in range(par.epochs):
         if par.optim == 'Cosine':
             lr_scheduler.step()
     logger.print('Train take {:.1f} sec'.format(time.time() - st_t))
-    logger.tensorboard.add_scalar("train_loss/epochs", loss_mean, epoch)
     loss_mean /= len(train_dl)
+    logger.tensorboard.add_scalar("train_loss/epochs", loss_mean, epoch)
 
     # Validation
     st_t = time.time()
@@ -114,8 +114,8 @@ for epoch in range(par.epochs):
         v_loss_list.append(float(v_ls))
         loss_mean_valid += float(v_ls)
     logger.print('Valid take {:.1f} sec'.format(time.time() - st_t))
-    logger.tensorboard.add_scalar("val_loss/epochs", loss_mean_valid, epoch)
     loss_mean_valid /= len(valid_dl)
+    logger.tensorboard.add_scalar("val_loss/epochs", loss_mean_valid, epoch)
 
     # Save records
     logger.print('Epoch {}\ntrain loss mean: {}, '
@@ -129,14 +129,14 @@ for epoch in range(par.epochs):
     if (epoch + 1) % 5 == 0:
         logger.print('Save model at ep {}, checkpoint'.format(epoch + 1))  # use 4.6 sec
         torch.save(e2e_vio_model.state_dict(), par.save_model_path + '.checkpoint')
-        torch.save(optimizer.state_dict(), par.save_optimzer_path + '.checkpoint')
+        torch.save(optimizer.state_dict(), par.save_optimizer_path + '.checkpoint')
     elif loss_mean_valid < min_loss_v:
         min_loss_v = loss_mean_valid
         logger.print('Save model at ep {}, mean of valid loss: {}'.format(epoch + 1, loss_mean_valid))  # use 4.6 sec
         torch.save(e2e_vio_model.state_dict(), par.save_model_path + '.valid')
-        torch.save(optimizer.state_dict(), par.save_optimzer_path + '.valid')
+        torch.save(optimizer.state_dict(), par.save_optimizer_path + '.valid')
     elif loss_mean < min_loss_t and epoch:
         min_loss_t = loss_mean
         logger.print('Save model at ep {}, mean of train loss: {}'.format(epoch + 1, loss_mean))
         torch.save(e2e_vio_model.state_dict(), par.save_model_path + '.train')
-        torch.save(optimizer.state_dict(), par.save_optimzer_path + '.train')
+        torch.save(optimizer.state_dict(), par.save_optimizer_path + '.train')

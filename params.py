@@ -29,8 +29,8 @@ class Parameters(object):
 
         # Data Preprocessing
         self.resize_mode = 'rescale'  # choice: 'crop' 'rescale' None
-        self.img_w = 608 // 4  # original size is about 1226
-        self.img_h = 184 // 4  # original size is about 370
+        self.img_w = 608  # original size is about 1226
+        self.img_h = 184  # original size is about 370
         self.img_means = (-0.14968217427134656, -0.12941663107068363, -0.1320610301921484)
         self.img_stds = (1, 1, 1)  # (0.309122, 0.315710, 0.3226514)
         self.minus_point_5 = True
@@ -47,7 +47,7 @@ class Parameters(object):
                 self.sample_times)
 
         # Model
-        self.rnn_hidden_size = 2
+        self.rnn_hidden_size = 1000
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
         self.rnn_dropout_between = 0  # 0: no dropout
