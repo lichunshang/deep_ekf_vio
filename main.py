@@ -10,6 +10,7 @@ from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDa
 from log import logger
 
 logger.log_parameters()
+logger.log_files()
 
 # Prepare Data
 if os.path.isfile(par.train_data_info_path) and os.path.isfile(par.valid_data_info_path):
