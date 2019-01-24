@@ -4,6 +4,7 @@ import numpy as np
 import os
 import time
 import pandas as pd
+import trainer
 from params import par
 from model import DeepVO
 from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDataset, get_partition_data_info
@@ -48,7 +49,9 @@ logger.print('=' * 50)
 
 # Model
 e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)
+e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
 e2e_vio_model = e2e_vio_model.cuda()
+e2e_vio_trainer = trainer.Trainer(e2e_vio_model)
 
 # Load FlowNet weights pretrained with FlyingChairs
 # NOTE: the pretrained model assumes image rgb values in range [-0.5, 0.5]
@@ -83,7 +86,7 @@ if par.resume:
 # Train
 min_loss_t = 1e10
 min_loss_v = 1e10
-e2e_vio_model.train()
+# e2e_vio_trainer.set_train_mode()
 for epoch in range(par.epochs):
     st_t = time.time()
     logger.print('=' * 50)
@@ -94,7 +97,8 @@ for epoch in range(par.epochs):
     for _, t_x, t_y in train_dl:
         t_x = t_x.cuda(non_blocking=par.pin_mem)
         t_y = t_y.cuda(non_blocking=par.pin_mem)
-        ls = e2e_vio_model.step(t_x, t_y, optimizer).data.cpu().numpy()
+        print("Out Model, input_size: ", t_x.size(), "output_size: ", t_y.size())
+        ls = e2e_vio_trainer.step(t_x, t_y, optimizer).data.cpu().numpy()
         t_loss_list.append(float(ls))
         loss_mean += float(ls)
         if par.optim == 'Cosine':
@@ -111,7 +115,7 @@ for epoch in range(par.epochs):
     for _, v_x, v_y in valid_dl:
         v_x = v_x.cuda(non_blocking=par.pin_mem)
         v_y = v_y.cuda(non_blocking=par.pin_mem)
-        v_ls = e2e_vio_model.get_loss(v_x, v_y).data.cpu().numpy()
+        v_ls = e2e_vio_trainer.get_loss(v_x, v_y).data.cpu().numpy()
         v_loss_list.append(float(v_ls))
         loss_mean_valid += float(v_ls)
     logger.print('Valid take {:.1f} sec'.format(time.time() - st_t))

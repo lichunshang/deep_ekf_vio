@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
+import numpy as np
 from params import par
 from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
-import numpy as np
-from log import logger
 
 
 def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
@@ -29,10 +28,7 @@ class DeepVO(nn.Module):
     def __init__(self, imsize1, imsize2, batchNorm):
         super(DeepVO, self).__init__()
         # CNN
-        self.num_train_iterations = 0
-        self.num_val_iterations = 0
         self.batchNorm = batchNorm
-        self.clip = par.clip
         self.conv1 = conv(self.batchNorm, 6, 64, kernel_size=7, stride=2, dropout=par.conv_dropout[0])
         self.conv2 = conv(self.batchNorm, 64, 128, kernel_size=5, stride=2, dropout=par.conv_dropout[1])
         self.conv3 = conv(self.batchNorm, 128, 256, kernel_size=5, stride=2, dropout=par.conv_dropout[2])
@@ -42,7 +38,7 @@ class DeepVO(nn.Module):
         self.conv5 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=2, dropout=par.conv_dropout[6])
         self.conv5_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[7])
         self.conv6 = conv(self.batchNorm, 512, 1024, kernel_size=3, stride=2, dropout=par.conv_dropout[8])
-        # Comput the shape based on diff image size
+        # Compute the shape based on diff image size
         __tmp = Variable(torch.zeros(1, 6, imsize1, imsize2))
         __tmp = self.encode_image(__tmp)
 
@@ -89,6 +85,7 @@ class DeepVO(nn.Module):
     def forward(self, x):
         # x: (batch, seq_len, channel, width, height)
         # stack_image
+        orig_x = x
         x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
         batch_size = x.size(0)
         seq_len = x.size(1)
@@ -101,6 +98,7 @@ class DeepVO(nn.Module):
         out, hc = self.rnn(x)
         out = self.rnn_drop_out(out)
         out = self.linear(out)
+        print("In Model, input_size: ", orig_x.size(), "output_size: ", out.size())
         return out
 
     def encode_image(self, x):
@@ -116,47 +114,3 @@ class DeepVO(nn.Module):
 
     def bias_parameters(self):
         return [param for name, param in self.named_parameters() if 'bias' in name]
-
-    def get_loss(self, x, y):
-        predicted = self.forward(x)
-        y = y[:, 1:, :]  # (batch, seq, dim_pose)
-
-        # Weighted MSE Loss
-        angle_loss = torch.nn.functional.mse_loss(predicted[:, :, :3], y[:, :, :3])
-        trans_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:], y[:, :, 3:])
-        loss = (100 * angle_loss + trans_loss)
-
-        # log the loss
-        loss_name = "train_loss" if self.training else "val_loss"
-        iterations = self.num_train_iterations if self.training else self.num_val_iterations
-        trans_x_loss = torch.nn.functional.mse_loss(predicted[:, :, 0], y[:, :, 0])
-        trans_y_loss = torch.nn.functional.mse_loss(predicted[:, :, 1], y[:, :, 1])
-        trans_z_loss = torch.nn.functional.mse_loss(predicted[:, :, 2], y[:, :, 2])
-        rot_x_loss = torch.nn.functional.mse_loss(predicted[:, :, 3], y[:, :, 3])
-        rot_y_loss = torch.nn.functional.mse_loss(predicted[:, :, 4], y[:, :, 4])
-        rot_z_loss = torch.nn.functional.mse_loss(predicted[:, :, 5], y[:, :, 5])
-        logger.tensorboard.add_scalar(loss_name + "/total_loss", loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/rot_loss", angle_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/rot_loss/x", rot_x_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/rot_loss/y", rot_y_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/rot_loss/z", rot_z_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/trans_loss", trans_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/trans_loss/x", trans_x_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/trans_loss/y", trans_y_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/trans_loss/z", trans_z_loss, iterations)
-
-        if self.training:
-            self.num_train_iterations += 1
-        else:
-            self.num_val_iterations += 1
-
-        return loss
-
-    def step(self, x, y, optimizer):
-        optimizer.zero_grad()
-        loss = self.get_loss(x, y)
-        loss.backward()
-        if self.clip != None:
-            torch.nn.utils.clip_grad_norm(self.rnn.parameters(), self.clip)
-        optimizer.step()
-        return loss
