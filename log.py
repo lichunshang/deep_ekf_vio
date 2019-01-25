@@ -56,7 +56,8 @@ class Logger(object):
         diff_file.write(diff_ret)
         diff_file.close()
 
-    def print(self, string=""):
+    def print(self, *args):
+        string = " ".join(args)
         sys.stdout.write(string)
         sys.stdout.write("\n")
         sys.stdout.flush()

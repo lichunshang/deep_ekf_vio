@@ -15,12 +15,17 @@ arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
 gpu_ids = arg_parser.parse_args().gpu_id
 
+train_description = input("Enter a description of this training run: ")
+logger.print("Train description: ", train_description)
+logger.tensorboard.add_text("description", train_description)
+
 logger.log_parameters()
 logger.log_files()
 
 # set the visible GPUs
 if gpu_ids:
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(i) for i in gpu_ids])
+    logger.print("CUDA_VISIVLE_DEVICES: %s" % os.environ["CUDA_VISIBLE_DEVICES"])
 
 # Prepare Data
 if os.path.isfile(par.train_data_info_path) and os.path.isfile(par.valid_data_info_path):
