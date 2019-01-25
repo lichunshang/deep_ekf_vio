@@ -5,7 +5,6 @@ import os
 import time
 import pandas as pd
 import trainer
-import parallel
 from params import par
 from model import DeepVO
 from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDataset, get_partition_data_info
@@ -82,8 +81,7 @@ if par.resume:
     logger.print('Load model from: %s' % par.load_model_path)
     logger.print('Load optimizer from: %s' % par.load_optimizer_path)
 
-# e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
-e2e_vio_model = parallel.DataParallelModel(e2e_vio_model)
+e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
 e2e_vio_trainer = trainer.Trainer(e2e_vio_model)
 
 # Train
