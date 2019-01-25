@@ -1,5 +1,4 @@
 import torch
-import torch.distributed
 from torch.utils.data import DataLoader
 import numpy as np
 import os
@@ -13,8 +12,6 @@ from log import logger
 
 logger.log_parameters()
 logger.log_files()
-
-torch.distributed.init_process_group(backend="nccl")
 
 # Prepare Data
 if os.path.isfile(par.train_data_info_path) and os.path.isfile(par.valid_data_info_path):
@@ -84,7 +81,7 @@ if par.resume:
     logger.print('Load model from: %s' % par.load_model_path)
     logger.print('Load optimizer from: %s' % par.load_optimizer_path)
 
-e2e_vio_model = torch.nn.parallel.DistributedDataParallel(e2e_vio_model)
+e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
 e2e_vio_trainer = trainer.Trainer(e2e_vio_model)
 
 # Train
