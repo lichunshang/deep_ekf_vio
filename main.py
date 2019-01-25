@@ -5,11 +5,16 @@ import os
 import time
 import pandas as pd
 import trainer
+import argparse
 from params import par
 from model import DeepVO
 from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDataset, get_partition_data_info
 from log import logger
 
+arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
+arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
+gpu_ids = arg_parser.parse_args().gpu_id
+print(gpu_ids)
 logger.log_parameters()
 logger.log_files()
 
@@ -49,7 +54,6 @@ logger.print('=' * 50)
 
 # Model
 e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)
-e2e_vio_model = e2e_vio_model.cuda()
 
 # Load FlowNet weights pretrained with FlyingChairs
 # NOTE: the pretrained model assumes image rgb values in range [-0.5, 0.5]
@@ -81,7 +85,16 @@ if par.resume:
     logger.print('Load model from: %s' % par.load_model_path)
     logger.print('Load optimizer from: %s' % par.load_optimizer_path)
 
-e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
+# if to use more than one GPU
+if par.n_gpu > 1:
+    assert(len(gpu_ids) == par.n_gpu)
+    assert(torch.cuda.device_count() >= par.n_gpu)
+    assert(torch.cuda.device_count() >= max(gpu_ids) and min(gpu_ids) >= 0)
+    e2e_vio_model = torch.nn.DataParallel(e2e_vio_model, device_ids=gpu_ids)
+    e2e_vio_model = e2e_vio_model.cuda()
+else:
+    gpu_device = torch.device("cuda", index=gpu_ids[0])
+    e2e_vio_model = e2e_vio_model.to(gpu_device)
 e2e_vio_trainer = trainer.Trainer(e2e_vio_model)
 
 # Train
