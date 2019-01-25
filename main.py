@@ -113,7 +113,9 @@ for epoch in range(par.epochs):
     e2e_vio_model.train()
     loss_mean = 0
     t_loss_list = []
+    count = 0
     for _, t_x, t_y in train_dl:
+        print("%d/%d (%.2f%%)" % (count, len(train_dl), 100 * count / len(train_dl)), end='\r')
         t_x = t_x.cuda(non_blocking=par.pin_mem)
         t_y = t_y.cuda(non_blocking=par.pin_mem)
         ls = e2e_vio_trainer.step(t_x, t_y, optimizer).data.cpu().numpy()
@@ -121,6 +123,7 @@ for epoch in range(par.epochs):
         loss_mean += float(ls)
         if par.optim == 'Cosine':
             lr_scheduler.step()
+        count += 1
     logger.print('Train take {:.1f} sec'.format(time.time() - st_t))
     loss_mean /= len(train_dl)
     logger.tensorboard.add_scalar("train_loss/epochs", loss_mean, epoch)
