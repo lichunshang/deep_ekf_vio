@@ -11,6 +11,8 @@ from model import DeepVO
 from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDataset, get_partition_data_info
 from log import logger
 
+np.set_printoptions(linewidth=1024)
+
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
 gpu_ids = arg_parser.parse_args().gpu_id

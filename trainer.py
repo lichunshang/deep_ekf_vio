@@ -14,11 +14,10 @@ class Trainer(object):
 
     def get_loss(self, x, y):
         predicted = self.model.forward(x)
-        y = y[:, 1:, :]  # (batch, seq, dim_pose)
 
         # Weighted MSE Loss
-        angle_loss = torch.nn.functional.mse_loss(predicted[:, :, :3], y[:, :, :3])
-        trans_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:], y[:, :, 3:])
+        angle_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:6], y[:, :, 3:6])
+        trans_loss = torch.nn.functional.mse_loss(predicted[:, :, 0:3], y[:, :, 0:3])
         loss = (100 * angle_loss + trans_loss)
 
         # log the loss

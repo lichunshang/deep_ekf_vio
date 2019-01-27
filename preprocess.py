@@ -50,12 +50,12 @@ def create_pose_data():
             '06': [0, 1100], '07': [0, 1100], '08': [1100, 5170], '09': [0, 1590], '10': [0, 1200]}
     start_t = time.time()
     for video in info.keys():
-        fn = '{}{}.txt'.format(par.pose_dir, video)
+        fn = os.path.join(par.pose_dir, video + ".txt")
         print('Transforming {}...'.format(fn))
         with open(fn) as f:
             lines = [line.split('\n')[0] for line in f.readlines()]
-            poses = [R_to_angle([float(value) for value in l.split(' ')]) for l in
-                     lines]  # list of pose (pose=list of 12 floats)
+            poses = [np.array([float(value) for value in l.split(' ')] + [0, 0, 0, 1]).reshape(4, 4)
+                     for l in lines]  # convert all poses to full transformation matrices
             poses = np.array(poses)
             base_fn = os.path.splitext(fn)[0]
             np.save(base_fn + '.npy', poses)

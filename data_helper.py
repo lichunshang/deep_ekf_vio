@@ -2,9 +2,10 @@ import os
 import glob
 import pandas as pd
 import numpy as np
-from PIL import Image
 import torch
-from torch.utils.data import Dataset, DataLoader
+import se3_math
+from PIL import Image
+from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
 from torchvision import transforms
 import time
@@ -35,14 +36,14 @@ def get_data_info(folder_list, seq_len_range, overlap, sample_times=1, pad_y=Fal
                 res = n_frames % seq_len
                 if res != 0:
                     n_frames = n_frames - res
-                x_segs = [fpaths[i:i+seq_len] for i in range(st, n_frames, jump)]
-                y_segs = [poses[i:i+seq_len] for i in range(st, n_frames, jump)]
+                x_segs = [fpaths[i:i + seq_len] for i in range(st, n_frames, jump)]
+                y_segs = [poses[i:i + seq_len] for i in range(st, n_frames, jump)]
                 Y += y_segs
                 X_path += x_segs
                 X_len += [len(xs) for xs in x_segs]
         # Random segment to sequences with diff lengths
         else:
-            assert(overlap < min(seq_len_range))
+            assert (overlap < min(seq_len_range))
             n_frames = len(fpaths)
             min_len, max_len = seq_len_range[0], seq_len_range[1]
             for i in range(sample_times):
@@ -50,24 +51,24 @@ def get_data_info(folder_list, seq_len_range, overlap, sample_times=1, pad_y=Fal
                 while True:
                     n = np.random.random_integers(min_len, max_len)
                     if start + n < n_frames:
-                        x_seg = fpaths[start:start+n]
+                        x_seg = fpaths[start:start + n]
                         X_path.append(x_seg)
                         if not pad_y:
-                            Y.append(poses[start:start+n])
+                            Y.append(poses[start:start + n])
                         else:
-                            pad_zero = np.zeros((max_len-n, 6))
-                            padded = np.concatenate((poses[start:start+n], pad_zero))
+                            pad_zero = np.zeros((max_len - n, 6))
+                            padded = np.concatenate((poses[start:start + n], pad_zero))
                             Y.append(padded.tolist())
                     else:
-                        print('Last %d frames is not used' %(start+n-n_frames))
+                        print('Last %d frames is not used' % (start + n - n_frames))
                         break
                     start += n - overlap
                     X_len.append(len(x_seg))
-        print('Folder {} finish in {} sec'.format(folder, time.time()-start_t))
+        print('Folder {} finish in {} sec'.format(folder, time.time() - start_t))
 
     # Convert to pandas dataframes
     data = {'seq_len': X_len, 'image_path': X_path, 'pose': Y}
-    df = pd.DataFrame(data, columns = ['seq_len', 'image_path', 'pose'])
+    df = pd.DataFrame(data, columns=['seq_len', 'image_path', 'pose'])
     # Shuffle through all videos
     if shuffle:
         df = df.sample(frac=1)
@@ -77,7 +78,8 @@ def get_data_info(folder_list, seq_len_range, overlap, sample_times=1, pad_y=Fal
     return df
 
 
-def get_partition_data_info(partition, folder_list, seq_len_range, overlap, sample_times=1, pad_y=False, shuffle=False, sort=True):
+def get_partition_data_info(partition, folder_list, seq_len_range, overlap, sample_times=1, pad_y=False, shuffle=False,
+                            sort=True):
     X_path = [[], []]
     Y = [[], []]
     X_len = [[], []]
@@ -90,10 +92,9 @@ def get_partition_data_info(partition, folder_list, seq_len_range, overlap, samp
             fpaths = glob.glob(os.path.join(par.image_dir, folder, "*.png"))
             fpaths.sort()
 
-
             # Get the middle section as validation set
-            n_val = int((1-partition)*len(fpaths))
-            st_val = int((len(fpaths)-n_val)/2)
+            n_val = int((1 - partition) * len(fpaths))
+            st_val = int((len(fpaths) - n_val) / 2)
             ed_val = st_val + n_val
             print('st_val: {}, ed_val:{}'.format(st_val, ed_val))
             if part == 1:
@@ -104,7 +105,7 @@ def get_partition_data_info(partition, folder_list, seq_len_range, overlap, samp
                 poses = np.concatenate((poses[:st_val], poses[ed_val:]), axis=0)
 
             # Random Segment
-            assert(overlap < min(seq_len_range))
+            assert (overlap < min(seq_len_range))
             n_frames = len(fpaths)
             min_len, max_len = seq_len_range[0], seq_len_range[1]
             for i in range(sample_times):
@@ -112,24 +113,24 @@ def get_partition_data_info(partition, folder_list, seq_len_range, overlap, samp
                 while True:
                     n = np.random.random_integers(min_len, max_len)
                     if start + n < n_frames:
-                        x_seg = fpaths[start:start+n]
+                        x_seg = fpaths[start:start + n]
                         X_path[part].append(x_seg)
                         if not pad_y:
-                            Y[part].append(poses[start:start+n])
+                            Y[part].append(poses[start:start + n])
                         else:
-                            pad_zero = np.zeros((max_len-n, 6))
-                            padded = np.concatenate((poses[start:start+n], pad_zero))
+                            pad_zero = np.zeros((max_len - n, 6))
+                            padded = np.concatenate((poses[start:start + n], pad_zero))
                             Y[part].append(padded.tolist())
                     else:
-                        print('Last %d frames is not used' %(start+n-n_frames))
+                        print('Last %d frames is not used' % (start + n - n_frames))
                         break
                     start += n - overlap
                     X_len[part].append(len(x_seg))
-            print('Folder {} finish in {} sec'.format(folder, time.time()-start_t))
+            print('Folder {} finish in {} sec'.format(folder, time.time() - start_t))
 
         # Convert to pandas dataframes
         data = {'seq_len': X_len[part], 'image_path': X_path[part], 'pose': Y[part]}
-        df = pd.DataFrame(data, columns = ['seq_len', 'image_path', 'pose'])
+        df = pd.DataFrame(data, columns=['seq_len', 'image_path', 'pose'])
         # Shuffle through all videos
         if shuffle:
             df = df.sample(frac=1)
@@ -166,7 +167,7 @@ class SortedRandomBatchSampler(Sampler):
             if not self.drop_last and n_sample % self.batch_size != 0:
                 n_batch += 1
             rand_idxs = (start_idx + torch.randperm(n_sample)).tolist()
-            tmp = [rand_idxs[s*self.batch_size: s*self.batch_size+self.batch_size] for s in range(0, n_batch)]
+            tmp = [rand_idxs[s * self.batch_size: s * self.batch_size + self.batch_size] for s in range(0, n_batch)]
             list_batch_indexes += tmp
             start_idx += n_sample
         return iter(list_batch_indexes)
@@ -176,7 +177,8 @@ class SortedRandomBatchSampler(Sampler):
 
 
 class ImageSequenceDataset(Dataset):
-    def __init__(self, info_dataframe, resize_mode='crop', new_sizeize=None, img_mean=None, img_std=(1,1,1), minus_point_5=False):
+    def __init__(self, info_dataframe, resize_mode='crop', new_sizeize=None, img_mean=None, img_std=(1, 1, 1),
+                 minus_point_5=False):
         # Transforms
         transform_ops = []
         if resize_mode == 'crop':
@@ -184,7 +186,7 @@ class ImageSequenceDataset(Dataset):
         elif resize_mode == 'rescale':
             transform_ops.append(transforms.Resize((new_sizeize[0], new_sizeize[1])))
         transform_ops.append(transforms.ToTensor())
-        #transform_ops.append(transforms.Normalize(mean=img_mean, std=img_std))
+        # transform_ops.append(transforms.Normalize(mean=img_mean, std=img_std))
         self.transformer = transforms.Compose(transform_ops)
         self.minus_point_5 = minus_point_5
         self.normalizer = transforms.Normalize(mean=img_mean, std=img_std)
@@ -195,12 +197,22 @@ class ImageSequenceDataset(Dataset):
         self.groundtruth_arr = np.asarray(self.data_info.pose)
 
     def __getitem__(self, index):
-        groundtruth_sequence = self.groundtruth_arr[index]
-        groundtruth_sequence = torch.FloatTensor(groundtruth_sequence)
-        groundtruth_sequence[1:] = groundtruth_sequence[1:] - groundtruth_sequence[0:-1]  # get relative pose w.r.t. previois frame
+        gt_poses = self.groundtruth_arr[index]
+
+        # transform
+        gt_rel_poses = []
+        for i in range(1, len(gt_poses)):
+            T_i_vkm1 = gt_poses[i - 1]
+            T_i_vk = gt_poses[i]
+            T_vkm1_k = se3_math.reorthogonalize_SE3(np.linalg.inv(T_i_vkm1).dot(T_i_vk))
+            r_vk_vkm1_vkm1 = T_vkm1_k[0:3, 3]  # get the translation from T
+            phi_vkm1_vk = se3_math.log_map_SO3(T_vkm1_k[0:3, 0:3])
+            gt_rel_poses.append(np.concatenate([r_vk_vkm1_vkm1, phi_vkm1_vk,]))
+
+        gt_rel_poses = torch.FloatTensor(gt_rel_poses)
 
         image_path_sequence = self.image_arr[index]
-        sequence_len = torch.tensor(self.seq_len_list[index])  #sequence_len = torch.tensor(len(image_path_sequence))
+        sequence_len = torch.tensor(self.seq_len_list[index])  # sequence_len = torch.tensor(len(image_path_sequence))
 
         image_sequence = []
         for img_path in image_path_sequence:
@@ -212,38 +224,7 @@ class ImageSequenceDataset(Dataset):
             img_as_tensor = img_as_tensor.unsqueeze(0)
             image_sequence.append(img_as_tensor)
         image_sequence = torch.cat(image_sequence, 0)
-        return (sequence_len, image_sequence, groundtruth_sequence)
+        return sequence_len, image_sequence, gt_rel_poses
 
     def __len__(self):
         return len(self.data_info.index)
-
-
-
-# Example of usage
-if __name__ == '__main__':
-    start_t = time.time()
-    # Gernerate info dataframe
-    overlap = 1
-    sample_times = 1
-    folder_list = ['00']
-    seq_len_range = [5, 7]
-    df = get_data_info(folder_list, seq_len_range, overlap, sample_times)
-    print('Elapsed Time (get_data_info): {} sec'.format(time.time()-start_t))
-    # Customized Dataset, Sampler
-    n_workers = 4
-    resize_mode = 'crop'
-    new_size = (150, 600)
-    img_mean = (-0.14968217427134656, -0.12941663107068363, -0.1320610301921484)
-    dataset = ImageSequenceDataset(df, resize_mode, new_size, img_mean)
-    sorted_sampler = SortedRandomBatchSampler(df, batch_size=4, drop_last=True)
-    dataloader = DataLoader(dataset, batch_sampler=sorted_sampler, num_workers=n_workers)
-    print('Elapsed Time (dataloader): {} sec'.format(time.time()-start_t))
-
-    for batch in dataloader:
-        s, x, y = batch
-        print('='*50)
-        print('len:{}\nx:{}\ny:{}'.format(s, x.shape, y.shape))
-
-    print('Elapsed Time: {} sec'.format(time.time()-start_t))
-    print('Number of workers = ', n_workers)
-
