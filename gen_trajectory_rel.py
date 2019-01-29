@@ -27,7 +27,7 @@ M_deepvo.eval()
 
 logger.log_parameters()
 
-logger.print("Testing sequences: \n" + "\n".join(sequences))
+logger.print("Sequences: \n" + "\n".join(sequences))
 
 seq_len_range = (2, 2,)
 for seq in sequences:
@@ -48,6 +48,9 @@ for seq in sequences:
         print('%d/%d (%.2f%%)' % (i, len(dataloader), i * 100 / len(dataloader)), end="\r")
         _, x, _ = batch
         predicted_rel_poses, lstm_states = M_deepvo.forward(x.cuda(), lstm_states)
+        lstm_states = list(lstm_states)
+        lstm_states[0] = lstm_states[0].detach()
+        lstm_states[1] = lstm_states[1].detach()
         predicted_rel_poses = predicted_rel_poses.detach().cpu().numpy()
 
         for rel_pose in predicted_rel_poses[-1]:  # select the only batch
