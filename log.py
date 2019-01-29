@@ -18,12 +18,22 @@ class Logger(object):
 
     def __init__(self):
 
-        # create directory to save the run
-        if not os.path.exists(par.results_dir):
-            os.makedirs(par.results_dir)
+        self.working_dir = None
+        self.tensorboard = None
+        self.record_file_handle = None
 
-        self.record_file_handle = open(par.record_path, "a")
-        self.tensorboard = SummaryWriter(os.path.join(par.results_dir))
+    def initialize(self, working_dir, use_tensorboard):
+        self.working_dir = working_dir
+
+        # create directory to save the run
+        if not os.path.exists(self.working_dir):
+            os.makedirs(self.working_dir)
+
+        self.record_file_handle = open(os.path.join(self.working_dir, "record.txt"), "a")
+        if use_tensorboard:
+            self.tensorboard = SummaryWriter(os.path.join(self.working_dir))
+        else:
+            self.tensorboard = None
 
     def log_parameters(self):
         # Write all hyperparameters
@@ -33,26 +43,26 @@ class Logger(object):
         parameters_str += '\n' + '=' * 50
         self.print(parameters_str)
 
-    def log_files(self):
+    def log_source_files(self):
         # log files
         files_to_log = []
         for filename in glob.iglob(os.path.join(par.project_dir, "**"), recursive=True):
             if "/results/" not in filename and filename.endswith(".py"):
                 files_to_log.append(filename)
 
-        Logger.log_file_content(par.results_dir, files_to_log)
+        Logger.log_file_content(self.working_dir, files_to_log)
 
         # log git commit number and status
         git_commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=par.project_dir).decode(
                 'ascii').strip()
         git_status_output = subprocess.check_output(['git', 'status'], cwd=par.project_dir).decode('ascii')
-        git_file = open(os.path.join(par.results_dir, git_commit_hash), 'w')
+        git_file = open(os.path.join(self.working_dir, git_commit_hash), 'w')
         git_file.write(git_status_output)
         git_file.close()
 
         # log git diff
         diff_ret = subprocess.check_output(['git', '--no-pager', 'diff'], cwd=par.project_dir).decode('ascii')
-        diff_file = open(os.path.join(par.results_dir, 'diff'), "w")
+        diff_file = open(os.path.join(self.working_dir, 'diff'), "w")
         diff_file.write(diff_ret)
         diff_file.close()
 
@@ -65,6 +75,10 @@ class Logger(object):
         self.record_file_handle.write(string)
         self.record_file_handle.write("\n")
         self.record_file_handle.flush()
+
+    def get_tensorboard(self):
+        assert (self.tensorboard is not None)
+        return self.tensorboard
 
     @staticmethod
     def make_dir_if_not_exist(path):

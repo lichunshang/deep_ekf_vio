@@ -89,7 +89,6 @@ class Parameters(object):
                 self.seq_len[1], self.batch_size, self.rnn_hidden_size,
                 '_'.join([k + str(v) for k, v in self.optim.items()]), self.resume_t_or_v)
 
-        self.record_path = os.path.join(self.results_dir, "record.txt")
         self.save_model_path = os.path.join(self.results_dir, "saved.model")
         self.save_optimizer_path = os.path.join(self.results_dir, "saved.optimizer")
 

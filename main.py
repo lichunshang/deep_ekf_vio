@@ -12,6 +12,7 @@ from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDa
 from log import logger
 
 np.set_printoptions(linewidth=1024)
+logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
 
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
@@ -22,7 +23,7 @@ logger.print("Train description: ", train_description)
 logger.tensorboard.add_text("description", train_description)
 
 logger.log_parameters()
-logger.log_files()
+logger.log_source_files()
 
 # set the visible GPUs
 if gpu_ids:

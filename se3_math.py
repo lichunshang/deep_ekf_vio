@@ -3,7 +3,9 @@ from log import logger
 import transformations
 
 
-def skew(v):
+def skew3(v):
+    assert (len(v.shape) == 1 and v.shape[0] == 3)
+
     m = np.zeros([3, 3])
     m[0, 1] = -v[2]
     m[0, 2] = v[1]
@@ -16,29 +18,60 @@ def skew(v):
     return m
 
 
-def unskew(m):
+def unskew3(m):
+    assert (m.shape[0] == 3 and m.shape[1] == 3)
     return np.array([m[2, 1], m[0, 2], m[1, 0]])
 
 
-def log_map_SO3(R):
-    assert (len(R.shape) == 2 and R.shape[0] == 3 and R.shape[1] == 3)
+def log_SO3(C):
+    assert (len(C.shape) == 2 and C.shape[0] == 3 and C.shape[1] == 3)
 
-    arccos = (np.trace(R) - 1) / 2
+    arccos = (np.trace(C) - 1) / 2
 
     if np.abs(arccos) > 1:
         phi = 0.0
         logger.print("WARNING: invalid arccos: %f\n" % arccos)
-        logger.print("%s\n" % str(R))
+        logger.print("%s\n" % str(C))
     else:
-        phi = np.arccos((np.trace(R) - 1) / 2)
+        phi = np.arccos((np.trace(C) - 1) / 2)
 
     if abs(phi) > 1e-12:
-        u = unskew(R - np.transpose(R)) / (2 * np.sin(phi))
+        u = unskew3(C - np.transpose(C)) / (2 * np.sin(phi))
         theta = phi * u
     else:
-        theta = 0.5 * unskew(R - R.transpose())
+        theta = 0.5 * unskew3(C - C.transpose())
 
     return theta
+
+
+def exp_SO3(phi):
+    phi_norm = np.linalg.norm(phi)
+    if np.abs(phi_norm) > 1e-12:
+        unit_phi = phi / phi_norm
+        unit_phi_skewed = skew3(unit_phi)
+        m = np.eye(3, 3) + np.sin(phi_norm) * unit_phi_skewed + \
+            (1 - np.cos(phi_norm)) * unit_phi_skewed.dot(unit_phi_skewed)
+    else:
+        phi_skewed = skew3(phi)
+        m = np.eye(3, 3) + phi_skewed + 0.5 * phi_skewed.dot(phi_skewed)
+
+    return m
+
+
+def C_from_T(T):
+    return T[0:3, 0:3]
+
+
+def r_from_T(T):
+    return T[0:3, 3]
+
+
+def T_from_Ct(C, r):
+    T = np.eye(4, 4)
+    T[0:3, 0:3] = C
+    T[0:3, 3] = r
+
+    return T
 
 
 # reorthogonalize the SO(3) part of SE(3) by normalizing a quaternion

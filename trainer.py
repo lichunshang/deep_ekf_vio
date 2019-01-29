@@ -13,7 +13,7 @@ class Trainer(object):
         self.clip = par.clip
 
     def get_loss(self, x, y):
-        predicted = self.model.forward(x)
+        predicted, _ = self.model.forward(x)
 
         # Weighted MSE Loss
         angle_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:6], y[:, :, 3:6])

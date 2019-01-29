@@ -82,10 +82,9 @@ class DeepVO(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def forward(self, x):
+    def forward(self, x, lstm_init_state=None):
         # x: (batch, seq_len, channel, width, height)
         # stack_image
-        orig_x = x
         x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
         batch_size = x.size(0)
         seq_len = x.size(1)
@@ -95,10 +94,10 @@ class DeepVO(nn.Module):
         x = x.view(batch_size, seq_len, -1)
 
         # RNN
-        out, hc = self.rnn(x)
+        out, lstm_state = self.rnn(x, lstm_init_state)
         out = self.rnn_drop_out(out)
         out = self.linear(out)
-        return out
+        return out, lstm_state
 
     def encode_image(self, x):
         out_conv2 = self.conv2(self.conv1(x))
