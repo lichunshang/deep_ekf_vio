@@ -79,7 +79,7 @@ class Logger(object):
         self.record_file_handle.flush()
 
     def log_training_state(self, tag, epoch, model_state_dict, optimizer_state_dict=None):
-        logger.print('Save model at ep %d, type: %d' % (epoch, tag))
+        logger.print('Save model at ep %d, type: %s' % (epoch, tag))
         torch.save(model_state_dict, os.path.join(self.working_dir, "saved_model.%s" % tag))
         if optimizer_state_dict:
             torch.save(optimizer_state_dict, os.path.join(self.working_dir, "saved_optimizer.%s" % tag))

@@ -159,4 +159,4 @@ for epoch in range(par.epochs):
         min_loss_t = loss_mean
         logger.log_training_state("train", epoch + 1, e2e_vio_model.state_dict())
 
-    logger.print("Latest saves:", " ".join(["%s: %s" % (k, v) for k, v in logger.log_training_state_latest_epoch]))
+    logger.print("Latest saves:", " ".join(["%s: %s" % (k, v) for k, v in logger.log_training_state_latest_epoch.items()]))
