@@ -3,6 +3,8 @@ import os
 import shutil
 import glob
 import subprocess
+import torch
+import collections
 from tensorboardX import SummaryWriter
 from params import par
 
@@ -17,10 +19,10 @@ class Logger(object):
         return Logger.__instance
 
     def __init__(self):
-
         self.working_dir = None
         self.tensorboard = None
         self.record_file_handle = None
+        self.log_training_state_latest_epoch = collections.OrderedDict()
 
     def initialize(self, working_dir, use_tensorboard):
         self.working_dir = working_dir
@@ -67,7 +69,7 @@ class Logger(object):
         diff_file.close()
 
     def print(self, *args):
-        string = " ".join(args)
+        string = " ".join([str(arg) for arg in args])
         sys.stdout.write(string)
         sys.stdout.write("\n")
         sys.stdout.flush()
@@ -75,6 +77,14 @@ class Logger(object):
         self.record_file_handle.write(string)
         self.record_file_handle.write("\n")
         self.record_file_handle.flush()
+
+    def log_training_state(self, tag, epoch, model_state_dict, optimizer_state_dict=None):
+        logger.print('Save model at ep %d, type: %d' % (epoch, tag))
+        torch.save(model_state_dict, os.path.join(self.working_dir, "saved_model.%s" % tag))
+        if optimizer_state_dict:
+            torch.save(optimizer_state_dict, os.path.join(self.working_dir, "saved_optimizer.%s" % tag))
+
+        self.log_training_state_latest_epoch[tag] = epoch
 
     def get_tensorboard(self):
         assert (self.tensorboard is not None)

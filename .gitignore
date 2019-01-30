@@ -16,3 +16,4 @@ train_data
 test_data
 *.pyc
 *.m~
+datainfo

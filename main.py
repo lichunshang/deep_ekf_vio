@@ -146,26 +146,17 @@ for epoch in range(par.epochs):
     loss_mean_valid /= len(valid_dl)
     logger.tensorboard.add_scalar("val_loss/epochs", loss_mean_valid, epoch)
 
-    # Save records
-    logger.print('Epoch {}\ntrain loss mean: {}, '
-                 'std: {:.2f}\nvalid loss mean: {}, '
-                 'std: {:.2f}\n'.format(epoch + 1, loss_mean,
-                                        np.std(t_loss_list),
-                                        loss_mean_valid,
-                                        np.std(v_loss_list)))
+    logger.print('Epoch {}\ntrain loss mean: {}, std: {}\nvalid loss mean: {}, std: {}\n'.
+                 format(epoch + 1, loss_mean, np.std(t_loss_list), loss_mean_valid, np.std(v_loss_list)))
 
     # Save model
     if (epoch + 1) % 5 == 0:
-        logger.print('Save model at ep {}, checkpoint'.format(epoch + 1))  # use 4.6 sec
-        torch.save(e2e_vio_model.state_dict(), par.save_model_path + '.checkpoint')
-        torch.save(optimizer.state_dict(), par.save_optimizer_path + '.checkpoint')
+        logger.log_training_state("checkpoint", epoch + 1, e2e_vio_model.state_dict(), optimizer.state_dict())
     elif loss_mean_valid < min_loss_v:
         min_loss_v = loss_mean_valid
-        logger.print('Save model at ep {}, mean of valid loss: {}'.format(epoch + 1, loss_mean_valid))  # use 4.6 sec
-        torch.save(e2e_vio_model.state_dict(), par.save_model_path + '.valid')
-        torch.save(optimizer.state_dict(), par.save_optimizer_path + '.valid')
+        logger.log_training_state("valid", epoch + 1, e2e_vio_model.state_dict())
     elif loss_mean < min_loss_t and epoch:
         min_loss_t = loss_mean
-        logger.print('Save model at ep {}, mean of train loss: {}'.format(epoch + 1, loss_mean))
-        torch.save(e2e_vio_model.state_dict(), par.save_model_path + '.train')
-        torch.save(optimizer.state_dict(), par.save_optimizer_path + '.train')
+        logger.log_training_state("train", epoch + 1, e2e_vio_model.state_dict())
+
+    logger.print("Latest saves:", " ".join(["%s: %s" % (k, v) for k, v in logger.log_training_state_latest_epoch]))

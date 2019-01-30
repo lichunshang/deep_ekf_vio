@@ -28,8 +28,12 @@ def log_SO3(C):
 
     arccos = (np.trace(C) - 1) / 2
 
-    if np.abs(arccos) > 1:
+    if arccos > 1:
         phi = 0.0
+        logger.print("WARNING: invalid arccos: %f\n" % arccos)
+        logger.print("%s\n" % str(C))
+    elif arccos < -1:
+        phi = np.pi
         logger.print("WARNING: invalid arccos: %f\n" % arccos)
         logger.print("%s\n" % str(C))
     else:
