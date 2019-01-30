@@ -152,10 +152,10 @@ for epoch in range(par.epochs):
     # Save model
     if (epoch + 1) % 5 == 0:
         logger.log_training_state("checkpoint", epoch + 1, e2e_vio_model.state_dict(), optimizer.state_dict())
-    elif loss_mean_valid < min_loss_v:
+    if loss_mean_valid < min_loss_v:
         min_loss_v = loss_mean_valid
         logger.log_training_state("valid", epoch + 1, e2e_vio_model.state_dict())
-    elif loss_mean < min_loss_t and epoch:
+    if loss_mean < min_loss_t and epoch:
         min_loss_t = loss_mean
         logger.log_training_state("train", epoch + 1, e2e_vio_model.state_dict())
 

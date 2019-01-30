@@ -46,6 +46,7 @@ for seq in sequences:
 
     df = get_data_info(folder_list=[seq], seq_len_range=seq_len_range, overlap=1, sample_times=1, shuffle=False,
                        sort=False)
+    # df = df.loc[df.seq_len == seq_len_range[0]]
     dataset = ImageSequenceDataset(df, par.resize_mode, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                    par.minus_point_5)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
