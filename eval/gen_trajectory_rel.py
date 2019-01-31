@@ -1,3 +1,4 @@
+import setup
 import numpy as np
 import torch
 import os
@@ -50,6 +51,7 @@ for seq in sequences:
     dataset = ImageSequenceDataset(df, par.resize_mode, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                    par.minus_point_5)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
+    gt_abs_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
 
     predicted_abs_poses = [np.eye(4, 4), ]
     errors = [np.zeros([6, 1, ]), ]
@@ -71,4 +73,6 @@ for seq in sequences:
             predicted_abs_poses.append(T_i_vk)
 
     np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "est_poses", seq + ".npy")), predicted_abs_poses)
+    np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "gt_poses", seq + ".npy")),
+            gt_abs_poses[:len(predicted_abs_poses)])  # ensure same length as est poses
     logger.print("Done, took %.2f seconds" % (time.time() - start_time))

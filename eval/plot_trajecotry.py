@@ -1,7 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
+# noinspection PyUnresolvedReferences
+import setup
 import os
 import sys
+import numpy as np
+import matplotlib.pyplot as plt
 import se3_math
 from params import par
 from log import logger, Logger

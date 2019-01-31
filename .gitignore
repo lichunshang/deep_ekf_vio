@@ -17,3 +17,5 @@ test_data
 *.pyc
 *.m~
 datainfo
+*.gch
+kitti_eval/cpp/evaluate_odometry
