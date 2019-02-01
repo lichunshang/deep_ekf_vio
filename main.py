@@ -3,12 +3,11 @@ from torch.utils.data import DataLoader
 import numpy as np
 import os
 import time
-import pandas as pd
 import trainer
 import argparse
 from params import par
 from model import DeepVO
-from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDataset, get_partition_data_info
+from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDataset
 from log import logger
 
 np.set_printoptions(linewidth=1024)
@@ -31,30 +30,29 @@ if gpu_ids:
     logger.print("CUDA_VISIVLE_DEVICES: %s" % os.environ["CUDA_VISIBLE_DEVICES"])
 
 # Prepare Data
-if os.path.isfile(par.train_data_info_path) and os.path.isfile(par.valid_data_info_path):
-    logger.print('Load data info from {}'.format(par.train_data_info_path))
-    train_df = pd.read_pickle(par.train_data_info_path)
-    valid_df = pd.read_pickle(par.valid_data_info_path)
-else:
-    logger.print('Create new data info')
+logger.print('Creating new data info')
 
-    train_df = get_data_info(folder_list=par.train_video, seq_len_range=par.seq_len, overlap=1,
-                             sample_times=par.sample_times)
-    valid_df = get_data_info(folder_list=par.valid_video, seq_len_range=par.seq_len, overlap=1,
-                             sample_times=par.sample_times)
-    # save the data info
-    train_df.to_pickle(par.train_data_info_path)
-    valid_df.to_pickle(par.valid_data_info_path)
+train_df = get_data_info(sequences=par.train_video, seq_len_range=par.seq_len, overlap=1,
+                         sample_times=par.sample_times)
+valid_df = get_data_info(sequences=par.valid_video, seq_len_range=par.seq_len, overlap=1,
+                         sample_times=par.sample_times)
+# save the data info
+train_df.to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
+valid_df.to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
 
 train_sampler = SortedRandomBatchSampler(train_df, par.batch_size, drop_last=True)
 train_dataset = ImageSequenceDataset(train_df, par.resize_mode, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                      par.minus_point_5)
-train_dl = DataLoader(train_dataset, batch_sampler=train_sampler, num_workers=par.n_processors, pin_memory=par.pin_mem)
+train_dl = DataLoader(train_dataset, batch_sampler=train_sampler, num_workers=par.n_processors,
+                      pin_memory=par.pin_mem)
 
 valid_sampler = SortedRandomBatchSampler(valid_df, par.batch_size, drop_last=True)
 valid_dataset = ImageSequenceDataset(valid_df, par.resize_mode, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                      par.minus_point_5)
-valid_dl = DataLoader(valid_dataset, batch_sampler=valid_sampler, num_workers=par.n_processors, pin_memory=par.pin_mem)
+valid_dl = DataLoader(valid_dataset, batch_sampler=valid_sampler, num_workers=par.n_processors,
+                      pin_memory=par.pin_mem)
+
+a = iter(valid_dl).next()
 
 logger.print('Number of samples in training dataset: %d' % len(train_df.index))
 logger.print('Number of samples in validation dataset: %d' % len(valid_df.index))
@@ -113,7 +111,7 @@ for epoch in range(par.epochs):
     loss_mean = 0
     t_loss_list = []
     count = 0
-    for _, t_x, t_y in train_dl:
+    for meta_data, t_x, t_y in train_dl:
         print("%d/%d (%.2f%%)" % (count, len(train_dl), 100 * count / len(train_dl)), end='\r')
         t_x = t_x.cuda(non_blocking=par.pin_mem)
         t_y = t_y.cuda(non_blocking=par.pin_mem)

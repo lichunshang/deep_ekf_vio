@@ -37,7 +37,7 @@ class Parameters(object):
         self.img_stds = (1, 1, 1)  # (0.309122, 0.315710, 0.3226514)
         self.minus_point_5 = True
 
-        self.seq_len = (5, 7)
+        self.seq_len = (8, 8)
         self.sample_times = 3
 
         # Data info path

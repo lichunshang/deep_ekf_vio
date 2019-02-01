@@ -57,12 +57,15 @@ def get_data_info(sequences, seq_len_range, overlap, sample_times=1, pad_y=False
                 subseq_seq_list += subseq_seq
                 subseq_type_list += subseq_type
                 subseq_id_list += subseq_ids
+
+                # ensure all sequence length are the same
+                assert (subseq_len_list.count(seq_len) == len(subseq_len_list))
         print('Folder {} finish in {} sec'.format(seq, time.time() - start_t))
 
     # Convert to pandas dataframes
     data = {'seq_len': subseq_len_list, 'image_path': subseq_image_path_list, "seq": subseq_seq_list,
             "type": subseq_type_list, "id": subseq_id_list, 'pose': subseq_gt_pose_list}
-    df = pd.DataFrame(data, columns=['seq_len', 'image_path', 'pose'])
+    df = pd.DataFrame(data, columns=data.keys())
     # Shuffle through all videos
     if shuffle:
         df = df.sample(frac=1)
@@ -149,8 +152,8 @@ class ImageSequenceDataset(Dataset):
         gt_rel_poses = torch.FloatTensor(gt_rel_poses)
 
         image_paths = self.subseq_image_path_list[index]
-        seq_len = torch.tensor(self.subseq_len_list[index])
         assert (self.subseq_len_list[index] == len(image_paths))
+        seq_len = self.subseq_len_list[index]
 
         image_sequence = []
         for img_path in image_paths:
@@ -162,7 +165,8 @@ class ImageSequenceDataset(Dataset):
             img_as_tensor = img_as_tensor.unsqueeze(0)
             image_sequence.append(img_as_tensor)
         image_sequence = torch.cat(image_sequence, 0)
-        return seq_len, seq, type, id, image_sequence, gt_rel_poses
+
+        return (seq_len, seq, type, id), image_sequence, gt_rel_poses
 
     def __len__(self):
         return len(self.data_info.index)
