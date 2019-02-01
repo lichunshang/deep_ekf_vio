@@ -9,6 +9,7 @@ def write_trj(file_handle, pose):
 
 
 def np_traj_to_kitti(working_dir):
+    logger.initialize(working_dir=working_dir, use_tensorboard=False)
     logger.print("================ CONVERT TO KITTI ================")
     logger.print("Working on directory:", working_dir)
 

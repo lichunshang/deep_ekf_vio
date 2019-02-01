@@ -406,13 +406,13 @@ void saveStats (vector<errors> err,string dir) {
   fclose(fp);
 }
 
-bool eval (const string &working_dir, const std::vector<string> &sequences, Mail* mail) {
+bool eval (const string &result_dir, const string &save_dir,
+           const std::vector<string> &sequences, Mail* mail) {
 
   // ground truth and result directories
-  string result_dir     = working_dir + "/kitti";
-  string error_dir      = result_dir + "/errors";
-  string plot_path_dir  = result_dir + "/plot_path";
-  string plot_error_dir = result_dir + "/plot_error";
+  string error_dir      = save_dir + "/errors";
+  string plot_path_dir  = save_dir + "/plot_path";
+  string plot_error_dir = save_dir + "/plot_error";
 
   // create output directories
   system(("mkdir " + error_dir).c_str());
@@ -470,7 +470,7 @@ bool eval (const string &working_dir, const std::vector<string> &sequences, Mail
     sprintf(prefix,"avg");
     saveErrorPlots(total_err,plot_error_dir,prefix);
     plotErrorPlots(plot_error_dir,prefix);
-    saveStats(total_err,result_dir);
+    saveStats(total_err,save_dir);
   }
 
   // success
@@ -480,13 +480,14 @@ bool eval (const string &working_dir, const std::vector<string> &sequences, Mail
 int32_t main (int32_t argc,char *argv[]) {
 
   // we need 2 or 4 arguments!
-   cout << "Usage: ./evaluate_odometry working_dir [sequences]" << endl;
+   cout << "Usage: ./evaluate_odometry est_gt_dir save_dir [sequences]" << endl;
 
   // read arguments
-  string working_dir = argv[1];
+  string result_dir = argv[1];
+  string save_dir = argv[2];
   std::vector<string> sequences;
 
-  for (unsigned int i = 2; i < argc; i++) {
+  for (unsigned int i = 3; i < argc; i++) {
     sequences.push_back(argv[i]);
   }
 
@@ -495,7 +496,7 @@ int32_t main (int32_t argc,char *argv[]) {
   mail->msg("Thank you for participating in our evaluation!");
 
   // run evaluation
-  bool success = eval(working_dir, sequences, mail);
+  bool success = eval(result_dir, save_dir, sequences, mail);
   // if (argc==4) mail->finalize(success,"odometry",result_sha,argv[2]);
   // else         mail->finalize(success,"odometry",result_sha);
 

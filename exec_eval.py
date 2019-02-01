@@ -2,12 +2,13 @@ import eval
 import argparse
 import sys
 import os
+from params import par
 
 script = sys.argv[1]
 args = sys.argv[2:]
 
 if script == "gen_trajectory_rel":
-    default_sequences = ["00", "01", "02", "04", "05", "06", "07", "08", "09", "10"]
+    default_sequences = par.train_video + par.valid_video
     default_seq_len = 2
     arg_parser = argparse.ArgumentParser(description='Generate trajectory')
     arg_parser.add_argument('model_file_path', type=str, help='path to the saved model state dict')

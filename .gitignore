@@ -18,4 +18,4 @@ test_data
 *.m~
 datainfo
 *.gch
-kitti_eval/cpp/evaluate_odometry
+eval/kitti_eval/cpp/evaluate_odometry
