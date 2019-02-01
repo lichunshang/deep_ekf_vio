@@ -191,12 +191,13 @@ vector<int32_t> computeRoi (vector<Matrix> &poses_gt,vector<Matrix> &poses_resul
   return roi;
 }
 
-void plotPathPlot (string dir,vector<int32_t> &roi,int32_t idx) {
+void plotPathPlot (string dir,vector<int32_t> &roi, string seq_str) {
 
   // gnuplot file name
   char command[1024];
   char file_name[256];
-  sprintf(file_name,"%02d.gp",idx);
+  const char *seq = seq_str.c_str();
+  sprintf(file_name,"%s.gp",seq);
   string full_name = dir + "/" + file_name;
 
   // create png + eps
@@ -208,10 +209,10 @@ void plotPathPlot (string dir,vector<int32_t> &roi,int32_t idx) {
     // save gnuplot instructions
     if (i==0) {
       fprintf(fp,"set term png size 900,900\n");
-      fprintf(fp,"set output \"%02d.png\"\n",idx);
+      fprintf(fp,"set output \"%s.png\"\n",seq);
     } else {
       fprintf(fp,"set term postscript eps enhanced color\n");
-      fprintf(fp,"set output \"%02d.eps\"\n",idx);
+      fprintf(fp,"set output \"%s.eps\"\n",seq);
     }
 
     fprintf(fp,"set size ratio -1\n");
@@ -219,9 +220,9 @@ void plotPathPlot (string dir,vector<int32_t> &roi,int32_t idx) {
     fprintf(fp,"set yrange [%d:%d]\n",roi[2],roi[3]);
     fprintf(fp,"set xlabel \"x [m]\"\n");
     fprintf(fp,"set ylabel \"z [m]\"\n");
-    fprintf(fp,"plot \"%02d.txt\" using 1:2 lc rgb \"#FF0000\" title 'Ground Truth' w lines,",idx);
-    fprintf(fp,"\"%02d.txt\" using 3:4 lc rgb \"#0000FF\" title 'Visual Odometry' w lines,",idx);
-    fprintf(fp,"\"< head -1 %02d.txt\" using 1:2 lc rgb \"#000000\" pt 4 ps 1 lw 2 title 'Sequence Start' w points\n",idx);
+    fprintf(fp,"plot \"%s.txt\" using 1:2 lc rgb \"#FF0000\" title 'Ground Truth' w lines,",seq);
+    fprintf(fp,"\"%s.txt\" using 3:4 lc rgb \"#0000FF\" title 'Visual Odometry' w lines,",seq);
+    fprintf(fp,"\"< head -1 %s.txt\" using 1:2 lc rgb \"#000000\" pt 4 ps 1 lw 2 title 'Sequence Start' w points\n",seq);
 
     // close file
     fclose(fp);
@@ -232,11 +233,11 @@ void plotPathPlot (string dir,vector<int32_t> &roi,int32_t idx) {
   }
 
   // create pdf and crop
-  sprintf(command,"cd %s; ps2pdf %02d.eps %02d_large.pdf",dir.c_str(),idx,idx);
+  sprintf(command,"cd %s; ps2pdf %s.eps %s_large.pdf",dir.c_str(),seq,seq);
   system(command);
-  sprintf(command,"cd %s; pdfcrop %02d_large.pdf %02d.pdf",dir.c_str(),idx,idx);
+  sprintf(command,"cd %s; pdfcrop %s_large.pdf %s.pdf",dir.c_str(),seq,seq);
   system(command);
-  sprintf(command,"cd %s; rm %02d_large.pdf",dir.c_str(),idx);
+  sprintf(command,"cd %s; rm %s_large.pdf",dir.c_str(),seq);
   system(command);
 }
 
@@ -405,7 +406,7 @@ void saveStats (vector<errors> err,string dir) {
   fclose(fp);
 }
 
-bool eval (const string &working_dir, const std::vector<string> &sequences, string Mail* mail) {
+bool eval (const string &working_dir, const std::vector<string> &sequences, Mail* mail) {
 
   // ground truth and result directories
   string result_dir     = working_dir + "/kitti";
@@ -431,8 +432,8 @@ bool eval (const string &working_dir, const std::vector<string> &sequences, stri
     sprintf(file_name,"%s.txt", seq.c_str());
 
     // read ground truth and result poses
-    vector<Matrix> poses_gt     = loadPoses(gt_dir + "/" + file_name);
-    vector<Matrix> poses_result = loadPoses(result_dir + "/" + file_name);
+    vector<Matrix> poses_gt     = loadPoses(result_dir + "/" + seq + "_gt.txt");
+    vector<Matrix> poses_result = loadPoses(result_dir + "/" + seq + "_est.txt");
 
     // plot status
     mail->msg("Processing: %s, poses: %d/%d",file_name,poses_result.size(),poses_gt.size());
@@ -454,7 +455,7 @@ bool eval (const string &working_dir, const std::vector<string> &sequences, stri
       // save + plot bird's eye view trajectories
       savePathPlot(poses_gt,poses_result,plot_path_dir + "/" + file_name);
       vector<int32_t> roi = computeRoi(poses_gt,poses_result);
-      plotPathPlot(plot_path_dir,roi,i);
+      plotPathPlot(plot_path_dir,roi,seq);
 
       // save + plot individual errors
       char prefix[256];
@@ -479,22 +480,22 @@ bool eval (const string &working_dir, const std::vector<string> &sequences, stri
 int32_t main (int32_t argc,char *argv[]) {
 
   // we need 2 or 4 arguments!
-  if (argc!=2 && argc!=4) {
-    cout << "Usage: ./eval_odometry result_sha [user_sha email]" << endl;
-    return 1;
-  }
+   cout << "Usage: ./evaluate_odometry working_dir [sequences]" << endl;
 
   // read arguments
-  string result_sha = argv[1];
+  string working_dir = argv[1];
+  std::vector<string> sequences;
+
+  for (unsigned int i = 2; i < argc; i++) {
+    sequences.push_back(argv[i]);
+  }
 
   // init notification mail
-  Mail *mail;
-  if (argc==4) mail = new Mail(argv[3]);
-  else         mail = new Mail();
+  Mail *mail = new Mail();
   mail->msg("Thank you for participating in our evaluation!");
 
   // run evaluation
-  bool success = eval(result_sha,mail);
+  bool success = eval(working_dir, sequences, mail);
   // if (argc==4) mail->finalize(success,"odometry",result_sha,argv[2]);
   // else         mail->finalize(success,"odometry",result_sha);
 
