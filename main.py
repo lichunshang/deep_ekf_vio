@@ -52,11 +52,8 @@ valid_dataset = ImageSequenceDataset(valid_df, par.resize_mode, (par.img_w, par.
 valid_dl = DataLoader(valid_dataset, batch_sampler=valid_sampler, num_workers=par.n_processors,
                       pin_memory=par.pin_mem)
 
-a = iter(valid_dl).next()
-
 logger.print('Number of samples in training dataset: %d' % len(train_df.index))
 logger.print('Number of samples in validation dataset: %d' % len(valid_df.index))
-logger.print('=' * 50)
 
 # Model
 e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)
@@ -75,15 +72,12 @@ if par.pretrained_flownet and not par.resume:
 
 # Create optimizer
 optimizer = None
-lr_scheduler = None
 if par.optim['opt'] == 'Adam':
     optimizer = torch.optim.Adam(e2e_vio_model.parameters(), lr=0.001, betas=(0.9, 0.999))
 elif par.optim['opt'] == 'Adagrad':
     optimizer = torch.optim.Adagrad(e2e_vio_model.parameters(), lr=par.optim['lr'])
-elif par.optim['opt'] == 'Cosine':
-    optimizer = torch.optim.SGD(e2e_vio_model.parameters(), lr=par.optim['lr'])
-    T_iter = par.optim['T'] * len(train_dl)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_iter, eta_min=0, last_epoch=-1)
+else:
+    raise ValueError("Invalid Optimizer Setting: ", par.optim['opt'])
 
 # Load trained DeepVO model and optimizer
 if par.resume:
@@ -118,8 +112,6 @@ for epoch in range(par.epochs):
         ls = e2e_vio_trainer.step(t_x, t_y, optimizer).data.cpu().numpy()
         t_loss_list.append(float(ls))
         loss_mean += float(ls)
-        if par.optim == 'Cosine':
-            lr_scheduler.step()
         count += 1
     logger.print('Train take {:.1f} sec'.format(time.time() - st_t))
     loss_mean /= len(train_dl)
