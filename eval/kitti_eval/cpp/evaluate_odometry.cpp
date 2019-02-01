@@ -452,16 +452,18 @@ bool eval (const string &result_dir, const string &save_dir,
     total_err.insert(total_err.end(),seq_err.begin(),seq_err.end());
 
 
-      // save + plot bird's eye view trajectories
-      savePathPlot(poses_gt,poses_result,plot_path_dir + "/" + file_name);
-      vector<int32_t> roi = computeRoi(poses_gt,poses_result);
-      plotPathPlot(plot_path_dir,roi,seq);
+    // save + plot bird's eye view trajectories
+    savePathPlot(poses_gt,poses_result,plot_path_dir + "/" + file_name);
+    vector<int32_t> roi = computeRoi(poses_gt,poses_result);
+    plotPathPlot(plot_path_dir,roi,seq);
 
-      // save + plot individual errors
-      char prefix[256];
-      sprintf(prefix,"%s", seq.c_str());
-      saveErrorPlots(seq_err,plot_error_dir,prefix);
-      plotErrorPlots(plot_error_dir,prefix);
+    // save + plot individual errors
+    char prefix[256];
+    sprintf(prefix,"%s", seq.c_str());
+    saveErrorPlots(seq_err,plot_error_dir,prefix);
+    plotErrorPlots(plot_error_dir,prefix);
+
+    cout << "finished sequence " << seq << endl;
   }
 
   // save + plot total errors + summary statistics
@@ -493,7 +495,7 @@ int32_t main (int32_t argc,char *argv[]) {
 
   // init notification mail
   Mail *mail = new Mail();
-  mail->msg("Thank you for participating in our evaluation!");
+//  mail->msg("Thank you for participating in our evaluation!");
 
   // run evaluation
   bool success = eval(result_dir, save_dir, sequences, mail);
@@ -501,6 +503,7 @@ int32_t main (int32_t argc,char *argv[]) {
   // else         mail->finalize(success,"odometry",result_sha);
 
   // send mail and exit
+  cout << "All done!" << endl;
   delete mail;
   return 0;
 }

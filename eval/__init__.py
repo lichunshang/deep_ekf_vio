@@ -1,3 +1,4 @@
 from eval.plot_trajecotry import plot_trajectory
 from eval.gen_trajectory_rel import gen_trajectory_rel
 from eval.np_traj_to_kitti import np_traj_to_kitti
+from eval.kitt_eval import kitti_eval
