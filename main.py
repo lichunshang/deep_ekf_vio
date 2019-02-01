@@ -37,15 +37,11 @@ if os.path.isfile(par.train_data_info_path) and os.path.isfile(par.valid_data_in
     valid_df = pd.read_pickle(par.valid_data_info_path)
 else:
     logger.print('Create new data info')
-    if par.partition != None:
-        partition = par.partition
-        train_df, valid_df = get_partition_data_info(partition, par.train_video, par.seq_len, overlap=1,
-                                                     sample_times=par.sample_times, shuffle=True, sort=True)
-    else:
-        train_df = get_data_info(folder_list=par.train_video, seq_len_range=par.seq_len, overlap=1,
-                                 sample_times=par.sample_times)
-        valid_df = get_data_info(folder_list=par.valid_video, seq_len_range=par.seq_len, overlap=1,
-                                 sample_times=par.sample_times)
+
+    train_df = get_data_info(folder_list=par.train_video, seq_len_range=par.seq_len, overlap=1,
+                             sample_times=par.sample_times)
+    valid_df = get_data_info(folder_list=par.valid_video, seq_len_range=par.seq_len, overlap=1,
+                             sample_times=par.sample_times)
     # save the data info
     train_df.to_pickle(par.train_data_info_path)
     valid_df.to_pickle(par.valid_data_info_path)
@@ -159,4 +155,5 @@ for epoch in range(par.epochs):
         min_loss_t = loss_mean
         logger.log_training_state("train", epoch + 1, e2e_vio_model.state_dict())
 
-    logger.print("Latest saves:", " ".join(["%s: %s" % (k, v) for k, v in logger.log_training_state_latest_epoch.items()]))
+    logger.print("Latest saves:",
+                 " ".join(["%s: %s" % (k, v) for k, v in logger.log_training_state_latest_epoch.items()]))
