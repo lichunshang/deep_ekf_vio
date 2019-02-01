@@ -23,56 +23,48 @@ def get_data_info(sequences, seq_len_range, overlap, sample_times=1, pad_y=False
     for seq in sequences:
         start_t = time.time()
         gt_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
-        fpaths = glob.glob(os.path.join(par.image_dir, seq, "*.png"))
-        fpaths.sort()
-        # Fixed seq_len
-        if seq_len_range[0] == seq_len_range[1]:
-            if sample_times > 1:
-                sample_interval = int(np.ceil(seq_len_range[0] / sample_times))
-                start_frames = list(range(0, seq_len_range[0], sample_interval))
-                print('Sample start from frame {}'.format(start_frames))
-            else:
-                start_frames = [0]
+        fpaths = sorted(glob.glob(os.path.join(par.image_dir, seq, "*.png")))
+        assert (len(gt_poses) == len(fpaths))  # make sure the number of images corresponds to number of poses
 
-            for st in start_frames:
-                seq_len = seq_len_range[0]
-                n_frames = len(fpaths) - st
-                jump = seq_len - overlap
-                res = n_frames % seq_len
-                if res != 0:
-                    n_frames = n_frames - res
+        if sample_times > 1:
+            sample_interval = int(np.ceil(seq_len_range[0] / sample_times))
+            start_frames = list(range(0, seq_len_range[0], sample_interval))
+            print('Sample start from frame {}'.format(start_frames))
+        else:
+            start_frames = [0]
 
-                subseq_image_path, subseq_gt_pose, subseq_ids = [], [], []
-                for i in range(st, n_frames, jump):
+        for st in start_frames:
+            seq_len = seq_len_range[0]
+            jump = seq_len - overlap
+
+            # The original image and data
+            subseq_image_path, subseq_gt_pose, subseq_ids = [], [], []
+            for i in range(st, len(fpaths), jump):
+                if i + seq_len <= len(fpaths):  # this will discard a few frames at the end
                     subseq_image_path.append(fpaths[i:i + seq_len])
                     subseq_gt_pose.append(gt_poses[i:i + seq_len])
                     subseq_ids.append(np.array([i, i + jump]))
 
-                subseq_type = ["normal"] * len(subseq_image_path)
-                subseq_seq = [seq] * len(subseq_image_path)
+            subseq_type = ["normal"] * len(subseq_image_path)
+            subseq_seq = [seq] * len(subseq_image_path)
 
-                subseq_gt_pose_list += subseq_gt_pose
-                subseq_image_path_list += subseq_image_path
-                subseq_len_list += [len(xs) for xs in subseq_image_path]
-                subseq_seq_list += subseq_seq
-                subseq_type_list += subseq_type
-                subseq_id_list += subseq_ids
+            # TODO Mirrors and going in reverse
 
-                # ensure all sequence length are the same
-                assert (subseq_len_list.count(seq_len) == len(subseq_len_list))
+            subseq_gt_pose_list += subseq_gt_pose
+            subseq_image_path_list += subseq_image_path
+            subseq_len_list += [len(xs) for xs in subseq_image_path]
+            subseq_seq_list += subseq_seq
+            subseq_type_list += subseq_type
+            subseq_id_list += subseq_ids
+
+            # ensure all sequence length are the same
+            assert (subseq_len_list.count(seq_len) == len(subseq_len_list))
         print('Folder {} finish in {} sec'.format(seq, time.time() - start_t))
 
     # Convert to pandas dataframes
     data = {'seq_len': subseq_len_list, 'image_path': subseq_image_path_list, "seq": subseq_seq_list,
             "type": subseq_type_list, "id": subseq_id_list, 'pose': subseq_gt_pose_list}
-    df = pd.DataFrame(data, columns=data.keys())
-    # Shuffle through all videos
-    if shuffle:
-        df = df.sample(frac=1)
-    # Sort dataframe by seq_len
-    if sort:
-        df = df.sort_values(by=['seq_len'], ascending=False)
-    return df
+    return pd.DataFrame(data, columns=data.keys())
 
 
 class SortedRandomBatchSampler(Sampler):
