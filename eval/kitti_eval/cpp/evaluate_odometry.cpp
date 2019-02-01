@@ -405,11 +405,10 @@ void saveStats (vector<errors> err,string dir) {
   fclose(fp);
 }
 
-bool eval (string working_dir, string Mail* mail) {
+bool eval (const string &working_dir, const std::vector<string> &sequences, string Mail* mail) {
 
   // ground truth and result directories
-  string gt_dir         = "/home/cs4li/Dev/KITTI/dataset/poses";
-  string result_dir     = "/home/cs4li/Dev/end_to_end_visual_odometry/results/trajectory_results/kitti_evals";
+  string result_dir     = working_dir + "/kitti";
   string error_dir      = result_dir + "/errors";
   string plot_path_dir  = result_dir + "/plot_path";
   string plot_error_dir = result_dir + "/plot_error";
@@ -422,16 +421,14 @@ bool eval (string working_dir, string Mail* mail) {
   // total errors
   vector<errors> total_err;
 
-  std::vector<int> sequences = {3, 4, 5, 6, 7, 10};
-
   // for all sequences do
   for (int32_t i_seq=0; i_seq<sequences.size(); i_seq++) {
 
-    int32_t i = sequences[i_seq];
+    string seq = sequences[i_seq];
 
     // file name
     char file_name[256];
-    sprintf(file_name,"%02d.txt",i);
+    sprintf(file_name,"%s.txt", seq.c_str());
 
     // read ground truth and result poses
     vector<Matrix> poses_gt     = loadPoses(gt_dir + "/" + file_name);
@@ -453,8 +450,6 @@ bool eval (string working_dir, string Mail* mail) {
     // add to total errors
     total_err.insert(total_err.end(),seq_err.begin(),seq_err.end());
 
-    // for first half => plot trajectory and compute individual stats
-    if (i<=15) {
 
       // save + plot bird's eye view trajectories
       savePathPlot(poses_gt,poses_result,plot_path_dir + "/" + file_name);
@@ -462,16 +457,15 @@ bool eval (string working_dir, string Mail* mail) {
       plotPathPlot(plot_path_dir,roi,i);
 
       // save + plot individual errors
-      char prefix[16];
-      sprintf(prefix,"%02d",i);
+      char prefix[256];
+      sprintf(prefix,"%s", seq.c_str());
       saveErrorPlots(seq_err,plot_error_dir,prefix);
       plotErrorPlots(plot_error_dir,prefix);
-    }
   }
 
   // save + plot total errors + summary statistics
   if (total_err.size()>0) {
-    char prefix[16];
+    char prefix[256];
     sprintf(prefix,"avg");
     saveErrorPlots(total_err,plot_error_dir,prefix);
     plotErrorPlots(plot_error_dir,prefix);

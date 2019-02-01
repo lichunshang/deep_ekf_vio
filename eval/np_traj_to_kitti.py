@@ -1,27 +1,40 @@
-import setup
-
-data_dir = os.path.join(config.save_path, "trajectory_results")
-
-sequences = ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]
+import os
+import numpy as np
+from log import Logger, logger
 
 
 def write_trj(file_handle, pose):
-    m = transformations.quaternion_matrix(pose[3:7])
-    m[0, 3] = pose[0]
-    m[1, 3] = pose[1]
-    m[2, 3] = pose[2]
-
-    m = np.concatenate(m[0:3])
-    m = m.astype(np.float32)
-    file_handle.write(" ".join(["%g" % i for i in list(m)]) + "\n")
+    pose = np.concatenate(pose[0:3])
+    file_handle.write(" ".join(["%f" % val for val in list(pose)]) + "\n")
 
 
-for seq in sequences:
-    np_file = os.path.join(data_dir, "trajectory_%s.npy" % seq)
-    kitti_file = open(os.path.join(data_dir, "kitti_evals", "%s.txt" % seq), "w")
-    trajectory = np.load(np_file)
+def np_traj_to_kitti(working_dir):
+    logger.print("================ CONVERT TO KITTI ================")
+    logger.print("Working on directory:", working_dir)
 
-    for i in range(0, trajectory.shape[0]):
-        write_trj(kitti_file, trajectory[i])
+    pose_est_dir = os.path.join(working_dir, "est_poses")
+    pose_gt_dir = os.path.join(working_dir, "gt_poses")
+    kitti_traj_output = os.path.join(working_dir, "kitti")
+    Logger.make_dir_if_not_exist(kitti_traj_output)
+    pose_est_files = sorted(os.listdir(pose_est_dir))
 
-    kitti_file.close()
+    logger.print("Found pose estimate files: \n" + "\n".join(pose_est_files))
+
+    for i, pose_est_file in enumerate(pose_est_files):
+        sequence = os.path.splitext(pose_est_file)[0]
+
+        traj_est = np.load(os.path.join(pose_est_dir, "%s.npy" % sequence))
+        traj_gt = np.load(os.path.join(pose_gt_dir, "%s.npy" % sequence))
+        kitti_est_file = open(os.path.join(kitti_traj_output, "%s_est.txt" % sequence), "w")
+        kitti_gt_file = open(os.path.join(kitti_traj_output, "%s_gt.txt" % sequence), "w")
+
+        assert (traj_est.shape[0] == traj_gt.shape[0])
+
+        for j in range(0, traj_est.shape[0]):
+            write_trj(kitti_est_file, traj_est[j, :, :])
+            write_trj(kitti_gt_file, traj_gt[j, :, :])
+
+        kitti_est_file.close()
+        kitti_gt_file.close()
+
+    logger.print("All Done.")

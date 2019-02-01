@@ -5,6 +5,7 @@ import glob
 import subprocess
 import torch
 import collections
+import time
 from tensorboardX import SummaryWriter
 from params import par
 
@@ -39,11 +40,9 @@ class Logger(object):
 
     def log_parameters(self):
         # Write all hyperparameters
-        parameters_str = ""
-        parameters_str += '\n' + '=' * 50 + '\n'
-        parameters_str += '\n'.join("%s: %s" % item for item in vars(par).items())
-        parameters_str += '\n' + '=' * 50
-        self.print(parameters_str)
+        self.print("---------- PARAMETERS -----------")
+        self.print('\n'.join("%s: %s" % item for item in vars(par).items()))
+        self.print("---------------------------------")
 
     def log_source_files(self):
         # log files
@@ -79,11 +78,11 @@ class Logger(object):
         self.record_file_handle.flush()
 
     def log_training_state(self, tag, epoch, model_state_dict, optimizer_state_dict=None):
-        logger.print('Save model at ep %d, type: %d' % (epoch, tag))
+        start_time = time.time()
         torch.save(model_state_dict, os.path.join(self.working_dir, "saved_model.%s" % tag))
         if optimizer_state_dict:
             torch.save(optimizer_state_dict, os.path.join(self.working_dir, "saved_optimizer.%s" % tag))
-
+        logger.print('Save model at ep %d, type: %d, time: %.2fs' % (epoch, tag, time.time() - start_time))
         self.log_training_state_latest_epoch[tag] = epoch
 
     def get_tensorboard(self):
