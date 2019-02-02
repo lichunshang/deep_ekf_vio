@@ -40,14 +40,6 @@ class Parameters(object):
         self.seq_len = (8, 8)
         self.sample_times = 3
 
-        # Data info path
-        self.train_data_info_path = 'datainfo/train_df_t{}_v{}_p{}_seq{}x{}_sample{}.pickle'.format(
-                ''.join(self.train_video), ''.join(self.valid_video), self.partition, self.seq_len[0], self.seq_len[1],
-                self.sample_times)
-        self.valid_data_info_path = 'datainfo/valid_df_t{}_v{}_p{}_seq{}x{}_sample{}.pickle'.format(
-                ''.join(self.train_video), ''.join(self.valid_video), self.partition, self.seq_len[0], self.seq_len[1],
-                self.sample_times)
-
         # Model
         self.rnn_hidden_size = 1000
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
@@ -88,9 +80,6 @@ class Parameters(object):
                 ''.join(self.train_video), ''.join(self.valid_video), self.img_h, self.img_w, self.seq_len[0],
                 self.seq_len[1], self.batch_size, self.rnn_hidden_size,
                 '_'.join([k + str(v) for k, v in self.optim.items()]), self.resume_t_or_v)
-
-        if not os.path.isdir(os.path.dirname(self.train_data_info_path)):
-            os.makedirs(os.path.dirname(self.train_data_info_path))
 
 
 par = Parameters.get_instance()

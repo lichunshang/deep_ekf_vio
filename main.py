@@ -7,7 +7,7 @@ import trainer
 import argparse
 from params import par
 from model import DeepVO
-from data_helper import get_data_info, SortedRandomBatchSampler, ImageSequenceDataset
+from data_helper import get_data_info, ImageSequenceDataset
 from log import logger
 
 np.set_printoptions(linewidth=1024)
@@ -40,16 +40,14 @@ valid_df = get_data_info(sequences=par.valid_video, seq_len_range=par.seq_len, o
 train_df.to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
 valid_df.to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
 
-train_sampler = SortedRandomBatchSampler(train_df, par.batch_size, drop_last=True)
 train_dataset = ImageSequenceDataset(train_df, par.resize_mode, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                      par.minus_point_5)
-train_dl = DataLoader(train_dataset, batch_sampler=train_sampler, num_workers=par.n_processors,
+train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
                       pin_memory=par.pin_mem)
 
-valid_sampler = SortedRandomBatchSampler(valid_df, par.batch_size, drop_last=True)
 valid_dataset = ImageSequenceDataset(valid_df, par.resize_mode, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                      par.minus_point_5)
-valid_dl = DataLoader(valid_dataset, batch_sampler=valid_sampler, num_workers=par.n_processors,
+valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                       pin_memory=par.pin_mem)
 
 logger.print('Number of samples in training dataset: %d' % len(train_df.index))

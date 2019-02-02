@@ -67,39 +67,24 @@ def get_data_info(sequences, seq_len_range, overlap, sample_times=1, pad_y=False
     return pd.DataFrame(data, columns=data.keys())
 
 
-class SortedRandomBatchSampler(Sampler):
-    def __init__(self, info_dataframe, batch_size, drop_last=False):
-        self.df = info_dataframe
-        self.batch_size = batch_size
-        self.drop_last = drop_last
-        self.unique_seq_lens = sorted(self.df.iloc[:].seq_len.unique(), reverse=True)
-        # Calculate len (num of batches, not num of samples)
-        self.len = 0
-        for v in self.unique_seq_lens:
-            n_sample = len(self.df.loc[self.df.seq_len == v])
-            n_batch = int(n_sample / self.batch_size)
-            if not self.drop_last and n_sample % self.batch_size != 0:
-                n_batch += 1
-            self.len += n_batch
-
-    def __iter__(self):
-
-        # Calculate number of sameples in each group (grouped by seq_len)
-        list_batch_indexes = []
-        start_idx = 0
-        for v in self.unique_seq_lens:
-            n_sample = len(self.df.loc[self.df.seq_len == v])
-            n_batch = int(n_sample / self.batch_size)
-            if not self.drop_last and n_sample % self.batch_size != 0:
-                n_batch += 1
-            rand_idxs = (start_idx + torch.randperm(n_sample)).tolist()
-            tmp = [rand_idxs[s * self.batch_size: s * self.batch_size + self.batch_size] for s in range(0, n_batch)]
-            list_batch_indexes += tmp
-            start_idx += n_sample
-        return iter(list_batch_indexes)
-
-    def __len__(self):
-        return self.len
+# class SortedRandomBatchSampler(Sampler):
+#     def __init__(self, info_dataframe, batch_size, drop_last=False):
+#         self.df = info_dataframe
+#         self.batch_size = batch_size
+#         self.drop_last = drop_last
+#
+#         assert (len(self.df.seq_len.unique()) == 1)  # ensure all sub-sequences are the same length
+#         self.num_sample = len(self.df)
+#         self.num_batch = self.num_sample // self.batch_size
+#
+#     def __iter__(self):
+#         rand_idxs = (torch.randperm(self.num_sample)).tolist()
+#         list_batch_indexes = [rand_idxs[s * self.batch_size: s * self.batch_size + self.batch_size] for s in
+#                               range(0, self.num_batch)]
+#         return iter(list_batch_indexes)
+#
+#     def __len__(self):
+#         return self.num_batch
 
 
 class ImageSequenceDataset(Dataset):
