@@ -106,7 +106,7 @@ class ImageSequenceDataset(Dataset):
                     self.image_cache[path] = img_as_tensor
                 counter += 1
                 print("Processed %d/%d (%.2f%%)" % (counter, total_images, counter / total_images * 100), end="\r")
-            logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
+        logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
 
     def __getitem__(self, index):
         gt_poses = self.subseq_gt_pose_list[index]
