@@ -82,7 +82,7 @@ class Logger(object):
         torch.save(model_state_dict, os.path.join(self.working_dir, "saved_model.%s" % tag))
         if optimizer_state_dict:
             torch.save(optimizer_state_dict, os.path.join(self.working_dir, "saved_optimizer.%s" % tag))
-        logger.print('Save model at ep %d, type: %d, time: %.2fs' % (epoch, tag, time.time() - start_time))
+        logger.print('Save model at ep %d, type: %s, time: %.2fs' % (epoch, tag, time.time() - start_time))
         self.log_training_state_latest_epoch[tag] = epoch
 
     def get_tensorboard(self):
