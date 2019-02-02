@@ -6,7 +6,7 @@ import torch
 import se3_math
 from PIL import Image
 from torch.utils.data import Dataset
-from torch.utils.data.sampler import Sampler
+from log import logger
 from torchvision import transforms
 import time
 from params import par
@@ -91,6 +91,23 @@ class ImageSequenceDataset(Dataset):
         self.subseq_seq_list = np.asarray(self.data_info.seq)
         self.subseq_id_list = np.asarray(self.data_info.id)
 
+        self.image_cache = {}
+        total_images = len(self.subseq_image_path_list[0]) * len(self.subseq_image_path_list)
+        counter = 0
+        start_t = time.time()
+        for subseq_image_path in self.subseq_image_path_list:
+            for path in subseq_image_path:
+                if path not in self.image_cache:
+                    img_as_tensor = self.transformer(Image.open(path))
+                    if self.minus_point_5:
+                        img_as_tensor = img_as_tensor - 0.5  # from [0, 1] -> [-0.5, 0.5]
+                    img_as_tensor = self.normalizer(img_as_tensor)
+                    img_as_tensor = img_as_tensor.unsqueeze(0)
+                    self.image_cache[path] = img_as_tensor
+                counter += 1
+                print("Processed %d/%d (%.2f%%)" % (counter, total_images, counter / total_images * 100), end="\r")
+            logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
+
     def __getitem__(self, index):
         gt_poses = self.subseq_gt_pose_list[index]
         type = self.subseq_type_list[index]
@@ -114,13 +131,9 @@ class ImageSequenceDataset(Dataset):
 
         image_sequence = []
         for img_path in image_paths:
-            img_as_img = Image.open(img_path)
-            img_as_tensor = self.transformer(img_as_img)
-            if self.minus_point_5:
-                img_as_tensor = img_as_tensor - 0.5  # from [0, 1] -> [-0.5, 0.5]
-            img_as_tensor = self.normalizer(img_as_tensor)
-            img_as_tensor = img_as_tensor.unsqueeze(0)
-            image_sequence.append(img_as_tensor)
+            # img_as_img = Image.open(img_path)
+            # img_as_tensor = self.transformer(img_as_img)
+            image_sequence.append(self.image_cache[img_path])
         image_sequence = torch.cat(image_sequence, 0)
 
         return (seq_len, seq, type, id), image_sequence, gt_rel_poses
