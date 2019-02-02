@@ -35,7 +35,7 @@ logger.print('Creating new data info')
 train_df = get_data_info(sequences=par.train_video, seq_len_range=par.seq_len, overlap=1,
                          sample_times=par.sample_times)
 valid_df = get_data_info(sequences=par.valid_video, seq_len_range=par.seq_len, overlap=1,
-                         sample_times=par.sample_times)
+                         sample_times=1)
 # save the data info
 train_df.to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
 valid_df.to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
@@ -105,7 +105,7 @@ for epoch in range(par.epochs):
     loss_mean = 0
     t_loss_list = []
     count = 0
-    for meta_data, t_x, t_y in train_dl:
+    for t_x_meta, t_x, t_y in train_dl:
         print("%d/%d (%.2f%%)" % (count, len(train_dl), 100 * count / len(train_dl)), end='\r')
         t_x = t_x.cuda(non_blocking=par.pin_mem)
         t_y = t_y.cuda(non_blocking=par.pin_mem)
