@@ -31,13 +31,13 @@ class Parameters(object):
 
         # Data Preprocessing
         self.resize_mode = 'rescale'  # choice: 'crop' 'rescale' None
-        self.img_w = 608  # original size is about 1226
-        self.img_h = 184  # original size is about 370
+        self.img_w = 320  # original size is about 1226
+        self.img_h = 96  # original size is about 370
         self.img_means = (-0.14968217427134656, -0.12941663107068363, -0.1320610301921484)
         self.img_stds = (1, 1, 1)  # (0.309122, 0.315710, 0.3226514)
         self.minus_point_5 = True
 
-        self.seq_len = (5, 7)
+        self.seq_len = (32, 32)
         self.sample_times = 3
 
         # Data info path
@@ -56,7 +56,7 @@ class Parameters(object):
         self.clip = None
         self.batch_norm = True
         # Training
-        self.epochs = 250
+        self.epochs = 200
         self.batch_size = 16
         self.pin_mem = True
         self.optim = {'opt': 'Adagrad', 'lr': 0.0005}
