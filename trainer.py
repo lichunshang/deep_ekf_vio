@@ -36,7 +36,12 @@ class Trainer(object):
 
         for i in range(0, num_batches):
             key = "%s_%s_%d" % (seq_list[i], type_list[i], id_list[i][-1])
-            tmp = self.lstm_state_cache[key]
+            if key in self.lstm_state_cache[key]:
+                tmp = self.lstm_state_cache[key]
+            else:
+                num_layers = self.model.rnn.num_layers
+                hidden_size = self.model.rnn.hidden_size
+                tmp = [torch.zeros([num_layers, hidden_size]), torch.zeros([num_layers, hidden_size])]
             lstm_hidden_states.append(tmp[0])
             lstm_cell_states.append(tmp[1])
 
