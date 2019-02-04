@@ -1,6 +1,6 @@
 import os
 import datetime
-
+import torch
 
 class Parameters(object):
     __instance = None
@@ -28,6 +28,9 @@ class Parameters(object):
         self.train_video = ['00', '01', '02', '05', '08', '09']
         self.valid_video = ['04', '06', '07', '10']
 
+        # self.train_video = ['04']
+        # self.valid_video = ['04']
+
         # Data Preprocessing
         self.resize_mode = 'rescale'  # choice: 'crop' 'rescale' None
         self.img_w = 320  # original size is about 1226
@@ -51,7 +54,8 @@ class Parameters(object):
         self.epochs = 200
         self.batch_size = 16
         self.pin_mem = True
-        self.optim = {'opt': 'Adagrad', 'lr': 0.0005}
+        self.optimizer = torch.optim.Adam
+        self.optimizer_args = {'lr': 0.001}
         # Choice:
         # {'opt': 'Adagrad', 'lr': 0.001}
         # {'opt': 'Adam'}
@@ -65,22 +69,6 @@ class Parameters(object):
         # './pretrained/flownets_EPE1.951.pth.tar'
         self.resume = False  # resume training
         self.resume_t_or_v = '.train'
-        self.load_model_path = 'models/t{}_v{}_im{}x{}_s{}x{}_b{}_rnn{}_{}.model{}'.format(''.join(self.train_video),
-                                                                                           ''.join(self.valid_video),
-                                                                                           self.img_h, self.img_w,
-                                                                                           self.seq_len[0],
-                                                                                           self.seq_len[1],
-                                                                                           self.batch_size,
-                                                                                           self.rnn_hidden_size,
-                                                                                           '_'.join([k + str(v) for k, v
-                                                                                                     in
-                                                                                                     self.optim.items()]),
-                                                                                           self.resume_t_or_v)
-        self.load_optimizer_path = 'models/t{}_v{}_im{}x{}_s{}x{}_b{}_rnn{}_{}.optimizer{}'.format(
-                ''.join(self.train_video), ''.join(self.valid_video), self.img_h, self.img_w, self.seq_len[0],
-                self.seq_len[1], self.batch_size, self.rnn_hidden_size,
-                '_'.join([k + str(v) for k, v in self.optim.items()]), self.resume_t_or_v)
-
 
 par = Parameters.get_instance()
 

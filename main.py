@@ -69,13 +69,7 @@ if par.pretrained_flownet and not par.resume:
     e2e_vio_model.load_state_dict(model_dict)
 
 # Create optimizer
-optimizer = None
-if par.optim['opt'] == 'Adam':
-    optimizer = torch.optim.Adam(e2e_vio_model.parameters(), lr=0.001, betas=(0.9, 0.999))
-elif par.optim['opt'] == 'Adagrad':
-    optimizer = torch.optim.Adagrad(e2e_vio_model.parameters(), lr=par.optim['lr'])
-else:
-    raise ValueError("Invalid Optimizer Setting: ", par.optim['opt'])
+optimizer = par.optimizer(e2e_vio_model.parameters(), **par.optimizer_args)
 
 # Load trained DeepVO model and optimizer
 if par.resume:
