@@ -27,7 +27,6 @@ class Parameters(object):
 
         self.train_video = ['00', '01', '02', '05', '08', '09']
         self.valid_video = ['04', '06', '07', '10']
-        self.partition = None  # partition videos in 'train_video' to train / valid dataset  #0.8
 
         # Data Preprocessing
         self.resize_mode = 'rescale'  # choice: 'crop' 'rescale' None
@@ -41,6 +40,7 @@ class Parameters(object):
         self.sample_times = 3
 
         # Model
+        self.stateful_training = True
         self.rnn_hidden_size = 1000
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5

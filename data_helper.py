@@ -43,6 +43,7 @@ def get_data_info(sequences, seq_len_range, overlap, sample_times=1, pad_y=False
                 if i + seq_len <= len(fpaths):  # this will discard a few frames at the end
                     subseq_image_path.append(fpaths[i:i + seq_len])
                     subseq_gt_pose.append(gt_poses[i:i + seq_len])
+                    # first index is the start, second is where the next sub-sequence start
                     subseq_ids.append(np.array([i, i + jump]))
 
             subseq_type = ["normal"] * len(subseq_image_path)
@@ -137,6 +138,15 @@ class ImageSequenceDataset(Dataset):
         image_sequence = torch.cat(image_sequence, 0)
 
         return (seq_len, seq, type, id), image_sequence, gt_rel_poses
+
+    @staticmethod
+    def decode_batch_meta_info(batch_meta_info):
+        seq_len_list = batch_meta_info[0]
+        seq_list = batch_meta_info[1]
+        type_list = batch_meta_info[2]
+        id_list = batch_meta_info[3]
+
+        return seq_len_list, seq_list, type_list, id_list
 
     def __len__(self):
         return len(self.data_info.index)

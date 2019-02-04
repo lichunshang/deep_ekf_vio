@@ -107,7 +107,7 @@ for epoch in range(par.epochs):
         print("%d/%d (%.2f%%)" % (count, len(train_dl), 100 * count / len(train_dl)), end='\r')
         t_x = t_x.cuda(non_blocking=par.pin_mem)
         t_y = t_y.cuda(non_blocking=par.pin_mem)
-        ls = e2e_vio_trainer.step(t_x, t_y, optimizer).data.cpu().numpy()
+        ls = e2e_vio_trainer.step(t_x_meta, t_x, t_y, optimizer).data.cpu().numpy()
         t_loss_list.append(float(ls))
         loss_mean += float(ls)
         count += 1
@@ -120,10 +120,10 @@ for epoch in range(par.epochs):
     e2e_vio_model.eval()
     loss_mean_valid = 0
     v_loss_list = []
-    for _, v_x, v_y in valid_dl:
+    for v_x_meta, v_x, v_y in valid_dl:
         v_x = v_x.cuda(non_blocking=par.pin_mem)
         v_y = v_y.cuda(non_blocking=par.pin_mem)
-        v_ls = e2e_vio_trainer.get_loss(v_x, v_y).data.cpu().numpy()
+        v_ls = e2e_vio_trainer.get_loss(v_x_meta, v_x, v_y).data.cpu().numpy()
         v_loss_list.append(float(v_ls))
         loss_mean_valid += float(v_ls)
     logger.print('Valid take {:.1f} sec'.format(time.time() - st_t))
