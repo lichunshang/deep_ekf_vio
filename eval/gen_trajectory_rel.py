@@ -63,3 +63,5 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len):
         np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "gt_poses", seq + ".npy")),
                 gt_abs_poses[:len(predicted_abs_poses)])  # ensure same length as est poses
         logger.print("Done, took %.2f seconds" % (time.time() - start_time))
+
+    return working_dir

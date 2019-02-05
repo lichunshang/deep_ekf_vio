@@ -10,7 +10,7 @@ top_level_arg_parser.add_argument('script', type=str, help='The program to run',
 top_level_arg_parsed, args = top_level_arg_parser.parse_known_args()
 
 if top_level_arg_parsed.script == "gen_trajectory_rel":
-    default_sequences = par.train_video + par.valid_video
+    default_sequences = par.train_seqs + par.valid_seqs
     default_seq_len = 2
     arg_parser = argparse.ArgumentParser(description='Generate trajectory')
     arg_parser.add_argument('model_file_path', type=str, help='path to the saved model state dict')
@@ -37,9 +37,9 @@ elif top_level_arg_parsed.script == "kitti_eval":
     arg_parser = argparse.ArgumentParser(description='KITTI evaluation')
     arg_parser.add_argument('working_dir', type=str, help='path to the saved model state dict')
     arg_parser.add_argument('--train_seqs', type=str, nargs="+", help="Select training sequences",
-                            default=par.train_video)
+                            default=par.train_seqs)
     arg_parser.add_argument('--val_seqs', type=str, nargs="+", help="Select validation sequences",
-                            default=par.valid_video)
+                            default=par.valid_seqs)
     arg_parsed = arg_parser.parse_args(args=args)
     eval.kitti_eval(arg_parsed.working_dir, arg_parsed.train_seqs, arg_parsed.val_seqs)
 

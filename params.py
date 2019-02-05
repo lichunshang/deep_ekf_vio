@@ -20,10 +20,10 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        # self.train_video = ['00', '01', '02', '05', '08', '09']
-        # self.valid_video = ['04', '06', '07', '10']
-        self.train_video = ['04']
-        self.valid_video = ['06']
+        self.train_seqs = ['00', '01', '02', '05', '08', '09']
+        self.valid_seqs = ['04', '06', '07', '10']
+        # self.train_seqs = ['04']
+        # self.valid_seqs = ['06']
 
         # Data Preprocessing
         self.img_w = 320  # original size is about 1226
@@ -65,7 +65,7 @@ class Parameters(object):
         # './pretrained/flownets_EPE1.951.pth.tar'
 
         # validation
-        assert (len(list(set(self.train_video) & set(self.valid_video))) == 0)
+        assert (len(list(set(self.train_seqs) & set(self.valid_seqs))) == 0)
 
     @staticmethod
     def get_instance():
