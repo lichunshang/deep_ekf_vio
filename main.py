@@ -15,12 +15,12 @@ logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
 
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
-arg_parser.add_argument('--resume_model_from', type=str, nargs=1, help="path of model state to resume from")
-arg_parser.add_argument('--resume_optimizer_from', type=str, nargs=1, help="path of optimizer state to resume from")
+arg_parser.add_argument('--resume_model_from', type=str, help="path of model state to resume from")
+arg_parser.add_argument('--resume_optimizer_from', type=str, help="path of optimizer state to resume from")
 arg_parsed = arg_parser.parse_args()
 gpu_ids = arg_parsed.gpu_id
-resume_model_path = arg_parsed.resume_model_from
-resume_optimizer_path = arg_parsed.resume_optimizer_from
+resume_model_path = os.path.abspath(arg_parsed.resume_model_from) if arg_parsed.resume_model_from else None
+resume_optimizer_path = os.path.abspath(arg_parsed.resume_optimizer_from) if arg_parsed.resume_optimizer_from else None
 
 train_description = input("Enter a description of this training run: ")
 logger.print("Train description: ", train_description)
@@ -94,7 +94,6 @@ e2e_vio_trainer = trainer.Trainer(e2e_vio_model)
 # Train
 min_loss_t = 1e10
 min_loss_v = 1e10
-# e2e_vio_trainer.set_train_mode()
 for epoch in range(par.epochs):
     st_t = time.time()
     logger.print('=' * 50)
