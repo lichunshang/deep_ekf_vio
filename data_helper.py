@@ -12,14 +12,14 @@ import time
 from params import par
 
 
-def get_data_info(sequences, seq_len_range, overlap, sample_times=1, pad_y=False, shuffle=False, sort=True):
+def get_data_info(sequences, seq_len, overlap, sample_times=1):
     subseq_image_path_list = []
     subseq_len_list = []
     subseq_type_list = []
     subseq_seq_list = []
     subseq_id_list = []
     subseq_gt_pose_list = []
-    assert (seq_len_range[0] == seq_len_range[1])
+
     for seq in sequences:
         start_t = time.time()
         gt_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
@@ -27,14 +27,13 @@ def get_data_info(sequences, seq_len_range, overlap, sample_times=1, pad_y=False
         assert (len(gt_poses) == len(fpaths))  # make sure the number of images corresponds to number of poses
 
         if sample_times > 1:
-            sample_interval = int(np.ceil(seq_len_range[0] / sample_times))
-            start_frames = list(range(0, seq_len_range[0], sample_interval))
+            sample_interval = int(np.ceil(seq_len / sample_times))
+            start_frames = list(range(0, seq_len, sample_interval))
             print('Sample start from frame {}'.format(start_frames))
         else:
             start_frames = [0]
 
         for st in start_frames:
-            seq_len = seq_len_range[0]
             jump = seq_len - overlap
 
             # The original image and data
@@ -69,14 +68,11 @@ def get_data_info(sequences, seq_len_range, overlap, sample_times=1, pad_y=False
 
 
 class ImageSequenceDataset(Dataset):
-    def __init__(self, info_dataframe, resize_mode='crop', new_sizeize=None, img_mean=None, img_std=(1, 1, 1),
+    def __init__(self, info_dataframe, new_sizeize=None, img_mean=None, img_std=(1, 1, 1),
                  minus_point_5=False):
         # Transforms
         transform_ops = []
-        if resize_mode == 'crop':
-            transform_ops.append(transforms.CenterCrop((new_sizeize[0], new_sizeize[1])))
-        elif resize_mode == 'rescale':
-            transform_ops.append(transforms.Resize((new_sizeize[0], new_sizeize[1])))
+        transform_ops.append(transforms.Resize((new_sizeize[0], new_sizeize[1])))
         transform_ops.append(transforms.ToTensor())
         # transform_ops.append(transforms.Normalize(mean=img_mean, std=img_std))
         self.transformer = transforms.Compose(transform_ops)
@@ -132,8 +128,6 @@ class ImageSequenceDataset(Dataset):
 
         image_sequence = []
         for img_path in image_paths:
-            # img_as_img = Image.open(img_path)
-            # img_as_tensor = self.transformer(img_as_img)
             image_sequence.append(self.image_cache[img_path])
         image_sequence = torch.cat(image_sequence, 0)
 

@@ -2,14 +2,9 @@ import os
 import datetime
 import torch
 
+
 class Parameters(object):
     __instance = None
-
-    @staticmethod
-    def get_instance():
-        if not Parameters.__instance:
-            Parameters.__instance = Parameters()
-        return Parameters.__instance
 
     def __init__(self):
         self.timestamp = datetime.datetime.today()
@@ -25,41 +20,42 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.train_video = ['00', '01', '02', '05', '08', '09']
-        self.valid_video = ['04', '06', '07', '10']
-
-        # self.train_video = ['04']
-        # self.valid_video = ['04']
+        # self.train_video = ['00', '01', '02', '05', '08', '09']
+        # self.valid_video = ['04', '06', '07', '10']
+        self.train_video = ['04']
+        self.valid_video = ['06']
 
         # Data Preprocessing
-        self.resize_mode = 'rescale'  # choice: 'crop' 'rescale' None
         self.img_w = 320  # original size is about 1226
         self.img_h = 96  # original size is about 370
         self.img_means = (-0.14968217427134656, -0.12941663107068363, -0.1320610301921484)
         self.img_stds = (1, 1, 1)  # (0.309122, 0.315710, 0.3226514)
         self.minus_point_5 = True
 
-        self.seq_len = (32, 32)
+        self.seq_len = 32
         self.sample_times = 3
 
         # Model
-        self.stateful_training = True
         self.rnn_hidden_size = 1000
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
         self.rnn_dropout_between = 0  # 0: no dropout
         self.clip = None
         self.batch_norm = True
+
         # Training
         self.epochs = 200
         self.batch_size = 16
         self.pin_mem = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 0.001}
-        # Choice:
-        # {'opt': 'Adagrad', 'lr': 0.001}
-        # {'opt': 'Adam'}
-        # {'opt': 'Cosine', 'T': 100 , 'lr': 0.001}
+
+        self.stateful_training = True
+        self.data_augmentation = {
+            "reverse": True,
+            "mirror": True,
+            "reverse_mirror": True,
+        }
 
         # Pretrain, Resume training
         self.pretrained_flownet = './pretrained/flownets_bn_EPE2.459.pth.tar'
@@ -67,8 +63,16 @@ class Parameters(object):
         # None
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
         # './pretrained/flownets_EPE1.951.pth.tar'
-        self.resume = False  # resume training
-        self.resume_t_or_v = '.train'
+
+        # validation
+        assert (len(list(set(self.train_video) & set(self.valid_video))) == 0)
+
+    @staticmethod
+    def get_instance():
+        if not Parameters.__instance:
+            Parameters.__instance = Parameters()
+        return Parameters.__instance
+
 
 par = Parameters.get_instance()
 

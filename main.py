@@ -15,7 +15,12 @@ logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
 
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
-gpu_ids = arg_parser.parse_args().gpu_id
+arg_parser.add_argument('--resume_model_from', type=str, nargs=1, help="path of model state to resume from")
+arg_parser.add_argument('--resume_optimizer_from', type=str, nargs=1, help="path of optimizer state to resume from")
+arg_parsed = arg_parser.parse_args()
+gpu_ids = arg_parsed.gpu_id
+resume_model_path = arg_parsed.resume_model_from
+resume_optimizer_path = arg_parsed.resume_optimizer_from
 
 train_description = input("Enter a description of this training run: ")
 logger.print("Train description: ", train_description)
@@ -32,20 +37,20 @@ if gpu_ids:
 # Prepare Data
 logger.print('Creating new data info')
 
-train_df = get_data_info(sequences=par.train_video, seq_len_range=par.seq_len, overlap=1,
+train_df = get_data_info(sequences=par.train_video, seq_len=par.seq_len, overlap=1,
                          sample_times=par.sample_times)
-valid_df = get_data_info(sequences=par.valid_video, seq_len_range=par.seq_len, overlap=1,
+valid_df = get_data_info(sequences=par.valid_video, seq_len=par.seq_len, overlap=1,
                          sample_times=1)
 # save the data info
 train_df.to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
 valid_df.to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
 
-train_dataset = ImageSequenceDataset(train_df, par.resize_mode, (par.img_w, par.img_h), par.img_means, par.img_stds,
+train_dataset = ImageSequenceDataset(train_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                      par.minus_point_5)
 train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
                       pin_memory=par.pin_mem)
 
-valid_dataset = ImageSequenceDataset(valid_df, par.resize_mode, (par.img_w, par.img_h), par.img_means, par.img_stds,
+valid_dataset = ImageSequenceDataset(valid_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                      par.minus_point_5)
 valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                       pin_memory=par.pin_mem)
@@ -59,7 +64,7 @@ e2e_vio_model = e2e_vio_model.cuda()
 
 # Load FlowNet weights pretrained with FlyingChairs
 # NOTE: the pretrained model assumes image rgb values in range [-0.5, 0.5]
-if par.pretrained_flownet and not par.resume:
+if par.pretrained_flownet and not resume_model_path:
     pretrained_w = torch.load(par.pretrained_flownet)
     logger.print('Load FlowNet pretrained model')
     # Use only conv-layer-part of FlowNet as CNN for DeepVO
@@ -72,11 +77,12 @@ if par.pretrained_flownet and not par.resume:
 optimizer = par.optimizer(e2e_vio_model.parameters(), **par.optimizer_args)
 
 # Load trained DeepVO model and optimizer
-if par.resume:
-    e2e_vio_model.load_state_dict(torch.load(par.load_model_path))
-    optimizer.load_state_dict(torch.load(par.load_optimizer_path))
-    logger.print('Load model from: %s' % par.load_model_path)
-    logger.print('Load optimizer from: %s' % par.load_optimizer_path)
+if resume_model_path:
+    e2e_vio_model.load_state_dict(torch.load(resume_model_path))
+    logger.print('Load model from: %s' % resume_model_path)
+    if resume_optimizer_path:
+        optimizer.load_state_dict(torch.load(resume_optimizer_path))
+        logger.print('Load optimizer from: %s' % resume_optimizer_path)
 
 # if to use more than one GPU
 if par.n_gpu > 1:
