@@ -58,7 +58,7 @@ class Parameters(object):
         }
 
         # Pretrain, Resume training
-        self.pretrained_flownet = './pretrained/flownets_bn_EPE2.459.pth.tar'
+        self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/flownets_bn_EPE2.459.pth.tar')
         # Choice:
         # None
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
