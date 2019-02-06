@@ -85,6 +85,21 @@ class Logger(object):
         logger.print('Save model at ep %d, type: %s, time: %.2fs' % (epoch, tag, time.time() - start_time))
         self.log_training_state_latest_epoch[tag] = epoch
 
+    @staticmethod
+    def clean_state_dict_key(state_dict):
+        keys = list(state_dict.keys())
+        cleaned_keys = []
+        new_state_dict = {}
+        for key in keys:
+            # if saved with dual GPU, remove the keys that start with "module."
+            if key[:7] == "module.":
+                new_state_dict[key[7:]] = state_dict[key]
+                cleaned_keys.append(key)
+            else:
+                new_state_dict[key] = state_dict[key]
+        logger.print("Cleaned keys: [%s]" % ", ".join(cleaned_keys))
+        return new_state_dict
+
     def get_tensorboard(self):
         assert (self.tensorboard is not None)
         return self.tensorboard

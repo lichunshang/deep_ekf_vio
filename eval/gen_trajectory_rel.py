@@ -24,7 +24,7 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len):
     M_deepvo = DeepVO(par.img_h, par.img_w, par.batch_norm)
     M_deepvo = M_deepvo.cuda()
     logger.print("Loading model from: ", model_file_path)
-    M_deepvo.load_state_dict(torch.load(model_file_path))
+    M_deepvo.load_state_dict(logger.clean_state_dict_key(torch.load(model_file_path)))
     M_deepvo.eval()
 
     logger.log_parameters()

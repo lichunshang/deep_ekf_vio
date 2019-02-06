@@ -160,7 +160,7 @@ def train(resume_model_path, resume_optimizer_path):
 
     # Load trained DeepVO model and optimizer
     if resume_model_path:
-        e2e_vio_model.load_state_dict(torch.load(resume_model_path))
+        e2e_vio_model.load_state_dict(logger.clean_state_dict_key(torch.load(resume_model_path)))
         logger.print('Load model from: %s' % resume_model_path)
         if resume_optimizer_path:
             optimizer.load_state_dict(torch.load(resume_optimizer_path))

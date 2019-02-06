@@ -1,6 +1,7 @@
 import os
 import subprocess
 from log import logger, Logger
+from params import par
 import glob
 import numpy as np
 import prettytable
@@ -50,8 +51,7 @@ def kitti_eval(working_dir, train_sequences, val_sequences):
     logger.print("================ Evaluate KITTI ================")
     logger.print("Working on directory:", working_dir)
 
-    executable = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                              "kitti_eval", "cpp", "evaluate_odometry")
+    executable = os.path.join(par.project_dir, "eval", "kitti_eval", "cpp", "evaluate_odometry")
     kitti_dir = os.path.join(working_dir, "kitti")
 
     available_seqs = []
