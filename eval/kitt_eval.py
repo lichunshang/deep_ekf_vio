@@ -2,6 +2,8 @@ import os
 import subprocess
 from log import logger, Logger
 import glob
+import numpy as np
+import prettytable
 
 
 def execute(cmd):
@@ -14,6 +16,33 @@ def execute(cmd):
     return_code = popen.wait()
     if return_code:
         raise subprocess.CalledProcessError(return_code, cmd)
+
+
+def compute_error_for_each_seq(kitti_eval_out_dir):
+    # print the errors
+    seq_error_files = os.listdir(os.path.join(kitti_eval_out_dir, "errors"))
+    seq_errors = {}
+    for seq_error_file in seq_error_files:
+        seq = os.path.splitext(seq_error_file)[0]
+        errors = np.loadtxt(os.path.join(kitti_eval_out_dir, "errors", seq_error_file))
+        seq_errors[seq] = (np.average(errors[:, 2]), np.average(errors[:, 1]),)  # translation and rotation
+
+    ave_errors = np.loadtxt(os.path.join(kitti_eval_out_dir, "stats.txt"))
+
+    return seq_errors, (ave_errors[0], ave_errors[1],)
+
+
+def print_error_table(errors, ave_errors):
+    table = prettytable.PrettyTable()
+    table.field_names = ["Seq.", "Trans. Err", "Rot. Error"]
+    table.align["Seq."] = "l"
+    table.align["Trans. Err"] = "r"
+    table.align["Rot. Error"] = "r"
+    keys = sorted(list(errors.keys()))
+    for key in keys:
+        table.add_row([key, "%.6f" % errors[key][0], "%.6f" % (errors[key][1] * 180 / np.pi)])
+    table.add_row(["Ave.", "%.6f" % ave_errors[0], "%.6f" % (ave_errors[1] * 180 / np.pi)])
+    logger.print(table)
 
 
 def kitti_eval(working_dir, train_sequences, val_sequences):
@@ -61,4 +90,12 @@ def kitti_eval(working_dir, train_sequences, val_sequences):
                 filename.endswith(".pdf") or filename.endswith(".gp"):
             os.remove(filename)
 
-    logger.print("Finished processing for KITTI")
+    logger.print("Finished running KITTI evaluation!")
+
+    # print the errors
+    train_errors, ave_train_errors = compute_error_for_each_seq(os.path.join(kitti_dir, "train"))
+    val_errors, ave_val_errors = compute_error_for_each_seq(os.path.join(kitti_dir, "valid"))
+    logger.print("Training errors are:")
+    print_error_table(train_errors, ave_train_errors)
+    logger.print("Validation errors are:")
+    print_error_table(val_errors, ave_val_errors)
