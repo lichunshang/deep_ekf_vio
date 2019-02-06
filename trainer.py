@@ -130,12 +130,12 @@ def train(resume_model_path, resume_optimizer_path):
     train_dataset = ImageSequenceDataset(train_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                          par.minus_point_5)
     train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
-                          pin_memory=par.pin_mem)
+                          pin_memory=par.pin_mem, drop_last=True)
 
     valid_dataset = ImageSequenceDataset(valid_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                          par.minus_point_5)
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
-                          pin_memory=par.pin_mem)
+                          pin_memory=par.pin_mem, drop_last=True)
 
     logger.print('Number of samples in training dataset: %d' % len(train_df.index))
     logger.print('Number of samples in validation dataset: %d' % len(valid_df.index))
@@ -169,7 +169,7 @@ def train(resume_model_path, resume_optimizer_path):
     # if to use more than one GPU
     if par.n_gpu > 1:
         assert (torch.cuda.device_count() == par.n_gpu)
-        e2e_vio_model = torch.nn.DataParallel(e2e_vio_model, device_ids=gpu_ids)
+        e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
 
     e2e_vio_ta = _TrainAssistant(e2e_vio_model)
 

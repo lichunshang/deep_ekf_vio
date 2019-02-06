@@ -27,8 +27,7 @@ trainer.train(resume_model_path, resume_optimizer_path)
 
 for tag in ["valid", "train"]:
     seq_results_dir = gen_trajectory_rel(os.path.join(par.results_dir, "saved_model.%s" % tag),
-                                         par.valid_seqs + par.train_seqs,
-                                         arg_parsed.seq_len)
+                                         par.valid_seqs + par.train_seqs, 2)
     plot_trajectory(seq_results_dir)
     np_traj_to_kitti(seq_results_dir)
-    kitti_eval(seq_results_dir, par.train_seqs, par.val_seqs)
+    kitti_eval(seq_results_dir, par.train_seqs, par.valid_seqs)
