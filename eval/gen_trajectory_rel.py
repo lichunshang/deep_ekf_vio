@@ -10,8 +10,7 @@ from torch.utils.data import DataLoader
 from log import logger
 
 
-def gen_trajectory_rel(model_file_path, sequences, seq_len):
-
+def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
     # Path
     model_file_path = os.path.abspath(model_file_path)
     assert (os.path.exists(model_file_path))
@@ -29,6 +28,7 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len):
 
     logger.log_parameters()
     logger.print("Using sequence length:", seq_len)
+    logger.print("Prop LSTM states:", prop_lstm_states)
     logger.print("Sequences: \n" + "\n".join(sequences))
 
     for seq in sequences:
@@ -46,7 +46,11 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len):
         for i, batch in enumerate(dataloader):
             print('%d/%d (%.2f%%)' % (i, len(dataloader), i * 100 / len(dataloader)), end="\r")
             _, x, _ = batch
+
+            lstm_states = lstm_states if prop_lstm_states else None
+            print(lstm_states)
             predicted_rel_poses, lstm_states = M_deepvo.forward(x.cuda(), lstm_states)
+
             lstm_states = list(lstm_states)
             lstm_states[0] = lstm_states[0].detach()
             lstm_states[1] = lstm_states[1].detach()

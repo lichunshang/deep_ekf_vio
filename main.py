@@ -2,6 +2,7 @@ import numpy as np
 import os
 import argparse
 import trainer
+import time
 from params import par
 from log import logger
 from eval import gen_trajectory_rel, plot_trajectory, kitti_eval, np_traj_to_kitti
@@ -23,11 +24,13 @@ if gpu_ids:
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(i) for i in gpu_ids])
     logger.print("CUDA_VISIVLE_DEVICES: %s" % os.environ["CUDA_VISIBLE_DEVICES"])
 
+start_t = time.time()
 trainer.train(resume_model_path, resume_optimizer_path)
+logger.print("Training took %.2fs" % (time.time() - start_t))
 
 for tag in ["valid", "train"]:
     seq_results_dir = gen_trajectory_rel(os.path.join(par.results_dir, "saved_model.%s" % tag),
-                                         par.valid_seqs + par.train_seqs, 2)
+                                         par.valid_seqs + par.train_seqs, 2, True)
     plot_trajectory(seq_results_dir)
     np_traj_to_kitti(seq_results_dir)
     kitti_eval(seq_results_dir, par.train_seqs, par.valid_seqs)

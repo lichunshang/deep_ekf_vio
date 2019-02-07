@@ -44,6 +44,10 @@ def print_error_table(errors, ave_errors):
         table.add_row([key, "%.6f" % errors[key][0], "%.6f" % (errors[key][1] * 180 / np.pi)])
     table.add_row(["Ave.", "%.6f" % ave_errors[0], "%.6f" % (ave_errors[1] * 180 / np.pi)])
     logger.print(table)
+    logger.print("Copy to Google Sheets:",
+                 ",".join([str(errors[k][0]) + "," + str(errors[k][1] * 180 / np.pi) for k in
+                           sorted(list(errors.keys()))]) +
+                 "," + str(ave_errors[0]) + "," + str(ave_errors[1] * 180 / np.pi))
 
 
 def kitti_eval(working_dir, train_sequences, val_sequences):

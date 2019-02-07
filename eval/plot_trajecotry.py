@@ -5,6 +5,8 @@ import se3_math
 from params import par
 from log import logger, Logger
 
+plt.switch_backend("Agg")
+
 
 def plot_trajectory(working_dir):
     output_dir = os.path.join(working_dir, "figures")

@@ -16,12 +16,12 @@ if top_level_arg_parsed.script == "gen_trajectory_rel":
     arg_parser.add_argument('model_file_path', type=str, help='path to the saved model state dict')
     arg_parser.add_argument('--sequences', type=str, nargs="+", help="Select the sequences", default=default_sequences)
     arg_parser.add_argument('--seq_len', type=int, help="sequence length", default=default_seq_len)
+    arg_parser.add_argument('--no_prop_lstm_states', help="Don't propagate LSTM states", default=False,
+                            action='store_true')
     arg_parsed = arg_parser.parse_args(args=args)
-    sequences = arg_parsed.sequences
-    seq_len = arg_parsed.seq_len
-    seq_len_range = (seq_len, seq_len,)
 
-    eval.gen_trajectory_rel(os.path.abspath(arg_parsed.model_file_path), arg_parsed.sequences, arg_parsed.seq_len)
+    eval.gen_trajectory_rel(os.path.abspath(arg_parsed.model_file_path), arg_parsed.sequences, arg_parsed.seq_len,
+                            not arg_parsed.no_prop_lstm_states)
 
 elif top_level_arg_parsed.script == "plot_trajectory":
     arg_parser = argparse.ArgumentParser(description='Plot trajectory')
