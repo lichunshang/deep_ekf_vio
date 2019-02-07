@@ -17,54 +17,51 @@ class _TrainAssistant(object):
         self.num_val_iterations = 0
         self.clip = par.clip
         self.lstm_state_cache = {}
+        self.epoch = 0
 
     def update_lstm_state(self, t_x_meta, lstm_states):
-        # FORMAT: lstm_states = (hidden state, cell state)
+        # lstm_states has the dimension of (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
         _, seq_list, type_list, id_list = ImageSequenceDataset.decode_batch_meta_info(t_x_meta)
         assert (len(seq_list) == len(type_list) and
                 len(seq_list) == len(id_list) and
-                len(seq_list) == lstm_states[0].size(1) and
-                len(seq_list) == lstm_states[1].size(1))
+                len(seq_list) == lstm_states.size(0) and
+                len(seq_list) == lstm_states.size(0))
         num_batches = len(seq_list)
 
         for i in range(0, num_batches):
             key = "%s_%s_%d" % (seq_list[i], type_list[i], id_list[i][-1])
-            self.lstm_state_cache[key] = (lstm_states[0][:, i, :], lstm_states[1][:, i, :],)
+            self.lstm_state_cache[key] = lstm_states[i, :, :, :]
 
     def retrieve_lstm_state(self, t_x_meta):
         _, seq_list, type_list, id_list = ImageSequenceDataset.decode_batch_meta_info(t_x_meta)
         assert (len(seq_list) == len(type_list) and len(seq_list) == len(id_list))
         num_batches = len(seq_list)
 
-        lstm_hidden_states = []
-        lstm_cell_states = []
+        lstm_states = []
 
         for i in range(0, num_batches):
             key = "%s_%s_%d" % (seq_list[i], type_list[i], id_list[i][0])
             if key in self.lstm_state_cache:
                 tmp = self.lstm_state_cache[key]
             else:
+                assert(not (id_list[i][0] >= par.seq_len - 1 and self.epoch > 0))
                 num_layers = par.rnn_num_layers
                 hidden_size = par.rnn_hidden_size
-                tmp = [torch.zeros([num_layers, hidden_size]), torch.zeros([num_layers, hidden_size])]
-            lstm_hidden_states.append(tmp[0])
-            lstm_cell_states.append(tmp[1])
+                tmp = torch.zeros(2, num_layers, hidden_size)
+            lstm_states.append(tmp)
 
-        return [torch.stack(lstm_hidden_states, dim=1), torch.stack(lstm_cell_states, dim=1), ]
+        return torch.stack(lstm_states, dim=0)
 
     def get_loss(self, t_x_meta, x, y):
         prev_lstm_states = None
         if par.stateful_training:
             prev_lstm_states = self.retrieve_lstm_state(t_x_meta)
-            prev_lstm_states[0] = prev_lstm_states[0].cuda()
-            prev_lstm_states[1] = prev_lstm_states[1].cuda()
+            prev_lstm_states = prev_lstm_states.cuda()
 
         predicted, lstm_states = self.model.forward(x, prev_lstm_states)
 
         if par.stateful_training:
-            lstm_states = list(lstm_states)
-            lstm_states[0] = lstm_states[0].detach().cpu()
-            lstm_states[1] = lstm_states[1].detach().cpu()
+            lstm_states = lstm_states.detach().cpu()
             self.update_lstm_state(t_x_meta, lstm_states)
 
         # Weighted MSE Loss
@@ -130,12 +127,12 @@ def train(resume_model_path, resume_optimizer_path):
     train_dataset = ImageSequenceDataset(train_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                          par.minus_point_5)
     train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
-                          pin_memory=par.pin_mem, drop_last=True)
+                          pin_memory=par.pin_mem, drop_last=False)
 
     valid_dataset = ImageSequenceDataset(valid_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
                                          par.minus_point_5)
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
-                          pin_memory=par.pin_mem, drop_last=True)
+                          pin_memory=par.pin_mem, drop_last=False)
 
     logger.print('Number of samples in training dataset: %d' % len(train_df.index))
     logger.print('Number of samples in validation dataset: %d' % len(valid_df.index))
@@ -177,6 +174,7 @@ def train(resume_model_path, resume_optimizer_path):
     min_loss_t = 1e10
     min_loss_v = 1e10
     for epoch in range(par.epochs):
+        e2e_vio_ta.epoch = epoch
         st_t = time.time()
         logger.print('=' * 50)
         # Train

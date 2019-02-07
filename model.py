@@ -93,10 +93,23 @@ class DeepVO(nn.Module):
         x = self.encode_image(x)
         x = x.view(batch_size, seq_len, -1)
 
+        # lstm_init_state has the dimension of (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
+        if lstm_init_state is not None:
+            hidden_state = lstm_init_state[:, 0, :, :].permute(1, 0, 2).contiguous()
+            cell_state = lstm_init_state[:, 1, :, :].permute(1, 0, 2).contiguous()
+            lstm_init_state = (hidden_state, cell_state,)
+
         # RNN
+        # lstm_state is (hidden state, cell state,)
+        # each hidden/cell state has the shape (lstm layers, batch size, lstm hidden size)
         out, lstm_state = self.rnn(x, lstm_init_state)
         out = self.rnn_drop_out(out)
         out = self.linear(out)
+
+        # rearrange the shape back to (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
+        lstm_state = torch.stack(lstm_state, dim=0)
+        lstm_state = lstm_state.permute(2, 0, 1, 3)
+
         return out, lstm_state
 
     def encode_image(self, x):
