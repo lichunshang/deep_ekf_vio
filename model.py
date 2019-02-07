@@ -46,7 +46,7 @@ class DeepVO(nn.Module):
         self.rnn = nn.LSTM(
                 input_size=int(np.prod(__tmp.size())),
                 hidden_size=par.rnn_hidden_size,
-                num_layers=2,
+                num_layers=par.rnn_num_layers,
                 dropout=par.rnn_dropout_between,
                 batch_first=True)
         self.rnn_drop_out = nn.Dropout(par.rnn_dropout_out)

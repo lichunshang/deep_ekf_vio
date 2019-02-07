@@ -44,8 +44,8 @@ class _TrainAssistant(object):
             if key in self.lstm_state_cache:
                 tmp = self.lstm_state_cache[key]
             else:
-                num_layers = self.model.rnn.num_layers
-                hidden_size = self.model.rnn.hidden_size
+                num_layers = par.rnn_num_layers
+                hidden_size = par.rnn_hidden_size
                 tmp = [torch.zeros([num_layers, hidden_size]), torch.zeros([num_layers, hidden_size])]
             lstm_hidden_states.append(tmp[0])
             lstm_cell_states.append(tmp[1])

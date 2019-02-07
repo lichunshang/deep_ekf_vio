@@ -20,10 +20,10 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.train_seqs = ['00', '01', '02', '05', '08', '09']
-        self.valid_seqs = ['04', '06', '07', '10']
-        # self.train_seqs = ['04']
-        # self.valid_seqs = ['06']
+        # self.train_seqs = ['00', '01', '02', '05', '08', '09']
+        # self.valid_seqs = ['04', '06', '07', '10']
+        self.train_seqs = ['04']
+        self.valid_seqs = ['06']
 
         # Data Preprocessing
         self.img_w = 320  # original size is about 1226
@@ -37,6 +37,7 @@ class Parameters(object):
 
         # Model
         self.rnn_hidden_size = 1000
+        self.rnn_num_layers = 2
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
         self.rnn_dropout_between = 0  # 0: no dropout
