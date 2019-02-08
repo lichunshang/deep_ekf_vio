@@ -69,10 +69,10 @@ class Parameters(object):
                 "hue": 0.05
             }
         })
-        self.data_aug_transforms = namedtuple("_", {
+        self.data_aug_transforms = AttrDict({
+            "lr_flip": False,
+            "td_flip": False,
             "reverse": True,
-            "mirror": True,
-            "reverse_mirror": True,
         })
 
         # Pretrain, Resume training

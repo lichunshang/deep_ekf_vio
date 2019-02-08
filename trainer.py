@@ -6,7 +6,7 @@ import os
 import time
 from params import par
 from model import DeepVO
-from data_helper import get_data_info, ImageSequenceDataset
+from data_helper import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
 from log import logger
 
 
@@ -21,30 +21,26 @@ class _TrainAssistant(object):
 
     def update_lstm_state(self, t_x_meta, lstm_states):
         # lstm_states has the dimension of (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
-        _, seq_list, type_list, id_list = ImageSequenceDataset.decode_batch_meta_info(t_x_meta)
-        assert (len(seq_list) == len(type_list) and
-                len(seq_list) == len(id_list) and
-                len(seq_list) == lstm_states.size(0) and
-                len(seq_list) == lstm_states.size(0))
+        _, seq_list, type_list, _, id_next_list = SubseqDataset.decode_batch_meta_info(t_x_meta)
+        assert (len(seq_list) == lstm_states.size(0) and len(seq_list) == lstm_states.size(0))
         num_batches = len(seq_list)
 
         for i in range(0, num_batches):
-            key = "%s_%s_%d" % (seq_list[i], type_list[i], id_list[i][-1])
+            key = "%s_%s_%d" % (seq_list[i], type_list[i], id_next_list[i])
             self.lstm_state_cache[key] = lstm_states[i, :, :, :]
 
     def retrieve_lstm_state(self, t_x_meta):
-        _, seq_list, type_list, id_list = ImageSequenceDataset.decode_batch_meta_info(t_x_meta)
-        assert (len(seq_list) == len(type_list) and len(seq_list) == len(id_list))
+        _, seq_list, type_list, id_list, _ = SubseqDataset.decode_batch_meta_info(t_x_meta)
         num_batches = len(seq_list)
 
         lstm_states = []
 
         for i in range(0, num_batches):
-            key = "%s_%s_%d" % (seq_list[i], type_list[i], id_list[i][0])
+            key = "%s_%s_%d" % (seq_list[i], type_list[i], id_list[i])
             if key in self.lstm_state_cache:
                 tmp = self.lstm_state_cache[key]
             else:
-                assert(not (id_list[i][0] >= par.seq_len - 1 and self.epoch > 0))
+                assert (not (id_list[i] >= par.seq_len - 1 and self.epoch > 0))
                 num_layers = par.rnn_num_layers
                 hidden_size = par.rnn_hidden_size
                 tmp = torch.zeros(2, num_layers, hidden_size)
@@ -119,23 +115,24 @@ def train(resume_model_path, resume_optimizer_path):
     # Prepare Data
     logger.print('Creating new data info')
 
-    train_df = get_data_info(sequences=par.train_seqs, seq_len=par.seq_len, overlap=1, sample_times=par.sample_times)
-    valid_df = get_data_info(sequences=par.valid_seqs, seq_len=par.seq_len, overlap=1, sample_times=1)
-    train_df.to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
-    valid_df.to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
+    train_subseqs = get_subseqs(sequences=par.train_seqs, seq_len=par.seq_len, overlap=1, sample_times=par.sample_times)
+    valid_subseqs = get_subseqs(sequences=par.valid_seqs, seq_len=par.seq_len, overlap=1, sample_times=1)
+    # save record of the train/val data
+    convert_subseqs_list_to_panda(train_subseqs).to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
+    convert_subseqs_list_to_panda(valid_subseqs).to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
 
-    train_dataset = ImageSequenceDataset(train_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
-                                         par.minus_point_5)
+    train_dataset = SubseqDataset(train_subseqs, (par.img_w, par.img_h), par.img_means,
+                                  par.img_stds, par.minus_point_5)
     train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
 
-    valid_dataset = ImageSequenceDataset(valid_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
-                                         par.minus_point_5, training=False)
+    valid_dataset = SubseqDataset(valid_subseqs, (par.img_w, par.img_h), par.img_means,
+                                  par.img_stds, par.minus_point_5, training=False)
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
 
-    logger.print('Number of samples in training dataset: %d' % len(train_df.index))
-    logger.print('Number of samples in validation dataset: %d' % len(valid_df.index))
+    logger.print('Number of samples in training dataset: %d' % len(train_subseqs))
+    logger.print('Number of samples in validation dataset: %d' % len(train_subseqs))
 
     # Model
     e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)

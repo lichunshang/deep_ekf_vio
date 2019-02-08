@@ -12,19 +12,40 @@ import time
 from params import par
 
 
-def get_data_info(sequences, seq_len, overlap, sample_times=1):
-    subseq_image_path_list = []
-    subseq_len_list = []
-    subseq_type_list = []
-    subseq_seq_list = []
-    subseq_id_list = []
-    subseq_gt_pose_list = []
+class Subsequence(object):
+    def __init__(self, image_paths, length, seq, type, idx, idx_next, gt_poses):
+        self.image_paths = image_paths[:]
+        self.length = length
+        self.type = type
+        self.id = idx
+        self.id_next = idx_next  # id to the next subsequence
+        self.gt_poses = gt_poses
+        self.seq = seq
+
+        assert (self.length == len(image_paths))
+        assert (self.length == len(gt_poses))
+
+
+def convert_subseqs_list_to_panda(subseqs):
+    # Convert to pandas data frames
+    data = {'seq_len': [subseq.length for subseq in subseqs],
+            'image_path': [subseq.image_paths for subseq in subseqs],
+            "seq": [subseq.seq for subseq in subseqs],
+            "type": [subseq.type for subseq in subseqs],
+            "id": [subseq.id for subseq in subseqs],
+            "id_next": [subseq.id_next for subseq in subseqs],
+            'gt_poses': [subseq.gt_poses for subseq in subseqs]}
+    return pd.DataFrame(data, columns=data.keys())
+
+
+def get_subseqs(sequences, seq_len, overlap, sample_times=1):
+    subseqs = []
 
     for seq in sequences:
         start_t = time.time()
         gt_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
-        fpaths = sorted(glob.glob(os.path.join(par.image_dir, seq, "*.png")))
-        assert (len(gt_poses) == len(fpaths))  # make sure the number of images corresponds to number of poses
+        image_paths = sorted(glob.glob(os.path.join(par.image_dir, seq, "*.png")))
+        assert (len(gt_poses) == len(image_paths))  # make sure the number of images corresponds to number of poses
 
         if sample_times > 1:
             sample_interval = int(np.ceil(seq_len / sample_times))
@@ -35,40 +56,31 @@ def get_data_info(sequences, seq_len, overlap, sample_times=1):
 
         for st in start_frames:
             jump = seq_len - overlap
-
+            sub_seqs_buffer = []
             # The original image and data
-            subseq_image_path, subseq_gt_pose, subseq_ids = [], [], []
-            for i in range(st, len(fpaths), jump):
-                if i + seq_len <= len(fpaths):  # this will discard a few frames at the end
-                    subseq_image_path.append(fpaths[i:i + seq_len])
-                    subseq_gt_pose.append(gt_poses[i:i + seq_len])
-                    # first index is the start, second is where the next sub-sequence start
-                    subseq_ids.append(np.array([i, i + jump]))
+            # normal_subseq_image_path, normal_subseq_gt_pose, normal_subseq_ids = [], [], []
+            sub_seqs_vanilla = []
+            for i in range(st, len(image_paths), jump):
+                if i + seq_len <= len(image_paths):  # this will discard a few frames at the end
+                    subseq = Subsequence(image_paths[i:i + seq_len], length=seq_len, seq=seq, type="vanilla", idx=i,
+                                         idx_next=i + jump, gt_poses=gt_poses[i:i + seq_len])
+                    sub_seqs_vanilla.append(subseq)
+            sub_seqs_buffer += sub_seqs_vanilla
 
-            subseq_type = ["normal"] * len(subseq_image_path)
-            subseq_seq = [seq] * len(subseq_image_path)
+            # Reverse, effectively doubles the number of examples
+            # if par.data_aug_transforms.reverse:
+            #     subseq_coll.add_reversed_buffer()
 
-            # TODO Mirrors and going in reverse
+            # collect the sub-sequences
+            subseqs += sub_seqs_buffer
 
-            subseq_gt_pose_list += subseq_gt_pose
-            subseq_image_path_list += subseq_image_path
-            subseq_len_list += [len(xs) for xs in subseq_image_path]
-            subseq_seq_list += subseq_seq
-            subseq_type_list += subseq_type
-            subseq_id_list += subseq_ids
+        print('Folder %s finish in %.2f sec' % (seq, time.time() - start_t))
 
-            # ensure all sequence length are the same
-            assert (subseq_len_list.count(seq_len) == len(subseq_len_list))
-        print('Folder {} finish in {} sec'.format(seq, time.time() - start_t))
-
-    # Convert to pandas dataframes
-    data = {'seq_len': subseq_len_list, 'image_path': subseq_image_path_list, "seq": subseq_seq_list,
-            "type": subseq_type_list, "id": subseq_id_list, 'pose': subseq_gt_pose_list}
-    return pd.DataFrame(data, columns=data.keys())
+    return subseqs
 
 
-class ImageSequenceDataset(Dataset):
-    def __init__(self, info_dataframe, new_sizeize=None, img_mean=None, img_std=(1, 1, 1),
+class SubseqDataset(Dataset):
+    def __init__(self, subseqs, new_sizeize=None, img_mean=None, img_std=(1, 1, 1),
                  minus_point_5=False, training=True):
 
         # Transforms
@@ -97,20 +109,14 @@ class ImageSequenceDataset(Dataset):
         logger.print("normalizer:", self.normalizer)
 
         # organize data
-        self.data_info = info_dataframe
-        self.subseq_len_list = list(self.data_info.seq_len)
-        self.subseq_image_path_list = np.asarray(self.data_info.image_path)  # image paths
-        self.subseq_gt_pose_list = np.asarray(self.data_info.pose)
-        self.subseq_type_list = np.asarray(self.data_info.type)
-        self.subseq_seq_list = np.asarray(self.data_info.seq)
-        self.subseq_id_list = np.asarray(self.data_info.id)
-
+        self.subseqs = subseqs
         self.image_cache = {}
-        total_images = len(self.subseq_image_path_list[0]) * len(self.subseq_image_path_list)
+
+        total_images = len(self.subseqs[0].length) * len(subseqs)
         counter = 0
         start_t = time.time()
-        for subseq_image_path in self.subseq_image_path_list:
-            for path in subseq_image_path:
+        for subseq in self.subseqs:
+            for path in subseq.image_paths:
                 if path not in self.image_cache:
                     self.image_cache[path] = self.pre_runtime_transformer(Image.open(path))
                 counter += 1
@@ -118,15 +124,13 @@ class ImageSequenceDataset(Dataset):
         logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
 
     def __getitem__(self, index):
-        gt_poses = self.subseq_gt_pose_list[index]
-        type = self.subseq_type_list[index]
-        seq = self.subseq_seq_list[index]
-        id = self.subseq_id_list[index]
+
+        subseq = self.subseqs[index]
         # transform
         gt_rel_poses = []
-        for i in range(1, len(gt_poses)):
-            T_i_vkm1 = gt_poses[i - 1]
-            T_i_vk = gt_poses[i]
+        for i in range(1, len(subseq.gt_poses)):
+            T_i_vkm1 = subseq.gt_poses[i - 1]
+            T_i_vk = subseq.gt_poses[i]
             T_vkm1_k = se3_math.reorthogonalize_SE3(np.linalg.inv(T_i_vkm1).dot(T_i_vk))
             r_vk_vkm1_vkm1 = T_vkm1_k[0:3, 3]  # get the translation from T
             phi_vkm1_vk = se3_math.log_SO3(T_vkm1_k[0:3, 0:3])
@@ -134,12 +138,8 @@ class ImageSequenceDataset(Dataset):
 
         gt_rel_poses = torch.FloatTensor(gt_rel_poses)
 
-        image_paths = self.subseq_image_path_list[index]
-        assert (self.subseq_len_list[index] == len(image_paths))
-        seq_len = self.subseq_len_list[index]
-
         image_sequence = []
-        for img_path in image_paths:
+        for img_path in subseq.image_paths:
             image = self.runtime_transformer(self.image_cache[img_path])
             if self.minus_point_5:
                 image = image - 0.5  # from [0, 1] -> [-0.5, 0.5]
@@ -147,7 +147,7 @@ class ImageSequenceDataset(Dataset):
             image_sequence.append(image)
         image_sequence = torch.stack(image_sequence, 0)
 
-        return (seq_len, seq, type, id), image_sequence, gt_rel_poses
+        return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), image_sequence, gt_rel_poses
 
     @staticmethod
     def decode_batch_meta_info(batch_meta_info):
@@ -155,8 +155,15 @@ class ImageSequenceDataset(Dataset):
         seq_list = batch_meta_info[1]
         type_list = batch_meta_info[2]
         id_list = batch_meta_info[3]
+        id_next_list = batch_meta_info[4]
 
-        return seq_len_list, seq_list, type_list, id_list
+        # check batch dimension is consistent
+        assert (len(seq_list) == len(seq_len_list))
+        assert (len(seq_list) == len(type_list))
+        assert (len(seq_list) == len(id_list))
+        assert (len(seq_list) == len(id_next_list))
+
+        return seq_len_list, seq_list, type_list, id_list, id_next_list
 
     def __len__(self):
         return len(self.data_info.index)
