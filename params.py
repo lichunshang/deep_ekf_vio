@@ -10,7 +10,7 @@ class Parameters(object):
         self.timestamp = datetime.datetime.today()
 
         self.n_processors = 8
-        self.n_gpu = 1
+        self.n_gpu = 2
 
         # Path
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
@@ -20,19 +20,18 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        # self.train_seqs = ['00', '01', '02', '05', '08', '09']
-        # self.valid_seqs = ['04', '06', '07', '10']
-        self.train_seqs = ['04']
-        self.valid_seqs = ['06']
+        self.train_seqs = ['00', '01', '02', '05', '08', '09']
+        self.valid_seqs = ['04', '06', '07', '10']
+        # self.train_seqs = ['09']
+        # self.valid_seqs = ['06']
 
-        # Data Preprocessing
         self.img_w = 320  # original size is about 1226
         self.img_h = 96  # original size is about 370
         self.img_means = (-0.14968217427134656, -0.12941663107068363, -0.1320610301921484)
         self.img_stds = (1, 1, 1)  # (0.309122, 0.315710, 0.3226514)
         self.minus_point_5 = True
 
-        self.seq_len = 32
+        self.seq_len = 128
         self.sample_times = 3
 
         # Model
@@ -46,7 +45,7 @@ class Parameters(object):
 
         # Training
         self.epochs = 200
-        self.batch_size = 16
+        self.batch_size = 8
         self.pin_mem = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 0.001}
