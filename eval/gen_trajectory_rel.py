@@ -48,12 +48,9 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
             _, x, _ = batch
 
             lstm_states = lstm_states if prop_lstm_states else None
-            print(lstm_states)
             predicted_rel_poses, lstm_states = M_deepvo.forward(x.cuda(), lstm_states)
 
-            lstm_states = list(lstm_states)
-            lstm_states[0] = lstm_states[0].detach()
-            lstm_states[1] = lstm_states[1].detach()
+            lstm_states = lstm_states.detach()
             predicted_rel_poses = predicted_rel_poses.detach().cpu().numpy()
 
             for rel_pose in predicted_rel_poses[-1]:  # select the only batch

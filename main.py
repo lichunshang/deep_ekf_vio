@@ -28,7 +28,7 @@ start_t = time.time()
 trainer.train(resume_model_path, resume_optimizer_path)
 logger.print("Training took %.2fs" % (time.time() - start_t))
 
-for tag in ["valid", "train"]:
+for tag in ["valid", "train", "checkpoint"]:
     seq_results_dir = gen_trajectory_rel(os.path.join(par.results_dir, "saved_model.%s" % tag),
                                          par.valid_seqs + par.train_seqs, 2, True)
     plot_trajectory(seq_results_dir)
