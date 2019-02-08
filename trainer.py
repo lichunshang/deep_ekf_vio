@@ -130,7 +130,7 @@ def train(resume_model_path, resume_optimizer_path):
                           pin_memory=par.pin_mem, drop_last=False)
 
     valid_dataset = ImageSequenceDataset(valid_df, (par.img_w, par.img_h), par.img_means, par.img_stds,
-                                         par.minus_point_5)
+                                         par.minus_point_5, training=False)
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
 

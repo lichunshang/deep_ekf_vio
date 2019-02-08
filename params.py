@@ -10,7 +10,7 @@ class Parameters(object):
         self.timestamp = datetime.datetime.today()
 
         self.n_processors = 8
-        self.n_gpu = 2
+        self.n_gpu = 1
 
         # Path
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
@@ -25,10 +25,10 @@ class Parameters(object):
         # self.train_seqs = ['09']
         # self.valid_seqs = ['06']
 
-        self.img_w = 320  # original size is about 1226
-        self.img_h = 96  # original size is about 370
-        self.img_means = (-0.14968217427134656, -0.12941663107068363, -0.1320610301921484)
-        self.img_stds = (1, 1, 1)  # (0.309122, 0.315710, 0.3226514)
+        self.img_w = 320
+        self.img_h = 96
+        self.img_means = (-0.151812640483464, -0.13357509111350818, -0.14181910364786987)
+        self.img_stds = (0.3174070577943728, 0.31982824445835345, 0.32372934976798146)
         self.minus_point_5 = True
 
         self.seq_len = 128
@@ -82,3 +82,5 @@ par = Parameters.get_instance()
 # mean_np =  [88.78708011161852, 93.43778497818349, 91.33551888646076]
 # std_tensor =  [0.3174070577943728, 0.31982824445835345, 0.32372934976798146]
 # std_np =  [80.93941240862273, 81.557427180421, 82.55097977909139]
+
+# self.img_stds = (1, 1, 1)  # (0.309122, 0.315710, 0.3226514)

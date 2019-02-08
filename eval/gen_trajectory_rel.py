@@ -36,7 +36,8 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
         start_time = time.time()
 
         df = get_data_info(sequences=[seq], seq_len=seq_len, overlap=1, sample_times=1)
-        dataset = ImageSequenceDataset(df, (par.img_w, par.img_h), par.img_means, par.img_stds, par.minus_point_5)
+        dataset = ImageSequenceDataset(df, (par.img_w, par.img_h), par.img_means, par.img_stds, par.minus_point_5,
+                                       training=False)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
         gt_abs_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
 

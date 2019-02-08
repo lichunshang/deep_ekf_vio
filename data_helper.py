@@ -69,13 +69,22 @@ def get_data_info(sequences, seq_len, overlap, sample_times=1):
 
 class ImageSequenceDataset(Dataset):
     def __init__(self, info_dataframe, new_sizeize=None, img_mean=None, img_std=(1, 1, 1),
-                 minus_point_5=False):
+                 minus_point_5=False, training=True):
+
         # Transforms
-        transform_ops = []
-        transform_ops.append(transforms.Resize((new_sizeize[0], new_sizeize[1])))
-        transform_ops.append(transforms.ToTensor())
-        # transform_ops.append(transforms.Normalize(mean=img_mean, std=img_std))
-        self.transformer = transforms.Compose(transform_ops)
+        self.pre_runtime_transformer = transforms.Compose([
+            transforms.Resize((new_sizeize[0], new_sizeize[1]))
+        ])
+
+        if training:
+            self.runtime_transformer = transforms.Compose([
+                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
+                transforms.ToTensor()
+            ])
+        else:
+            self.runtime_transformer = transforms.ToTensor()
+
+        # Normalization
         self.minus_point_5 = minus_point_5
         self.normalizer = transforms.Normalize(mean=img_mean, std=img_std)
 
@@ -95,12 +104,7 @@ class ImageSequenceDataset(Dataset):
         for subseq_image_path in self.subseq_image_path_list:
             for path in subseq_image_path:
                 if path not in self.image_cache:
-                    img_as_tensor = self.transformer(Image.open(path))
-                    if self.minus_point_5:
-                        img_as_tensor = img_as_tensor - 0.5  # from [0, 1] -> [-0.5, 0.5]
-                    img_as_tensor = self.normalizer(img_as_tensor)
-                    img_as_tensor = img_as_tensor.unsqueeze(0)
-                    self.image_cache[path] = img_as_tensor
+                    self.image_cache[path] = self.pre_runtime_transformer(Image.open(path))
                 counter += 1
                 print("Processed %d/%d (%.2f%%)" % (counter, total_images, counter / total_images * 100), end="\r")
         logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
@@ -128,8 +132,12 @@ class ImageSequenceDataset(Dataset):
 
         image_sequence = []
         for img_path in image_paths:
-            image_sequence.append(self.image_cache[img_path])
-        image_sequence = torch.cat(image_sequence, 0)
+            image = self.runtime_transformer(self.image_cache[img_path])
+            if self.minus_point_5:
+                image = image - 0.5  # from [0, 1] -> [-0.5, 0.5]
+            image = self.normalizer(image)
+            image_sequence.append(image)
+        image_sequence = torch.stack(image_sequence, 0)
 
         return (seq_len, seq, type, id), image_sequence, gt_rel_poses
 
