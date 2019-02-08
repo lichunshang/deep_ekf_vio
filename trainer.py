@@ -30,7 +30,7 @@ class _TrainAssistant(object):
             self.lstm_state_cache[key] = lstm_states[i, :, :, :]
 
     def retrieve_lstm_state(self, t_x_meta):
-        _, seq_list, type_list, id_list, _ = SubseqDataset.decode_batch_meta_info(t_x_meta)
+        _, seq_list, type_list, id_list, id_next_list = SubseqDataset.decode_batch_meta_info(t_x_meta)
         num_batches = len(seq_list)
 
         lstm_states = []
@@ -40,7 +40,8 @@ class _TrainAssistant(object):
             if key in self.lstm_state_cache:
                 tmp = self.lstm_state_cache[key]
             else:
-                assert (not (id_list[i] >= par.seq_len - 1 and self.epoch > 0))
+                # This assert only checks "vanilla" sequences for now
+                assert (not (self.epoch > 0 and id_list[i] >= par.seq_len - 1 and id_next_list[i] > id_list[i]))
                 num_layers = par.rnn_num_layers
                 hidden_size = par.rnn_hidden_size
                 tmp = torch.zeros(2, num_layers, hidden_size)

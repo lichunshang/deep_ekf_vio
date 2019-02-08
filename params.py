@@ -1,7 +1,6 @@
 import os
 import datetime
 import torch
-from collections import namedtuple
 
 
 class AttrDict(dict):
@@ -27,10 +26,10 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.train_seqs = ['00', '01', '02', '05', '08', '09']
-        self.valid_seqs = ['04', '06', '07', '10']
-        # self.train_seqs = ['09']
-        # self.valid_seqs = ['06']
+        # self.train_seqs = ['00', '01', '02', '05', '08', '09']
+        # self.valid_seqs = ['04', '06', '07', '10']
+        self.train_seqs = ['04']
+        self.valid_seqs = ['06']
 
         self.img_w = 320
         self.img_h = 96
@@ -38,7 +37,7 @@ class Parameters(object):
         self.img_stds = (0.3174070577943728, 0.31982824445835345, 0.32372934976798146)
         self.minus_point_5 = True
 
-        self.seq_len = 128
+        self.seq_len = 5
         self.sample_times = 3
 
         # Model
@@ -70,6 +69,7 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
+            "enable": True,
             "lr_flip": False,
             "td_flip": False,
             "reverse": True,

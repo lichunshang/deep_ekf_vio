@@ -39,7 +39,7 @@ def convert_subseqs_list_to_panda(subseqs):
 
 
 def get_subseqs(sequences, seq_len, overlap, sample_times=1):
-    subseqs = []
+    subseq_list = []
 
     for seq in sequences:
         start_t = time.time()
@@ -56,7 +56,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times=1):
 
         for st in start_frames:
             jump = seq_len - overlap
-            sub_seqs_buffer = []
+            subseqs_buffer = []
             # The original image and data
             # normal_subseq_image_path, normal_subseq_gt_pose, normal_subseq_ids = [], [], []
             sub_seqs_vanilla = []
@@ -65,18 +65,26 @@ def get_subseqs(sequences, seq_len, overlap, sample_times=1):
                     subseq = Subsequence(image_paths[i:i + seq_len], length=seq_len, seq=seq, type="vanilla", idx=i,
                                          idx_next=i + jump, gt_poses=gt_poses[i:i + seq_len])
                     sub_seqs_vanilla.append(subseq)
-            sub_seqs_buffer += sub_seqs_vanilla
+            subseqs_buffer += sub_seqs_vanilla
 
             # Reverse, effectively doubles the number of examples
-            # if par.data_aug_transforms.reverse:
-            #     subseq_coll.add_reversed_buffer()
+            if par.data_aug_transforms.enable:
+                if par.data_aug_transforms.reverse:
+                    subseqs_rev_buffer = []
+                    for subseq in subseqs_buffer:
+                        subseq_rev = Subsequence(list(reversed(subseq.image_paths)), length=subseq.length, seq=seq,
+                                                 type=subseq.type + "_reversed",
+                                                 idx=subseq.id_next, idx_next=subseq.id,
+                                                 gt_poses=np.flip(subseq.gt_poses, axis=0))
+                        subseqs_rev_buffer.append(subseq_rev)
+                    subseqs_buffer += subseqs_rev_buffer
 
             # collect the sub-sequences
-            subseqs += sub_seqs_buffer
+            subseq_list += subseqs_buffer
 
         print('Folder %s finish in %.2f sec' % (seq, time.time() - start_t))
 
-    return subseqs
+    return subseq_list
 
 
 class SubseqDataset(Dataset):
@@ -112,7 +120,7 @@ class SubseqDataset(Dataset):
         self.subseqs = subseqs
         self.image_cache = {}
 
-        total_images = len(self.subseqs[0].length) * len(subseqs)
+        total_images = self.subseqs[0].length * len(subseqs)
         counter = 0
         start_t = time.time()
         for subseq in self.subseqs:
@@ -124,9 +132,9 @@ class SubseqDataset(Dataset):
         logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
 
     def __getitem__(self, index):
-
         subseq = self.subseqs[index]
-        # transform
+
+        # get relative poses
         gt_rel_poses = []
         for i in range(1, len(subseq.gt_poses)):
             T_i_vkm1 = subseq.gt_poses[i - 1]
@@ -166,4 +174,4 @@ class SubseqDataset(Dataset):
         return seq_len_list, seq_list, type_list, id_list, id_next_list
 
     def __len__(self):
-        return len(self.data_info.index)
+        return len(self.subseqs)
