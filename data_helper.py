@@ -77,10 +77,11 @@ class ImageSequenceDataset(Dataset):
         ])
 
         if training:
-            self.runtime_transformer = transforms.Compose([
-                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
-                transforms.ToTensor()
-            ])
+            transform_ops = []
+            if par.data_aug_rand_color.enable:
+                transform_ops.append(transforms.ColorJitter(**par.data_aug_rand_color.params))
+            transform_ops.append(transforms.ToTensor())
+            self.runtime_transformer = transforms.Compose(transform_ops)
         else:
             self.runtime_transformer = transforms.ToTensor()
 
@@ -88,11 +89,18 @@ class ImageSequenceDataset(Dataset):
         self.minus_point_5 = minus_point_5
         self.normalizer = transforms.Normalize(mean=img_mean, std=img_std)
 
+        # log
+        logger.print("Transform parameters: ")
+        logger.print("pre_runtime_transformer:", self.pre_runtime_transformer)
+        logger.print("runtime_transformer:", self.runtime_transformer)
+        logger.print("minus_point_5:", self.minus_point_5)
+        logger.print("normalizer:", self.normalizer)
+
+        # organize data
         self.data_info = info_dataframe
         self.subseq_len_list = list(self.data_info.seq_len)
         self.subseq_image_path_list = np.asarray(self.data_info.image_path)  # image paths
         self.subseq_gt_pose_list = np.asarray(self.data_info.pose)
-
         self.subseq_type_list = np.asarray(self.data_info.type)
         self.subseq_seq_list = np.asarray(self.data_info.seq)
         self.subseq_id_list = np.asarray(self.data_info.id)

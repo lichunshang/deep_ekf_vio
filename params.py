@@ -1,6 +1,13 @@
 import os
 import datetime
 import torch
+from collections import namedtuple
+
+
+class AttrDict(dict):
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        self.__dict__ = self
 
 
 class Parameters(object):
@@ -51,11 +58,22 @@ class Parameters(object):
         self.optimizer_args = {'lr': 0.001}
 
         self.stateful_training = True
-        self.data_augmentation = {
+
+        # data augmentation
+        self.data_aug_rand_color = AttrDict({
+            "enable": True,
+            "params": {
+                "brightness": 0.1,
+                "contrast": 0.1,
+                "saturation": 0.1,
+                "hue": 0.05
+            }
+        })
+        self.data_aug_transforms = namedtuple("_", {
             "reverse": True,
             "mirror": True,
             "reverse_mirror": True,
-        }
+        })
 
         # Pretrain, Resume training
         self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/flownets_bn_EPE2.459.pth.tar')
