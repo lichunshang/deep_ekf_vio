@@ -35,7 +35,7 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
         logger.print("Generating trajectory for seq...", seq)
         start_time = time.time()
 
-        subseqs = get_subseqs(sequences=[seq], seq_len=seq_len, overlap=1, sample_times=1)
+        subseqs = get_subseqs([seq], seq_len, overlap=1, sample_times=1, training=False)
         dataset = SubseqDataset(subseqs, (par.img_w, par.img_h), par.img_means, par.img_stds, par.minus_point_5,
                                 training=False)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)

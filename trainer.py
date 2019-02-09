@@ -116,8 +116,8 @@ def train(resume_model_path, resume_optimizer_path):
     # Prepare Data
     logger.print('Creating new data info')
 
-    train_subseqs = get_subseqs(sequences=par.train_seqs, seq_len=par.seq_len, overlap=1, sample_times=par.sample_times)
-    valid_subseqs = get_subseqs(sequences=par.valid_seqs, seq_len=par.seq_len, overlap=1, sample_times=1)
+    train_subseqs = get_subseqs(par.train_seqs, par.seq_len, overlap=1, sample_times=par.sample_times, training=True)
+    valid_subseqs = get_subseqs(par.valid_seqs, par.seq_len, overlap=1, sample_times=1, training=False)
     # save record of the train/val data
     convert_subseqs_list_to_panda(train_subseqs).to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
     convert_subseqs_list_to_panda(valid_subseqs).to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
@@ -133,7 +133,7 @@ def train(resume_model_path, resume_optimizer_path):
                           pin_memory=par.pin_mem, drop_last=False)
 
     logger.print('Number of samples in training dataset: %d' % len(train_subseqs))
-    logger.print('Number of samples in validation dataset: %d' % len(train_subseqs))
+    logger.print('Number of samples in validation dataset: %d' % len(valid_subseqs))
 
     # Model
     e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)

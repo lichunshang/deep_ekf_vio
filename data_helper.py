@@ -38,7 +38,7 @@ def convert_subseqs_list_to_panda(subseqs):
     return pd.DataFrame(data, columns=data.keys())
 
 
-def get_subseqs(sequences, seq_len, overlap, sample_times=1):
+def get_subseqs(sequences, seq_len, overlap, sample_times, training):
     subseq_list = []
 
     for seq in sequences:
@@ -68,7 +68,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times=1):
             subseqs_buffer += sub_seqs_vanilla
 
             # Reverse, effectively doubles the number of examples
-            if par.data_aug_transforms.enable:
+            if training and par.data_aug_transforms.enable:
                 if par.data_aug_transforms.reverse:
                     subseqs_rev_buffer = []
                     for subseq in subseqs_buffer:
