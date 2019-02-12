@@ -125,12 +125,12 @@ def train(resume_model_path, resume_optimizer_path):
     train_dataset = SubseqDataset(train_subseqs, (par.img_w, par.img_h), par.img_means,
                                   par.img_stds, par.minus_point_5)
     train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
-                          pin_memory=par.pin_mem, drop_last=False)
+                          pin_memory=par.pin_mem, drop_last=True)
 
     valid_dataset = SubseqDataset(valid_subseqs, (par.img_w, par.img_h), par.img_means,
                                   par.img_stds, par.minus_point_5, training=False)
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
-                          pin_memory=par.pin_mem, drop_last=False)
+                          pin_memory=par.pin_mem, drop_last=True)
 
     logger.print('Number of samples in training dataset: %d' % len(train_subseqs))
     logger.print('Number of samples in validation dataset: %d' % len(valid_subseqs))

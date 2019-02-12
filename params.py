@@ -16,7 +16,7 @@ class Parameters(object):
         self.timestamp = datetime.datetime.today()
 
         self.n_processors = 8
-        self.n_gpu = 1
+        self.n_gpu = 2
 
         # Path
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
@@ -53,10 +53,10 @@ class Parameters(object):
         self.epochs = 200
         self.batch_size = 8
         self.pin_mem = True
-        self.optimizer = torch.optim.Adam
+        self.optimizer = torch.optim.Adagrad
         self.optimizer_args = {'lr': 0.001}
 
-        self.stateful_training = True
+        self.stateful_training = False
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({
