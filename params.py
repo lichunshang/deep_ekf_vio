@@ -16,7 +16,7 @@ class Parameters(object):
         self.timestamp = datetime.datetime.today()
 
         self.n_processors = 8
-        self.n_gpu = 1
+        self.n_gpu = 2
 
         # Path
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
@@ -26,22 +26,22 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        # self.train_seqs = ['00', '01', '02', '05', '08', '09']
-        # self.valid_seqs = ['04', '06', '07', '10']
-        self.train_seqs = ['04']
-        self.valid_seqs = ['06']
+        self.train_seqs = ['00', '01', '02', '05', '08', '09']
+        self.valid_seqs = ['04', '06', '07', '10']
+        # self.train_seqs = ['01']
+        # self.valid_seqs = ['06']
 
         self.img_w = 320
         self.img_h = 96
         self.img_means = (-0.151812640483464, -0.13357509111350818, -0.14181910364786987)
-        self.img_stds = (0.3174070577943728, 0.31982824445835345, 0.32372934976798146)
+        self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
 
-        self.seq_len = 16
+        self.seq_len = 128
         self.sample_times = 3
 
         # Model
-        self.rnn_hidden_size = 10
+        self.rnn_hidden_size = 1000
         self.rnn_num_layers = 2
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
@@ -51,7 +51,7 @@ class Parameters(object):
 
         # Training
         self.epochs = 200
-        self.batch_size = 4
+        self.batch_size = 8
         self.pin_mem = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 0.001}
@@ -69,7 +69,7 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
-            "enable": True,
+            "enable": False,
             "lr_flip": False,
             "td_flip": False,
             "reverse": True,

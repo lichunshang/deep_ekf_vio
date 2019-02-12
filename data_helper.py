@@ -10,6 +10,7 @@ from log import logger
 from torchvision import transforms
 import time
 from params import par
+from cache import image_cache
 
 
 class Subsequence(object):
@@ -118,15 +119,13 @@ class SubseqDataset(Dataset):
 
         # organize data
         self.subseqs = subseqs
-        self.image_cache = {}
-
         total_images = self.subseqs[0].length * len(subseqs)
         counter = 0
         start_t = time.time()
         for subseq in self.subseqs:
             for path in subseq.image_paths:
-                if path not in self.image_cache:
-                    self.image_cache[path] = self.pre_runtime_transformer(Image.open(path))
+                if not image_cache.exists(path):
+                    image_cache.store(path, self.pre_runtime_transformer(Image.open(path)))
                 counter += 1
                 print("Processed %d/%d (%.2f%%)" % (counter, total_images, counter / total_images * 100), end="\r")
         logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
@@ -148,7 +147,7 @@ class SubseqDataset(Dataset):
 
         image_sequence = []
         for img_path in subseq.image_paths:
-            image = self.runtime_transformer(self.image_cache[img_path])
+            image = self.runtime_transformer(image_cache.get(img_path))
             if self.minus_point_5:
                 image = image - 0.5  # from [0, 1] -> [-0.5, 0.5]
             image = self.normalizer(image)

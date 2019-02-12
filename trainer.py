@@ -1,6 +1,5 @@
 import torch
 import torch.nn.functional
-from torch.utils.data import DataLoader
 import numpy as np
 import os
 import time
@@ -8,6 +7,35 @@ from params import par
 from model import DeepVO
 from data_helper import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
 from log import logger
+from torch.utils.data import DataLoader
+from eval.kitti_eval_pyimpl import KittiErrorCalc
+from eval.gen_trajectory_rel import gen_trajectory_rel_iter
+
+
+class _OnlineDatasetEvaluator(object):
+    def __init__(self, model, sequences, eval_length):
+        self.model = model  # this is a reference
+        self.dataloaders = {}
+        self.error_calc = KittiErrorCalc(sequences)
+        logger.print("Loading data for the online dataset evaluator...")
+        for seq in sequences:
+            subseqs = get_subseqs([seq], eval_length, overlap=1, sample_times=1, training=False)
+            dataset = SubseqDataset(subseqs, (par.img_w, par.img_h), par.img_means, par.img_stds, par.minus_point_5,
+                                    training=False)
+            dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
+            self.dataloaders[seq] = dataloader
+
+    def evaluate_rel(self):
+        start_time = time.time()
+        seqs = sorted(list(self.dataloaders.keys()))
+        for seq in seqs:
+            predicted_abs_poses = gen_trajectory_rel_iter(self.model, self.dataloaders[seq], True)
+            self.error_calc.accumulate_error(seq, predicted_abs_poses)
+        ave_err = self.error_calc.get_average_error()
+        self.error_calc.clear()
+        logger.print("Online evaluation took %.2fs, err %.6f" % (time.time() - start_time, ave_err))
+
+        return ave_err
 
 
 class _TrainAssistant(object):
@@ -114,31 +142,26 @@ def train(resume_model_path, resume_optimizer_path):
     logger.log_source_files()
 
     # Prepare Data
-    logger.print('Creating new data info')
-
     train_subseqs = get_subseqs(par.train_seqs, par.seq_len, overlap=1, sample_times=par.sample_times, training=True)
-    valid_subseqs = get_subseqs(par.valid_seqs, par.seq_len, overlap=1, sample_times=1, training=False)
-    # save record of the train/val data
     convert_subseqs_list_to_panda(train_subseqs).to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
-    convert_subseqs_list_to_panda(valid_subseqs).to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
-
     train_dataset = SubseqDataset(train_subseqs, (par.img_w, par.img_h), par.img_means,
                                   par.img_stds, par.minus_point_5)
     train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
+    logger.print('Number of samples in training dataset: %d' % len(train_subseqs))
 
+    valid_subseqs = get_subseqs(par.valid_seqs, par.seq_len, overlap=1, sample_times=1, training=False)
+    convert_subseqs_list_to_panda(valid_subseqs).to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
     valid_dataset = SubseqDataset(valid_subseqs, (par.img_w, par.img_h), par.img_means,
                                   par.img_stds, par.minus_point_5, training=False)
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
-
-    logger.print('Number of samples in training dataset: %d' % len(train_subseqs))
     logger.print('Number of samples in validation dataset: %d' % len(valid_subseqs))
 
     # Model
     e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)
     e2e_vio_model = e2e_vio_model.cuda()
-    e2e_vio_model_orig = e2e_vio_model
+    online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, 50)
 
     # Load FlowNet weights pretrained with FlyingChairs
     # NOTE: the pretrained model assumes image rgb values in range [-0.5, 0.5]
@@ -163,15 +186,16 @@ def train(resume_model_path, resume_optimizer_path):
             logger.print('Load optimizer from: %s' % resume_optimizer_path)
 
     # if to use more than one GPU
-    # if par.n_gpu > 1:
-    #     assert (torch.cuda.device_count() == par.n_gpu)
-    e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
+    if par.n_gpu > 1:
+        assert (torch.cuda.device_count() == par.n_gpu)
+        e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
 
     e2e_vio_ta = _TrainAssistant(e2e_vio_model)
 
     # Train
     min_loss_t = 1e10
     min_loss_v = 1e10
+    min_err_eval = 1e10
     for epoch in range(par.epochs):
         e2e_vio_ta.epoch = epoch
         st_t = time.time()
@@ -211,15 +235,21 @@ def train(resume_model_path, resume_optimizer_path):
         logger.print('Epoch {}\ntrain loss mean: {}, std: {}\nvalid loss mean: {}, std: {}\n'.
                      format(epoch + 1, loss_mean, np.std(t_loss_list), loss_mean_valid, np.std(v_loss_list)))
 
+        err_eval = online_evaluator.evaluate_rel()
+        logger.tensorboard.add_scalar("eval_loss/epochs", err_eval, epoch)
+
         # Save model
         if (epoch + 1) % 5 == 0:
             logger.log_training_state("checkpoint", epoch + 1, e2e_vio_model.state_dict(), optimizer.state_dict())
         if loss_mean_valid < min_loss_v:
             min_loss_v = loss_mean_valid
             logger.log_training_state("valid", epoch + 1, e2e_vio_model.state_dict())
-        if loss_mean < min_loss_t and epoch:
+        if loss_mean < min_loss_t:
             min_loss_t = loss_mean
             logger.log_training_state("train", epoch + 1, e2e_vio_model.state_dict())
+        if err_eval < min_err_eval:
+            min_err_eval = err_eval
+            logger.log_training_state("eval", epoch + 1, e2e_vio_model.state_dict())
 
         logger.print("Latest saves:",
                      " ".join(["%s: %s" % (k, v) for k, v in logger.log_training_state_latest_epoch.items()]))
