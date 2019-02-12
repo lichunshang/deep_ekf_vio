@@ -82,7 +82,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             # collect the sub-sequences
             subseq_list += subseqs_buffer
 
-        print('Folder %s finish in %.2f sec' % (seq, time.time() - start_t))
+        print('Folder %s finish in %.2g sec' % (seq, time.time() - start_t))
 
     return subseq_list
 
@@ -110,11 +110,11 @@ class SubseqDataset(Dataset):
         self.normalizer = transforms.Normalize(mean=img_mean, std=img_std)
 
         # log
-        logger.print("Transform parameters: ")
-        logger.print("pre_runtime_transformer:", self.pre_runtime_transformer)
-        logger.print("runtime_transformer:", self.runtime_transformer)
-        logger.print("minus_point_5:", self.minus_point_5)
-        logger.print("normalizer:", self.normalizer)
+        # logger.print("Transform parameters: ")
+        # logger.print("pre_runtime_transformer:", self.pre_runtime_transformer)
+        # logger.print("runtime_transformer:", self.runtime_transformer)
+        # logger.print("minus_point_5:", self.minus_point_5)
+        # logger.print("normalizer:", self.normalizer)
 
         # organize data
         self.subseqs = subseqs
