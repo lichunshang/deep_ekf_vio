@@ -10,6 +10,28 @@ from torch.utils.data import DataLoader
 from log import logger
 
 
+def gen_trajectory_rel_iter(model, dataloader, prop_lstm_states):
+    predicted_abs_poses = [np.eye(4, 4), ]
+    lstm_states = None  # none defaults to zero
+    for i, batch in enumerate(dataloader):
+        print('%d/%d (%.2f%%)' % (i, len(dataloader), i * 100 / len(dataloader)), end="\r")
+        _, x, _ = batch
+
+        lstm_states = lstm_states if prop_lstm_states else None
+        predicted_rel_poses, lstm_states = model.forward(x.cuda(), lstm_states)
+
+        lstm_states = lstm_states.detach()
+        predicted_rel_poses = predicted_rel_poses.detach().cpu().numpy()
+
+        for rel_pose in predicted_rel_poses[-1]:  # select the only batch
+            T_vkm1_vk = se3_math.T_from_Ct(se3_math.exp_SO3(rel_pose[3:6]), rel_pose[0:3])
+            T_i_vk = predicted_abs_poses[-1].dot(T_vkm1_vk)
+            se3_math.log_SO3(T_i_vk[0:3, 0:3])  # just here to check for warnings
+            predicted_abs_poses.append(T_i_vk)
+
+    return predicted_abs_poses
+
+
 def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
     # Path
     model_file_path = os.path.abspath(model_file_path)
@@ -41,24 +63,7 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
         gt_abs_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
 
-        predicted_abs_poses = [np.eye(4, 4), ]
-        lstm_states = None  # none defaults to zero
-
-        for i, batch in enumerate(dataloader):
-            print('%d/%d (%.2f%%)' % (i, len(dataloader), i * 100 / len(dataloader)), end="\r")
-            _, x, _ = batch
-
-            lstm_states = lstm_states if prop_lstm_states else None
-            predicted_rel_poses, lstm_states = M_deepvo.forward(x.cuda(), lstm_states)
-
-            lstm_states = lstm_states.detach()
-            predicted_rel_poses = predicted_rel_poses.detach().cpu().numpy()
-
-            for rel_pose in predicted_rel_poses[-1]:  # select the only batch
-                T_vkm1_vk = se3_math.T_from_Ct(se3_math.exp_SO3(rel_pose[3:6]), rel_pose[0:3])
-                T_i_vk = predicted_abs_poses[-1].dot(T_vkm1_vk)
-                se3_math.log_SO3(T_i_vk[0:3, 0:3])  # just here to check for warnings
-                predicted_abs_poses.append(T_i_vk)
+        predicted_abs_poses = gen_trajectory_rel_iter(M_deepvo, dataloader, prop_lstm_states)
 
         np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "est_poses", seq + ".npy")),
                 predicted_abs_poses)

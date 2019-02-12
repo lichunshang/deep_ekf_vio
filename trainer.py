@@ -138,6 +138,7 @@ def train(resume_model_path, resume_optimizer_path):
     # Model
     e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)
     e2e_vio_model = e2e_vio_model.cuda()
+    e2e_vio_model_orig = e2e_vio_model
 
     # Load FlowNet weights pretrained with FlyingChairs
     # NOTE: the pretrained model assumes image rgb values in range [-0.5, 0.5]
@@ -162,9 +163,9 @@ def train(resume_model_path, resume_optimizer_path):
             logger.print('Load optimizer from: %s' % resume_optimizer_path)
 
     # if to use more than one GPU
-    if par.n_gpu > 1:
-        assert (torch.cuda.device_count() == par.n_gpu)
-        e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
+    # if par.n_gpu > 1:
+    #     assert (torch.cuda.device_count() == par.n_gpu)
+    e2e_vio_model = torch.nn.DataParallel(e2e_vio_model)
 
     e2e_vio_ta = _TrainAssistant(e2e_vio_model)
 
