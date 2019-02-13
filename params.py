@@ -56,7 +56,7 @@ class Parameters(object):
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 0.0001}
 
-        self.stateful_training = True
+        self.stateful_training = False
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({
