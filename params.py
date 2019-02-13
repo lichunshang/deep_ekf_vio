@@ -54,7 +54,7 @@ class Parameters(object):
         self.batch_size = 8
         self.pin_mem = True
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 0.001}
+        self.optimizer_args = {'lr': 0.0001}
 
         self.stateful_training = True
 
@@ -69,7 +69,7 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
-            "enable": False,
+            "enable": True,
             "lr_flip": False,
             "td_flip": False,
             "reverse": True,
