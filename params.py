@@ -70,8 +70,7 @@ class Parameters(object):
         })
         self.data_aug_transforms = AttrDict({
             "enable": True,
-            "lr_flip": False,
-            "td_flip": False,
+            "lr_flip": True,
             "reverse": True,
         })
 
