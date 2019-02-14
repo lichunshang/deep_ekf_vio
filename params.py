@@ -46,7 +46,7 @@ class Parameters(object):
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
         self.rnn_dropout_between = 0  # 0: no dropout
-        self.clip = None
+        self.clip = 0.001
         self.batch_norm = True
 
         # Training
@@ -54,7 +54,7 @@ class Parameters(object):
         self.batch_size = 8
         self.pin_mem = True
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 0.0001}
+        self.optimizer_args = {'lr': 0.001}
 
         self.stateful_training = False
 
