@@ -68,8 +68,20 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
                     sub_seqs_vanilla.append(subseq)
             subseqs_buffer += sub_seqs_vanilla
 
-            # Reverse, effectively doubles the number of examples
             if training and par.data_aug_transforms.enable:
+                if par.data_aug_transforms.lr_flip:
+                    subseq_flipped_buffer = []
+                    H = np.diag([-1, 1, 1])  # reflection matrix, flip x, across the yz plane
+                    for subseq in sub_seqs_vanilla:
+                        gt_poses = [se3_math.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())),
+                                                       H.dot(T[0:3, 3])) for T in subseq.gt_poses]
+                        subseq_flipped = Subsequence(subseq.image_paths, length=subseq.length, seq=seq,
+                                                     type=subseq.type + "_flippedlr", idx=subseq.id,
+                                                     idx_next=subseq.id_next, gt_poses=gt_poses)
+                        subseq_flipped_buffer.append(subseq_flipped)
+                    subseqs_buffer += subseq_flipped_buffer
+
+                # Reverse, effectively doubles the number of examples
                 if par.data_aug_transforms.reverse:
                     subseqs_rev_buffer = []
                     for subseq in subseqs_buffer:
@@ -148,6 +160,8 @@ class SubseqDataset(Dataset):
         image_sequence = []
         for img_path in subseq.image_paths:
             image = self.runtime_transformer(image_cache.get(img_path))
+            if "flippedlr" in subseq.type:
+                image = torch.flip(image, dims=[1])
             if self.minus_point_5:
                 image = image - 0.5  # from [0, 1] -> [-0.5, 0.5]
             image = self.normalizer(image)
