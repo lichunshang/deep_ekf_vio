@@ -125,7 +125,10 @@ class _TrainAssistant(object):
         loss = self.get_loss(t_x_meta, x, y)
         loss.backward()
         if self.clip is not None:
-            torch.nn.utils.clip_grad_norm(self.model.rnn.parameters(), self.clip)
+            if isinstance(self.model, torch.nn.DataParallel):
+                torch.nn.utils.clip_grad_norm(self.model.module.rnn.parameters(), self.clip)
+            else:
+                torch.nn.utils.clip_grad_norm(self.model.rnn.parameters(), self.clip)
         optimizer.step()
         return loss
 
