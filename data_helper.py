@@ -59,7 +59,6 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             jump = seq_len - overlap
             subseqs_buffer = []
             # The original image and data
-            # normal_subseq_image_path, normal_subseq_gt_pose, normal_subseq_ids = [], [], []
             sub_seqs_vanilla = []
             for i in range(st, len(image_paths), jump):
                 if i + seq_len <= len(image_paths):  # this will discard a few frames at the end
@@ -73,11 +72,11 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
                     subseq_flipped_buffer = []
                     H = np.diag([-1, 1, 1])  # reflection matrix, flip x, across the yz plane
                     for subseq in sub_seqs_vanilla:
-                        gt_poses = [se3_math.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())),
-                                                       H.dot(T[0:3, 3])) for T in subseq.gt_poses]
+                        flipped_gt_poses = [se3_math.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())),
+                                                               H.dot(T[0:3, 3])) for T in subseq.gt_poses]
                         subseq_flipped = Subsequence(subseq.image_paths, length=subseq.length, seq=seq,
                                                      type=subseq.type + "_flippedlr", idx=subseq.id,
-                                                     idx_next=subseq.id_next, gt_poses=gt_poses)
+                                                     idx_next=subseq.id_next, gt_poses=flipped_gt_poses)
                         subseq_flipped_buffer.append(subseq_flipped)
                     subseqs_buffer += subseq_flipped_buffer
 
@@ -101,12 +100,12 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
 
 
 class SubseqDataset(Dataset):
-    def __init__(self, subseqs, new_sizeize=None, img_mean=None, img_std=(1, 1, 1),
+    def __init__(self, subseqs, img_size=None, img_mean=None, img_std=(1, 1, 1),
                  minus_point_5=False, training=True):
 
         # Transforms
         self.pre_runtime_transformer = transforms.Compose([
-            transforms.Resize((new_sizeize[0], new_sizeize[1]))
+            transforms.Resize((img_size[0], img_size[1]))
         ])
 
         if training:
@@ -159,9 +158,11 @@ class SubseqDataset(Dataset):
 
         image_sequence = []
         for img_path in subseq.image_paths:
-            image = self.runtime_transformer(image_cache.get(img_path))
+
+            image = image_cache.get(img_path)
             if "flippedlr" in subseq.type:
-                image = torch.flip(image, dims=[1])
+                image = image.transpose(Image.FLIP_LEFT_RIGHT)
+            image = self.runtime_transformer(image)
             if self.minus_point_5:
                 image = image - 0.5  # from [0, 1] -> [-0.5, 0.5]
             image = self.normalizer(image)

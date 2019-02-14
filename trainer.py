@@ -20,7 +20,7 @@ class _OnlineDatasetEvaluator(object):
         logger.print("Loading data for the online dataset evaluator...")
         for seq in sequences:
             subseqs = get_subseqs([seq], eval_length, overlap=1, sample_times=1, training=False)
-            dataset = SubseqDataset(subseqs, (par.img_w, par.img_h), par.img_means, par.img_stds, par.minus_point_5,
+            dataset = SubseqDataset(subseqs, (par.img_h, par.img_w), par.img_means, par.img_stds, par.minus_point_5,
                                     training=False)
             dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
             self.dataloaders[seq] = dataloader
@@ -144,7 +144,7 @@ def train(resume_model_path, resume_optimizer_path):
     # Prepare Data
     train_subseqs = get_subseqs(par.train_seqs, par.seq_len, overlap=1, sample_times=par.sample_times, training=True)
     convert_subseqs_list_to_panda(train_subseqs).to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
-    train_dataset = SubseqDataset(train_subseqs, (par.img_w, par.img_h), par.img_means,
+    train_dataset = SubseqDataset(train_subseqs, (par.img_h, par.img_w), par.img_means,
                                   par.img_stds, par.minus_point_5)
     train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
@@ -152,7 +152,7 @@ def train(resume_model_path, resume_optimizer_path):
 
     valid_subseqs = get_subseqs(par.valid_seqs, par.seq_len, overlap=1, sample_times=1, training=False)
     convert_subseqs_list_to_panda(valid_subseqs).to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
-    valid_dataset = SubseqDataset(valid_subseqs, (par.img_w, par.img_h), par.img_means,
+    valid_dataset = SubseqDataset(valid_subseqs, (par.img_h, par.img_w), par.img_means,
                                   par.img_stds, par.minus_point_5, training=False)
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
