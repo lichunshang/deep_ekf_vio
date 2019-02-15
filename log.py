@@ -41,8 +41,12 @@ class Logger(object):
     def log_parameters(self):
         # Write all hyperparameters
         self.print("---------- PARAMETERS -----------")
-        self.print('\n'.join("%s: %s" % item for item in vars(par).items()))
+        d = vars(par)
+        s = '\n'.join("%s: %s" % (key, d[key]) for key in sorted(list(d.keys())))
+        self.print(s)
         self.print("---------------------------------")
+        if self.tensorboard:
+            self.tensorboard.add_text("params", s)
 
     def log_source_files(self):
         # log files
