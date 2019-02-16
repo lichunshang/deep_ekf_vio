@@ -26,8 +26,8 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.train_seqs = ['00', '01', '02', '05', '08', '09']
-        self.valid_seqs = ['04', '06', '07', '10']
+        self.train_seqs = ['00', '02', '08', '09',]
+        self.valid_seqs = ['04', '05', '06', "07", "10"]
         # self.train_seqs = ['01']
         # self.valid_seqs = ['06']
 
@@ -46,7 +46,7 @@ class Parameters(object):
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
         self.rnn_dropout_between = 0  # 0: no dropout
-        self.clip = 0.001
+        self.clip = None
         self.batch_norm = True
 
         # Training
@@ -54,7 +54,7 @@ class Parameters(object):
         self.batch_size = 8
         self.pin_mem = True
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 0.001}
+        self.optimizer_args = {'lr': 0.0001}
 
         self.stateful_training = False
 
