@@ -26,18 +26,21 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.train_seqs = ['00', '02', '08', '09',]
-        self.valid_seqs = ['04', '05', '06', "07", "10"]
+        # self.train_seqs = ['00', '02', '08', '09',]
+        # self.valid_seqs = ['04', '05', '06', "07", "10"]
         # self.train_seqs = ['01']
         # self.valid_seqs = ['06']
+        self.train_seqs = ['00', '01', '02', '05', '08', '09']
+        self.valid_seqs = ['04', '06', '07', '10']
 
-        self.img_w = 320
-        self.img_h = 96
+
+        self.img_w = 320 * 2
+        self.img_h = 96 * 2
         self.img_means = (-0.151812640483464, -0.13357509111350818, -0.14181910364786987)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
 
-        self.seq_len = 128
+        self.seq_len = 112
         self.sample_times = 3
 
         # Model
@@ -51,7 +54,7 @@ class Parameters(object):
 
         # Training
         self.epochs = 200
-        self.batch_size = 8
+        self.batch_size = 2
         self.pin_mem = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 0.0001}
