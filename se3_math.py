@@ -1,6 +1,7 @@
 import numpy as np
 from log import logger
 import transformations
+import scipy.linalg
 
 
 def skew3(v):
@@ -39,18 +40,23 @@ def log_SO3(C):
     else:
         phi = np.arccos((np.trace(C) - 1) / 2)
 
-    if abs(phi) > 1e-12:
+    assert (phi >= 0 and np.sin(phi) >= 0)
+
+    # theta = unskew3(scipy.linalg.logm(C))
+
+    if np.sin(phi) > 1e-2:
         u = unskew3(C - np.transpose(C)) / (2 * np.sin(phi))
         theta = phi * u
     else:
-        theta = 0.5 * unskew3(C - C.transpose())
+        # theta = 0.5 * unskew3(C - C.transpose())
+        theta = unskew3(scipy.linalg.logm(C))
 
     return theta
 
 
 def exp_SO3(phi):
     phi_norm = np.linalg.norm(phi)
-    if np.abs(phi_norm) > 1e-12:
+    if np.abs(phi_norm) > 1e-8:
         unit_phi = phi / phi_norm
         unit_phi_skewed = skew3(unit_phi)
         m = np.eye(3, 3) + np.sin(phi_norm) * unit_phi_skewed + \

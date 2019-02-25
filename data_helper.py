@@ -149,9 +149,9 @@ class SubseqDataset(Dataset):
         for i in range(1, len(subseq.gt_poses)):
             T_i_vkm1 = subseq.gt_poses[i - 1]
             T_i_vk = subseq.gt_poses[i]
-            T_vkm1_k = se3_math.reorthogonalize_SE3(np.linalg.inv(T_i_vkm1).dot(T_i_vk))
-            r_vk_vkm1_vkm1 = T_vkm1_k[0:3, 3]  # get the translation from T
-            phi_vkm1_vk = se3_math.log_SO3(T_vkm1_k[0:3, 0:3])
+            T_vkm1_vk = se3_math.reorthogonalize_SE3(np.linalg.inv(T_i_vkm1).dot(T_i_vk))
+            r_vk_vkm1_vkm1 = T_vkm1_vk[0:3, 3]  # get the translation from T
+            phi_vkm1_vk = se3_math.log_SO3(T_vkm1_vk[0:3, 0:3])
             gt_rel_poses.append(np.concatenate([r_vk_vkm1_vkm1, phi_vkm1_vk, ]))
 
         gt_rel_poses = torch.FloatTensor(gt_rel_poses)
