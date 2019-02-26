@@ -52,7 +52,7 @@ def plot_trajectory(working_dir):
         plt.axis("equal")
         plt.xlabel("x [m]")
         plt.ylabel("y [m]")
-        plt.title("KITTI Seq. %s Trajectory XY Plane" % sequence)
+        plt.title("Seq. %s Trajectory XY Plane" % sequence)
         plt.legend()
         plt.savefig(os.path.join(output_dir, "seq_%s_00_xy_traj.png" % sequence))
 
@@ -62,7 +62,7 @@ def plot_trajectory(working_dir):
         plt.axis("equal")
         plt.xlabel("x [m]")
         plt.ylabel("z [m]")
-        plt.title("KITTI Seq. %s Trajectory XZ Plane" % sequence)
+        plt.title("Seq. %s Trajectory XZ Plane" % sequence)
         plt.legend()
         plt.savefig(os.path.join(output_dir, "seq_%s_01_xz_traj.png" % sequence))
 
@@ -72,7 +72,7 @@ def plot_trajectory(working_dir):
         plt.axis("equal")
         plt.xlabel("y [m]")
         plt.ylabel("z [m]")
-        plt.title("KITTI Seq. %s Trajectory YZ Plane" % sequence)
+        plt.title("Seq. %s Trajectory YZ Plane" % sequence)
         plt.legend()
         plt.savefig(os.path.join(output_dir, "seq_%s_02_yz_traj.png" % sequence))
 
@@ -87,7 +87,7 @@ def plot_trajectory(working_dir):
             plt.plot(data_gt[j], linewidth=1.0, color="b", label="Ground Truth")
             plt.xlabel("frame # []")
             plt.ylabel(labels[j].lower())
-            plt.title("KITTI Sequence %s %s" % (sequence, labels[j]))
+            plt.title("Seq. %s %s" % (sequence, labels[j]))
             plt.legend()
             plt.savefig(os.path.join(output_dir, "seq_%s_%02d_%s_plt.png" %
                                      (sequence, j + 3, "_".join(labels[j].lower().split()))))

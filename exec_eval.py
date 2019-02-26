@@ -3,7 +3,7 @@ import argparse
 import os
 from params import par
 
-choices = ["gen_trajectory_rel", "plot_trajectory", "np_traj_to_kitti", "kitti_eval"]
+choices = ["gen_trajectory_rel", "plot_trajectory", "np_traj_to_kitti", "kitti_eval", "calc_error", "plot_error"]
 
 top_level_arg_parser = argparse.ArgumentParser(description='Execute evaluation scripts')
 top_level_arg_parser.add_argument('script', type=str, help='The program to run', choices=choices)
@@ -27,6 +27,16 @@ elif top_level_arg_parsed.script == "plot_trajectory":
     arg_parser = argparse.ArgumentParser(description='Plot trajectory')
     arg_parser.add_argument("working_dir", type=str, help="working directory of generated results")
     eval.plot_trajectory(arg_parser.parse_args(args=args).working_dir)
+
+elif top_level_arg_parsed.script == "plot_error":
+    arg_parser = argparse.ArgumentParser(description='Plot error')
+    arg_parser.add_argument("working_dir", type=str, help="working directory of generated results")
+    eval.plot_errors(arg_parser.parse_args(args=args).working_dir)
+
+elif top_level_arg_parsed.script == "calc_error":
+    arg_parser = argparse.ArgumentParser(description='Calculate error')
+    arg_parser.add_argument("working_dir", type=str, help="working directory of generated results")
+    eval.calc_error(arg_parser.parse_args(args=args).working_dir)
 
 elif top_level_arg_parsed.script == "np_traj_to_kitti":
     arg_parser = argparse.ArgumentParser(description='Convert np trajectory to KITTI')
