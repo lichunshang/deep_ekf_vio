@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 import se3_math
 from params import par
 from log import logger, Logger
+import os
 
-plt.switch_backend("Agg")
+if "DISPLAY" not in os.environ:
+    plt.switch_backend("Agg")
 
 
 def plot_trajectory(working_dir):

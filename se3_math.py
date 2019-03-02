@@ -31,24 +31,23 @@ def log_SO3(C):
 
     if arccos > 1:
         phi = 0.0
-        logger.print("WARNING: invalid arccos: %f\n" % arccos)
-        logger.print("%s\n" % str(C))
+        # logger.print("WARNING: invalid arccos: %f\n" % arccos)
+        # logger.print("%s\n" % str(C))
     elif arccos < -1:
         phi = np.pi
-        logger.print("WARNING: invalid arccos: %f\n" % arccos)
-        logger.print("%s\n" % str(C))
+        # logger.print("WARNING: invalid arccos: %f\n" % arccos)
+        # logger.print("%s\n" % str(C))
     else:
         phi = np.arccos((np.trace(C) - 1) / 2)
 
     assert (phi >= 0 and np.sin(phi) >= 0)
 
-    # theta = unskew3(scipy.linalg.logm(C))
-
-    if np.sin(phi) > 1e-2:
+    if phi < np.pi / 2 and np.sin(phi) > 1e-6:
         u = unskew3(C - np.transpose(C)) / (2 * np.sin(phi))
         theta = phi * u
+    elif phi < np.pi / 2:
+        theta = 0.5 * unskew3(C - C.transpose())
     else:
-        # theta = 0.5 * unskew3(C - C.transpose())
         theta = unskew3(scipy.linalg.logm(C))
 
     return theta
@@ -82,6 +81,22 @@ def T_from_Ct(C, r):
     T[0:3, 3] = r
 
     return T
+
+
+def interpolate_SO3(C1, C2, alpha):
+    C_interp = scipy.linalg.fractional_matrix_power(C2.dot(C1.transpose()), alpha).dot(C1)
+    if np.linalg.norm(np.imag(C_interp)) > 1e-10:
+        logger.print("Bad SO(3) interp:")
+        logger.print(C_interp)
+    return np.real(C_interp)
+
+
+def interpolate_SE3(T1, T2, alpha):
+    T_interp = scipy.linalg.fractional_matrix_power(T2.dot(np.linalg.inv(T1)), alpha).dot(T1)
+    if np.linalg.norm(np.imag(T_interp)) > 1e-10:
+        logger.print("Bad SE(3) interp:")
+        logger.print(T_interp)
+    return np.real(T_interp)
 
 
 # reorthogonalize the SO(3) part of SE(3) by normalizing a quaternion

@@ -11,7 +11,7 @@ function pose = convertOxtsToPose(oxts)
 
 % init pose
 pose = zeros(4, 4, size(oxts, 2));
-Tr_0_inv = [];
+% Tr_0_inv = [];
 
 lat0 = oxts{1}(1);
 lon0 = oxts{1}(2);
@@ -43,11 +43,11 @@ for i=1:length(oxts)
   R = eul2rotm([rz, ry, rx], 'ZYX');
   
   % normalize translation and rotation (start at 0/0/0)
-  if isempty(Tr_0_inv)
-    Tr_0_inv = inv([R t;0 0 0 1]);
-  end
+%   if isempty(Tr_0_inv)
+%     Tr_0_inv = inv([R t;0 0 0 1]);
+%   end
       
   % add pose
-  pose(:, :, i) = Tr_0_inv * [R t;0 0 0 1];
+  pose(:, :, i) = [R t;0 0 0 1];
 end
 

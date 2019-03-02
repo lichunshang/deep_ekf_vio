@@ -64,6 +64,7 @@ plot(squeeze(poses(1, 4, :)), squeeze(poses(2, 4, :)));
 xlabel('x'); ylabel('y');
 title('XY');
 axis equal;
+grid minor;
 saveas(gcf, strcat(base_dir, '/oxts/XY.png'))
 
 figure('visible','off'); clf;
@@ -72,6 +73,7 @@ plot(squeeze(poses(1, 4, :)), squeeze(poses(3, 4, :)));
 xlabel('x'); ylabel('z');
 title('XZ');
 axis equal;
+grid minor;
 saveas(gcf, strcat(base_dir, '/oxts/XZ.png'))
 
 figure('visible','off'); clf;
@@ -80,6 +82,7 @@ plot(squeeze(poses(2, 4, :)), squeeze(poses(3, 4, :)));
 xlabel('y'); ylabel('z');
 title('YZ');
 axis equal;
+grid minor;
 saveas(gcf, strcat(base_dir, '/oxts/YZ.png'))
 
 figure('visible','off'); clf;
@@ -87,6 +90,7 @@ hold on;
 plot(posmodes);
 xlabel('frames []'); ylabel('mode');
 title('Posmode');
+grid minor;
 saveas(gcf, strcat(base_dir, '/oxts/posmodes.png'))
 
 figure('visible','off'); clf;
@@ -94,6 +98,7 @@ hold on;
 plot(velmodes);
 xlabel('frames []'); ylabel('mode');
 title('Velmode');
+grid minor;
 saveas(gcf, strcat(base_dir, '/oxts/velmodes.png'))
 
 figure('visible','off'); clf;
@@ -101,4 +106,5 @@ hold on;
 plot(rotmodes);
 xlabel('frames []'); ylabel('mode');
 title('Rotmode');
+grid minor;
 saveas(gcf, strcat(base_dir, '/oxts/rotmodes.png'))

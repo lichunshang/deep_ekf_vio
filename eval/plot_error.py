@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from log import logger, Logger
 from scipy import stats
 
-plt.switch_backend("Agg")
+if "DISPLAY" not in os.environ:
+    plt.switch_backend("Agg")
 
 
 def plot_errors(working_dir):

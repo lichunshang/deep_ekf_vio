@@ -2,10 +2,12 @@ import eval
 import argparse
 import os
 from params import par
+import preprocess
 
-choices = ["gen_trajectory_rel", "plot_trajectory", "np_traj_to_kitti", "kitti_eval", "calc_error", "plot_error"]
+choices = ["gen_trajectory_rel", "plot_trajectory", "np_traj_to_kitti", "kitti_eval", "calc_error", "plot_error",
+           "preprocess_kitti_raw"]
 
-top_level_arg_parser = argparse.ArgumentParser(description='Execute evaluation scripts')
+top_level_arg_parser = argparse.ArgumentParser(description='Execute scripts')
 top_level_arg_parser.add_argument('script', type=str, help='The program to run', choices=choices)
 top_level_arg_parsed, args = top_level_arg_parser.parse_known_args()
 
@@ -52,6 +54,17 @@ elif top_level_arg_parsed.script == "kitti_eval":
                             default=par.valid_seqs)
     arg_parsed = arg_parser.parse_args(args=args)
     eval.kitti_eval(arg_parsed.working_dir, arg_parsed.train_seqs, arg_parsed.val_seqs)
+
+elif top_level_arg_parsed.script == "preprocess_kitti_raw":
+    arg_parser = argparse.ArgumentParser(description='Preprocess RAW Kitti Data')
+    arg_parser.add_argument('kitti_raw_dir', type=str, help='KITTI raw data path (extract)')
+    arg_parser.add_argument('output_dir', type=str,
+                            help='Output directory, the name of the output dir is also the sequence name')
+    arg_parser.add_argument('cam_subset_range', type=int, nargs=2,
+                            help="The subset the sequence to process, "
+                                 "indicated by camera frame start and end index, inclusive ")
+    arg_parsed = arg_parser.parse_args(args=args)
+    preprocess.preprocess_kitti_raw(arg_parsed.kitti_raw_dir, arg_parsed.output_dir, arg_parsed.cam_subset_range)
 
 else:
     print("Invalid selection!")
