@@ -266,22 +266,12 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
         dt = data_imu_timestamps[i + 1] - data_imu_timestamps[i]
         orientations_data_int.append(orientations_data_int[-1].dot(exp_SO3(dt * data_gyro_measurements[i])))
 
-    # integration of original gyro data
-    # orientations_imu_int = [np.eye(3,3)]
-    # for i in range(0, len(imu_timestamps) - 1):
-    #     dt = imu_timestamps[i + 1] - imu_timestamps[i]
-    #     orientations_imu_int.append(orientations_imu_int[-1].dot(exp_SO3(dt * imu_data[i, wx:wz + 1])))
-
     orientations_data_int = np.array([log_SO3(o) for o in orientations_data_int])
-    # orientations_imu_int = np.array([log_SO3(o) for o in orientations_imu_int])
-    # orientation_gps = np.array([log_SO3(data["T_i_vk"][0][:3, :3].transpose().dot(p[:3, :3])) for p in gps_poses])
     orientation_data_cam = np.array([log_SO3(p[:3, :3]) for p in data["T_i_vk"]])
 
     plt.clf()
     plt.plot(data_imu_timestamps, orientations_data_int[:, 0], label="data_int")
     plt.plot(data["timestamp"], orientation_data_cam[:, 0], label="data_poses")
-    # plt.plot(imu_timestamps, orientations_imu_int[:, 0], label="imu_int")
-    # plt.plot(imu_timestamps, orientation_gps[:, 0], label="gps")
     plt.xlabel("t [s]")
     plt.ylabel("theta [rad]")
     plt.title("Theta X Plot")
@@ -292,8 +282,6 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     plt.clf()
     plt.plot(data_imu_timestamps, orientations_data_int[:, 1], label="data_int")
     plt.plot(data["timestamp"], orientation_data_cam[:, 1], label="data_pose")
-    # plt.plot(imu_timestamps, orientations_imu_int[:, 1], label="imu_int")
-    # plt.plot(imu_timestamps, orientation_gps[:, 1], label="gps")
     plt.xlabel("t [s]")
     plt.ylabel("theta [rad]")
     plt.title("Theta Y Plot")
@@ -304,8 +292,6 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     plt.clf()
     plt.plot(data_imu_timestamps, np.unwrap(orientations_data_int[:, 2]), label="data_int")
     plt.plot(data["timestamp"], np.unwrap(orientation_data_cam[:, 2]), label="data_pose")
-    # plt.plot(imu_timestamps, orientations_imu_int[:, 2], label="imu_int")
-    # plt.plot(imu_timestamps, orientation_gps[:, 2], label="gps")
     plt.xlabel("t [s]")
     plt.ylabel("theta [rad]")
     plt.title("Theta Z Plot")
