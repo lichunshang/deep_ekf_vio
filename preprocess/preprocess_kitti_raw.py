@@ -1,9 +1,8 @@
 from log import logger
 import numpy as np
-from numpy.linalg import inv
 import os
 import transformations
-from se3_math import log_SO3, exp_SO3, interpolate_SE3, interpolate_SO3
+from se3_math import log_SO3, exp_SO3, interpolate_SE3, interpolate_SO3, log_SE3
 import matplotlib.pyplot as plt
 import time
 import pandas
@@ -31,6 +30,37 @@ class Frame(object):
         assert (len(imu_timestamps) == len(accel_measurements))
         assert (len(imu_timestamps) == len(gyro_measurements))
         assert (len(imu_timestamps) == len(imu_poses))
+
+
+class Plotter(object):
+    def __init__(self, output_dir):
+        self.output_dir = output_dir
+        self.counter = 0
+
+    def plot(self, plots, xlabel, ylabel, title, labels=None, equal_axes=False):
+        if not labels:
+            labels_txt = [None] * len(plots)
+        else:
+            labels_txt = labels
+        assert (len(plots) == len(labels_txt))
+
+        plt.clf()
+        for i in range(0, len(plots)):
+            plt.plot(*plots[i], label=labels_txt[i])
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.title(title)
+
+        if equal_axes:
+            plt.axis("equal")
+
+        if labels:
+            plt.legend()
+
+        plt.grid()
+        filename = "%02d_%s.png" % (self.counter, "_".join(title.lower().split()))
+        plt.savefig(os.path.join(self.output_dir, filename))
+        self.counter += 1
 
 
 def read_timestamps(ts_file):
@@ -74,7 +104,11 @@ def interpolate(imu_data_i, imu_data_j, pose_i, pose_j, alpha):
     v_hj = np.array([imu_data_j[vf], imu_data_j[vl], imu_data_j[vu]])
     v_hk = alpha * (v_hj - v_hi) + v_hi
     v_vk = C_i_vk.transpose().dot(C_i_hk).dot(v_hk)
-    # v_vk[1] = -v_vk[1]
+
+    # it seems there is a mismatch between reported velocity and velocity estimated
+    # from differentiating poses, they seem to be negative of each other only on the
+    # y axis, not sure why
+    v_vk[1] = -v_vk[1]
 
     return T_i_vk, v_vk, w_vk, a_vk
 
@@ -89,8 +123,7 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     oxts_dir = os.path.join(raw_seq_dir, "oxts")
     image_dir = os.path.join(raw_seq_dir, "image_02")
     gps_poses = np.loadtxt(os.path.join(oxts_dir, "poses.txt"))
-    gps_poses = np.array(
-            [np.vstack([np.reshape(p, [3, 4]), [0, 0, 0, 1]]) for p in gps_poses])  # convert to 4x4 matrices
+    gps_poses = np.array([np.vstack([np.reshape(p, [3, 4]), [0, 0, 0, 1]]) for p in gps_poses])
     T_velo_imu = np.loadtxt(os.path.join(raw_seq_dir, "../T_velo_imu.txt"))
     T_cam_velo = np.loadtxt(os.path.join(raw_seq_dir, '../T_cam_velo.txt'))
     T_cam_imu = T_cam_velo.dot(T_velo_imu)
@@ -177,15 +210,6 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
         assert (np.allclose(data_frames[-1].timestamp, data_frames[-1].imu_timestamps[0], atol=1e-13))
         assert (np.allclose(data_frames[-1].T_i_vk, data_frames[-1].imu_poses[0], atol=1e-13))
         if len(data_frames) > 1:
-            # self.image_path = image_path
-            # self.timestamp = timestamp
-            # self.T_i_vk = T_i_vk  # inertial to vehicle frame pose
-            # self.T_cam_imu = T_cam_imu  # calibration from imu to camera
-            # self.v_vk_i_vk = v_vk_i_vk  # velocity expressed in vehicle frame
-            # self.imu_timestamps = imu_timestamps
-            # self.imu_poses = imu_poses
-            # self.accel_measurements = accel_measurements
-            # self.gyro_measurements = gyro_measurements
             assert (np.allclose(data_frames[-1].timestamp, data_frames[-2].imu_timestamps[-1], atol=1e-13))
             assert (np.allclose(data_frames[-1].T_i_vk, data_frames[-2].imu_poses[-1], atol=1e-13))
             assert (
@@ -194,7 +218,7 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
                 np.allclose(data_frames[-1].accel_measurements[0], data_frames[-2].accel_measurements[-1], atol=1e-13))
 
     # add the last frame without any IMU data
-    data_frames.append(Frame(image_paths[-1], cam_timestamps[-1], T_i_vkp1, T_cam_imu, v_vkp1,
+    data_frames.append(Frame(image_paths[cam_subset_range[1]], t_kp1, T_i_vkp1, T_cam_imu, v_vkp1,
                              np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3])))
 
     logger.print("Processing data took %.2fs" % (time.time() - start_time))
@@ -213,157 +237,140 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     pandas_df.to_pickle(os.path.join(output_dir, "data.pickle"))
     logger.print("Saving pandas took %.2fs" % (time.time() - start_time))
 
-    # saving some figures for sanity test
+    # ============================== FIGURES FOR SANITY TESTS ==============================
     # plot trajectory
     start_time = time.time()
-    poses = np.array(data["T_i_vk"])
-    plt.clf()
-    plt.plot(poses[:, 0, 3], poses[:, 1, 3])  # XY
-    plt.xlabel("X [m]")
-    plt.ylabel("Y [m]")
-    plt.title("XY Plot")
-    plt.axis('equal')
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "00_xy_plot.png"))
+    plotter = Plotter(output_dir)
+    p_poses = np.array(data["T_i_vk"])
+    p_timestamps = np.array(data["timestamp"])
+    p_velocities = np.array(data["v_vk_i_vk"])
 
-    plt.clf()
-    plt.plot(poses[:, 0, 3], poses[:, 2, 3])  # XZ
-    plt.xlabel("X [m]")
-    plt.ylabel("Z [m]")
-    plt.title("XZ Plot")
-    plt.axis('equal')
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "01_xz_plot.png"))
-
-    plt.clf()
-    plt.plot(poses[:, 1, 3], poses[:, 2, 3])  # YZ
-    plt.xlabel("Y [m]")
-    plt.ylabel("Z [m]")
-    plt.title("YZ Plot")
-    plt.axis('equal')
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "02_yz_plot.png"))
-
-    # three velocities in one plot
-    velocities = np.array(data["v_vk_i_vk"])
-    poses_timestamps = np.array(data["timestamp"])
-    plt.clf()
-    plt.plot(poses_timestamps, velocities[:, 0], label="vx")
-    plt.plot(poses_timestamps, velocities[:, 1], label="vy")
-    plt.plot(poses_timestamps, velocities[:, 2], label="vz")
-    plt.xlabel("t [s]")
-    plt.ylabel("v [m/s]")
-    plt.title("Velocities Plot")
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "03_velocities_plot.png"))
-
-    # integrate gyroscope to compare against rotation
-    data_imu_timestamps = np.concatenate([d[:-1] for d in data['imu_timestamps']])
-    data_gyro_measurements = np.concatenate([d[:-1] for d in data['gyro_measurements']])
-    assert (len(data_imu_timestamps) == len(data_gyro_measurements))
-    orientations_data_int = [data["T_i_vk"][0][:3, :3]]
-    for i in range(0, len(data_imu_timestamps) - 1):
-        dt = data_imu_timestamps[i + 1] - data_imu_timestamps[i]
-        orientations_data_int.append(orientations_data_int[-1].dot(exp_SO3(dt * data_gyro_measurements[i])))
-
-    orientations_data_int = np.array([log_SO3(o) for o in orientations_data_int])
-    orientation_data_cam = np.array([log_SO3(p[:3, :3]) for p in data["T_i_vk"]])
-
-    plt.clf()
-    plt.plot(data_imu_timestamps, orientations_data_int[:, 0], label="data_int")
-    plt.plot(data["timestamp"], orientation_data_cam[:, 0], label="data_poses")
-    plt.xlabel("t [s]")
-    plt.ylabel("theta [rad]")
-    plt.title("Theta X Plot")
-    plt.legend()
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "04_theta_x_cmp_plot.png"))
-
-    plt.clf()
-    plt.plot(data_imu_timestamps, orientations_data_int[:, 1], label="data_int")
-    plt.plot(data["timestamp"], orientation_data_cam[:, 1], label="data_pose")
-    plt.xlabel("t [s]")
-    plt.ylabel("theta [rad]")
-    plt.title("Theta Y Plot")
-    plt.legend()
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "05_theta_y_cmp_plot.png"))
-
-    plt.clf()
-    plt.plot(data_imu_timestamps, np.unwrap(orientations_data_int[:, 2]), label="data_int")
-    plt.plot(data["timestamp"], np.unwrap(orientation_data_cam[:, 2]), label="data_pose")
-    plt.xlabel("t [s]")
-    plt.ylabel("theta [rad]")
-    plt.title("Theta Z Plot")
-    plt.legend()
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "06_theta_z_cmp_plot.png"))
+    p_imu_timestamps = np.concatenate([d[:-1] for d in data['imu_timestamps']])
+    p_gyro_measurements = np.concatenate([d[:-1] for d in data['gyro_measurements']])
+    p_accel_measurements = np.concatenate([d[:-1] for d in data["accel_measurements"]])
+    p_imu_poses = np.concatenate([d[:-1, :, :] for d in data["imu_poses"]])
+    assert (len(p_imu_timestamps) == len(p_gyro_measurements))
+    assert (len(p_imu_timestamps) == len(p_accel_measurements))
+    assert (len(p_imu_timestamps) == len(p_imu_poses))
 
     # integrate accel to compare against velocity
-    data_accel_measurements = np.concatenate([d[:-1] for d in data["accel_measurements"]])
-    data_imu_poses = np.concatenate([d[:-1, :, :] for d in data["imu_poses"]])
-
-    velocities_data_int = [velocities[0, :]]
+    p_accel_int = [p_velocities[0, :]]
+    p_accel_int_int = [p_poses[0, :3, 3]]
     # g = np.array([0, 0, 9.80665])
     g = np.array([0, 0, 9.808679801065017])
-    for i in range(0, len(data_imu_timestamps) - 1):
-        dt = data_imu_timestamps[i + 1] - data_imu_timestamps[i]
-        C_i_vk = data_imu_poses[i][:3, :3]
-        C_vkp1_vk = data_imu_poses[i + 1][:3, :3].transpose().dot(data_imu_poses[i][:3, :3])
+    # g = np.array([0, 0, 9.8096])
+    for i in range(0, len(p_imu_timestamps) - 1):
+        dt = p_imu_timestamps[i + 1] - p_imu_timestamps[i]
+        C_i_vk = p_imu_poses[i, :3, :3]
+        C_vkp1_vk = p_imu_poses[i + 1, :3, :3].transpose().dot(p_imu_poses[i, :3, :3])
 
-        v_vk_i_vk = velocities_data_int[-1]
-        v_vkp1_vk_vk = dt * (data_accel_measurements[i] - C_i_vk.transpose().dot(g))
+        v_vk_i_vk = p_accel_int[-1]
+        v_vkp1_vk_vk = dt * (p_accel_measurements[i] - C_i_vk.transpose().dot(g))
         v_vkp1_i_vk = v_vk_i_vk + v_vkp1_vk_vk
-        velocities_data_int.append(C_vkp1_vk.dot(v_vkp1_i_vk))
-    velocities_data_int = np.array(velocities_data_int)
+        p_accel_int.append(C_vkp1_vk.dot(v_vkp1_i_vk))
+        p_accel_int_int.append(p_accel_int_int[-1] + p_imu_poses[i, :3, :3].dot(p_accel_int[-1]) * dt)
+    p_accel_int = np.array(p_accel_int)
+    p_accel_int_int = np.array(p_accel_int_int)
 
-    velocities_from_rel_poses = []
-    for i in range(0, len(gps_poses) - 1):
-        dt = imu_timestamps[i + 1] - imu_timestamps[i]
-        velocities_from_rel_poses.append(np.linalg.inv(gps_poses[i]).dot(gps_poses[i + 1])[0:3, 3] / dt)
-    velocities_from_rel_poses = np.array(velocities_from_rel_poses)
+    # poses from integrating velocity
+    p_vel_int_poses = [p_poses[0, :3, 3]]
+    for i in range(0, len(p_velocities) - 1):
+        dt = p_timestamps[i + 1] - p_timestamps[i]
+        dp = p_poses[i, :3, :3].dot(p_velocities[i]) * dt
+        p_vel_int_poses.append(p_vel_int_poses[-1] + dp)
+    p_vel_int_poses = np.array(p_vel_int_poses)
 
-    # velocities_from_rel_poses = []
-    # for i in range(0, len(data["T_i_vk"]) - 1):
-    #     dt = data["timestamp"][i + 1] - data["timestamp"][i]
-    #     velocities_from_rel_poses.append(np.linalg.inv(data["T_i_vk"][i]).dot(data["T_i_vk"][i + 1])[0:3, 3] / dt)
-    # velocities_from_rel_poses = np.array(velocities_from_rel_poses)
+    plotter.plot(([p_poses[:, 0, 3], p_poses[:, 1, 3]],
+                  [p_vel_int_poses[:, 0], p_vel_int_poses[:, 1]],
+                  [p_accel_int_int[:, 0], p_accel_int_int[:, 1]],),
+                 "x [m]", "Y [m]", "XY Plot", labels=["dat_poses", "dat_vel_int", "dat_acc_int^2"], equal_axes=True)
+    plotter.plot(([p_poses[:, 0, 3], p_poses[:, 2, 3]],
+                  [p_vel_int_poses[:, 0], p_vel_int_poses[:, 2]],
+                  [p_accel_int_int[:, 0], p_accel_int_int[:, 2]],),
+                 "X [m]", "Z [m]", "XZ Plot", labels=["dat_poses", "dat_vel_int", "dat_acc_int^2"], equal_axes=True)
+    plotter.plot(([p_poses[:, 1, 3], p_poses[:, 2, 3]],
+                  [p_vel_int_poses[:, 1], p_vel_int_poses[:, 2]],
+                  [p_accel_int_int[:, 1], p_accel_int_int[:, 2]],),
+                 "Y [m]", "Z [m]", "YZ Plot", labels=["dat_poses", "dat_vel_int", "dat_acc_int^2"], equal_axes=True)
 
-    plt.clf()
-    plt.plot(imu_timestamps[1:], velocities_from_rel_poses[:, 0], label="gps_poses_diff")
-    plt.plot(data_imu_timestamps, velocities_data_int[:, 0], label="data_int")
-    plt.plot(poses_timestamps, velocities[:, 0], label="data_vel")
-    # plt.plot(imu_timestamps, imu_data[:, vf], label="gps_vel")
-    plt.xlabel("t [s]")
-    plt.ylabel("v [m/s]")
-    plt.title("Velocity X Plot")
-    plt.legend()
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "07_velocity_x_cmp_plot.png"))
+    plotter.plot(([p_timestamps, p_poses[:, 0, 3]],
+                  [p_timestamps, p_vel_int_poses[:, 0]],
+                  [p_imu_timestamps, p_accel_int_int[:, 0]],),
+                 "t [s]", "Y [m]", "X Plot From Zero", labels=["dat_poses", "dat_vel_int", "dat_acc_int^2"])
+    plotter.plot(([p_timestamps, p_poses[:, 1, 3]],
+                  [p_timestamps, p_vel_int_poses[:, 1]],
+                  [p_imu_timestamps, p_accel_int_int[:, 1]],),
+                 "t [s]", "Z [m]", "Y Plot From Zero", labels=["dat_poses", "dat_vel_int", "dat_acc_int^2"])
+    plotter.plot(([p_timestamps, p_poses[:, 2, 3]],
+                  [p_timestamps, p_vel_int_poses[:, 2]],
+                  [p_imu_timestamps, p_accel_int_int[:, 2]],),
+                 "t [s]", "Z [m]", "Z Plot From Zero", labels=["dat_poses", "dat_vel_int", "dat_acc_int^2"])
 
-    plt.clf()
-    plt.plot(imu_timestamps[1:], velocities_from_rel_poses[:, 1], label="gps_poses_diff")
-    plt.plot(data_imu_timestamps, velocities_data_int[:, 1], label="data_int")
-    plt.plot(poses_timestamps, velocities[:, 1], label="data_vel")
-    # plt.plot(imu_timestamps, imu_data[:, vl], label="gps_vel")
-    plt.xlabel("t [s]")
-    plt.ylabel("v [m/s]")
-    plt.title("Velocity Y Plot")
-    plt.legend()
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "08_velocity_y_cmp_plot.png"))
+    # plot trajectory rotated wrt to the first frame
+    p_poses_from_I = np.array([np.linalg.inv(p_poses[0]).dot(p) for p in p_poses])
+    plotter.plot(([p_poses_from_I[:, 0, 3], p_poses_from_I[:, 1, 3]],),
+                 "x [m]", "Y [m]", "XY Plot From Identity", equal_axes=True)
+    plotter.plot(([p_poses_from_I[:, 0, 3], p_poses_from_I[:, 2, 3]],),
+                 "X [m]", "Z [m]", "XZ Plot From Identity", equal_axes=True)
+    plotter.plot(([p_poses_from_I[:, 1, 3], p_poses_from_I[:, 2, 3]],),
+                 "Y [m]", "Z [m]", "YZ Plot From Identity", equal_axes=True)
 
-    plt.clf()
-    plt.plot(imu_timestamps[1:], velocities_from_rel_poses[:, 2], label="gps_poses_diff")
-    plt.plot(data_imu_timestamps, velocities_data_int[:, 2], label="data_int")
-    plt.plot(poses_timestamps, velocities[:, 2], label="data_vel")
-    # plt.plot(imu_timestamps, imu_data[:, vu], label="gps_vel")
-    plt.xlabel("t [s]")
-    plt.ylabel("v [m/s]")
-    plt.title("Velocity Z Plot")
-    plt.legend()
-    plt.grid()
-    plt.savefig(os.path.join(output_dir, "09_velocity_z_cmp_plot.png"))
+    # plot p_velocities
+    plotter.plot(([p_timestamps, p_velocities[:, 0]], [p_timestamps, p_velocities[:, 1]],
+                  [p_timestamps, p_velocities[:, 2]]), "t [s]", "v [m/s]", "YZ Plot",
+                 labels=["dat_vx", "dat_vy", "dat_vz"])
+
+    # make sure the interpolated acceleration and gyroscope measurements are the same
+    plotter.plot(([p_imu_timestamps, p_gyro_measurements[:, 0]], [imu_timestamps, imu_data[:, wx]],),
+                 "t [s]", "w [rad/s]", "Rot Vel X Verification")
+    plotter.plot(([p_imu_timestamps, p_gyro_measurements[:, 1]], [imu_timestamps, imu_data[:, wy]],),
+                 "t [s]", "w [rad/s]", "Rot Vel Y Verification")
+    plotter.plot(([p_imu_timestamps, p_gyro_measurements[:, 2]], [imu_timestamps, imu_data[:, wz]],),
+                 "t [s]", "w [rad/s]", "Rot Vel Z Verification")
+    plotter.plot(([p_imu_timestamps, p_accel_measurements[:, 0]], [imu_timestamps, imu_data[:, ax]],),
+                 "t [s]", "a [m/s^2]", "Accel X Verification")
+    plotter.plot(([p_imu_timestamps, p_accel_measurements[:, 1]], [imu_timestamps, imu_data[:, ay]],),
+                 "t [s]", "a [m/s^2]", "Accel Y Verification")
+    plotter.plot(([p_imu_timestamps, p_accel_measurements[:, 2]], [imu_timestamps, imu_data[:, az]],),
+                 "t [s]", "a [m/s^2]", "Accel Z Verification")
+
+    # integrate gyroscope to compare against rotation
+    p_gyro_int = [data["T_i_vk"][0][:3, :3]]
+    for i in range(0, len(p_imu_timestamps) - 1):
+        dt = p_imu_timestamps[i + 1] - p_imu_timestamps[i]
+        p_gyro_int.append(p_gyro_int[-1].dot(exp_SO3(dt * p_gyro_measurements[i])))
+    p_gyro_int = np.array([log_SO3(o) for o in p_gyro_int])
+    p_orientation = np.array([log_SO3(p[:3, :3]) for p in data["T_i_vk"]])
+
+    plotter.plot(([p_imu_timestamps, np.unwrap(p_gyro_int[:, 0])], [p_timestamps, np.unwrap(p_orientation[:, 0])],),
+                 "t [s]", "rot [rad/s]", "Theta X Cmp Plot", labels=["gyro_int", "dat_pose"])
+    plotter.plot(([p_imu_timestamps, np.unwrap(p_gyro_int[:, 1])], [p_timestamps, np.unwrap(p_orientation[:, 1])],),
+                 "t [s]", "rot [rad/s]", "Theta Y Cmp Plot", labels=["gyro_int", "dat_pose"])
+    plotter.plot(([p_imu_timestamps, np.unwrap(p_gyro_int[:, 2])], [p_timestamps, np.unwrap(p_orientation[:, 2])],),
+                 "t [s]", "rot [rad/s]", "Theta Z Cmp Plot", labels=["gyro_int", "dat_pose"])
+
+    vel_from_gps_rel_poses = []
+    for k in range(0, len(gps_poses) - 1):
+        dt = imu_timestamps[k + 1] - imu_timestamps[k]
+        T_i_vk = gps_poses[k]
+        T_i_vkp1 = gps_poses[k + 1]
+        T_vk_vkp1 = np.linalg.inv(T_i_vk).dot(T_i_vkp1)
+        vel_from_gps_rel_poses.append(T_vk_vkp1[0:3, 3] / dt)
+        # vel_from_gps_rel_poses.append(log_SE3(T_vk_vkp1)[0:3] / dt)
+    vel_from_gps_rel_poses = np.array(vel_from_gps_rel_poses)
+
+    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 0]],
+                  [p_timestamps, p_velocities[:, 0]],
+                  [p_imu_timestamps, p_accel_int[:, 0]],),
+                 "t [s]", "v [m/s]", "Velocity X Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
+    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 1]],
+                  [p_timestamps, p_velocities[:, 1]],
+                  [p_imu_timestamps, p_accel_int[:, 1]],),
+                 "t [s]", "v [m/s]", "Velocity Y Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
+    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 2]],
+                  [p_timestamps, p_velocities[:, 2]],
+                  [p_imu_timestamps, p_accel_int[:, 2]],),
+                 "t [s]", "v [m/s]", "Velocity Z Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
 
     logger.print("Generating figures took %.2fs" % (time.time() - start_time))
     logger.print("All done!")

@@ -4,6 +4,22 @@ import transformations
 import scipy.linalg
 
 
+def C_from_T(T):
+    return T[0:3, 0:3]
+
+
+def r_from_T(T):
+    return T[0:3, 3]
+
+
+def T_from_Ct(C, r):
+    T = np.eye(4, 4)
+    T[0:3, 0:3] = C
+    T[0:3, 3] = r
+
+    return T
+
+
 def skew3(v):
     assert (len(v.shape) == 1 and v.shape[0] == 3)
 
@@ -53,6 +69,37 @@ def log_SO3(C):
     return theta
 
 
+def left_jacobi_SO3(phi):
+    phi_norm = np.linalg.norm(phi)
+    if np.abs(phi_norm) > 1e-8:
+        a = phi / phi_norm
+        J = (np.sin(phi_norm) / phi_norm) * np.eye(3, 3) + (1 - (np.sin(phi_norm) / phi_norm)) * a.dot(
+                a.transpose()) + ((1 - np.cos(phi_norm)) / phi_norm) * skew3(a)
+    else:
+        J = np.eye(3, 3)
+    return J
+
+
+def left_jacobi_SO3_inv(phi):
+    phi_norm = np.linalg.norm(phi)
+    if np.abs(phi_norm) > 1e-8:
+        a = phi / phi_norm
+        cot_half_phi_norm = 1 / np.tan(phi_norm / 2)
+        J_inv = (phi_norm / 2) * cot_half_phi_norm * np.eye(3, 3) + \
+                (1 - (phi_norm / 2) * cot_half_phi_norm) * (a.dot(a.transpose())) - (phi_norm / 2) * skew3(a)
+    else:
+        J_inv = np.eye(3, 3)
+    return J_inv
+
+
+def log_SE3(T):
+    C = C_from_T(T)
+    r = r_from_T(T)
+    phi = log_SO3(C)
+    rou = left_jacobi_SO3_inv(phi).dot(r)
+    return np.concatenate([rou, phi])
+
+
 def exp_SO3(phi):
     phi_norm = np.linalg.norm(phi)
     if np.abs(phi_norm) > 1e-8:
@@ -65,22 +112,6 @@ def exp_SO3(phi):
         m = np.eye(3, 3) + phi_skewed + 0.5 * phi_skewed.dot(phi_skewed)
 
     return m
-
-
-def C_from_T(T):
-    return T[0:3, 0:3]
-
-
-def r_from_T(T):
-    return T[0:3, 3]
-
-
-def T_from_Ct(C, r):
-    T = np.eye(4, 4)
-    T[0:3, 0:3] = C
-    T[0:3, 3] = r
-
-    return T
 
 
 def interpolate_SO3(C1, C2, alpha):
