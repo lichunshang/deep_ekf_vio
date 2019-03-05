@@ -1,1 +1,1 @@
-from preprocess.preprocess_kitti_raw import preprocess_kitti_raw
+from preprocess.preprocess_kitti_raw import preprocess_kitti_raw, check_time_discontinuities

@@ -6,7 +6,8 @@ function run_OxtsToPoseTxt(base_dir)
 % Input arguments:
 % base_dir .... absolute path to sequence base directory (ends with _sync)
 
-disp('======= KITTI DevKit Demo =======');
+disp('Converting GPS data from: ');
+disp(base_dir)
 
 % load oxts data
 oxts = loadOxtsliteData(base_dir);
@@ -44,18 +45,9 @@ for i=1:size(poses, 3)
     rotmodes(i) = oxts{i}(end);
 end
 
-disp('posmodes');
-disp(mean(posmodes));
-disp(min(posmodes));
-disp(max(posmodes));
-disp('velmodes');
-disp(mean(velmodes));
-disp(min(velmodes));
-disp(max(velmodes));
-disp('rotmodes');
-disp(mean(rotmodes));
-disp(min(rotmodes));
-disp(max(rotmodes));
+fprintf('posmodes: min=%.5f max=%.5f ave=%.5f\n', min(posmodes), max(posmodes), mean(posmodes));
+fprintf('velmodes: min=%.5f max=%.5f ave=%.5f\n', min(velmodes), max(velmodes), mean(velmodes));
+fprintf('rotmodes: min=%.5f max=%.5f ave=%.5f\n', min(rotmodes), max(rotmodes), mean(rotmodes));
 
 % Save the figures
 figure('visible','off'); clf;

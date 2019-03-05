@@ -113,6 +113,20 @@ def interpolate(imu_data_i, imu_data_j, pose_i, pose_j, alpha):
     return T_i_vk, v_vk, w_vk, a_vk
 
 
+def check_time_discontinuities(raw_seq_dir):
+    oxts_dir = os.path.join(raw_seq_dir, "oxts")
+    imu_timestamps = read_timestamps(os.path.join(oxts_dir, "timestamps.txt"))
+
+    for i in range(1, len(imu_timestamps)):
+        dt = (imu_timestamps[i] - imu_timestamps[i - 1]) / np.timedelta64(1, 's')
+        if dt > (1.5 / 100.0):
+            print("Timestamp skip %.5fs, idx %d => %d, time %s => %s" %
+                  (dt, i - 1, i, imu_timestamps[i - 1], imu_timestamps[i]))
+        elif dt < (0.5 / 100.0):
+            print("Negative timestamp skip %.2fs, idx %d => %d, time %s => %s" %
+                  (dt, i - 1, i, imu_timestamps[i - 1], imu_timestamps[i]))
+
+
 def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     logger.initialize(working_dir=output_dir, use_tensorboard=False)
     logger.print("================ PREPROCESS KITTI RAW ================")
@@ -157,6 +171,7 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     cam_timestamps = (cam_timestamps - imu_timestamps[0]) / np.timedelta64(1, 's')
     imu_timestamps = (imu_timestamps - imu_timestamps[0]) / np.timedelta64(1, 's')
 
+    first_idx_imu_slice_start = 0
     idx_imu_slice_start = 0
     idx_imu_slice_end = 0
     data_frames = []
@@ -173,6 +188,8 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
         # i am a lazy person, this will work
         while imu_timestamps[idx_imu_slice_start] < t_k:
             idx_imu_slice_start += 1
+        if k == cam_subset_range[0]:
+            first_idx_imu_slice_start = idx_imu_slice_start - 1
         assert (imu_timestamps[idx_imu_slice_start - 1] <= t_k <= imu_timestamps[idx_imu_slice_start])
         # interpolate
         tk_i = imu_timestamps[idx_imu_slice_start - 1]
@@ -217,6 +234,7 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
             assert (
                 np.allclose(data_frames[-1].accel_measurements[0], data_frames[-2].accel_measurements[-1], atol=1e-13))
 
+    last_idx_imu_slice_end = idx_imu_slice_end
     # add the last frame without any IMU data
     data_frames.append(Frame(image_paths[cam_subset_range[1]], t_kp1, T_i_vkp1, T_cam_imu, v_vkp1,
                              np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3])))
@@ -359,15 +377,18 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
         # vel_from_gps_rel_poses.append(log_SE3(T_vk_vkp1)[0:3] / dt)
     vel_from_gps_rel_poses = np.array(vel_from_gps_rel_poses)
 
-    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 0]],
+    plotter.plot(([imu_timestamps[first_idx_imu_slice_start + 1:last_idx_imu_slice_end + 1],
+                   vel_from_gps_rel_poses[first_idx_imu_slice_start:last_idx_imu_slice_end, 0]],
                   [p_timestamps, p_velocities[:, 0]],
                   [p_imu_timestamps, p_accel_int[:, 0]],),
                  "t [s]", "v [m/s]", "Velocity X Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
-    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 1]],
+    plotter.plot(([imu_timestamps[first_idx_imu_slice_start + 1:last_idx_imu_slice_end + 1],
+                   vel_from_gps_rel_poses[first_idx_imu_slice_start:last_idx_imu_slice_end, 1]],
                   [p_timestamps, p_velocities[:, 1]],
                   [p_imu_timestamps, p_accel_int[:, 1]],),
                  "t [s]", "v [m/s]", "Velocity Y Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
-    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 2]],
+    plotter.plot(([imu_timestamps[first_idx_imu_slice_start + 1:last_idx_imu_slice_end + 1],
+                   vel_from_gps_rel_poses[first_idx_imu_slice_start:last_idx_imu_slice_end, 2]],
                   [p_timestamps, p_velocities[:, 2]],
                   [p_imu_timestamps, p_accel_int[:, 2]],),
                  "t [s]", "v [m/s]", "Velocity Z Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
