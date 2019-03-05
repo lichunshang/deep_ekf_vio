@@ -113,17 +113,59 @@ def interpolate(imu_data_i, imu_data_j, pose_i, pose_j, alpha):
     return T_i_vk, v_vk, w_vk, a_vk
 
 
+def remove_negative_timesteps(imu_timestamps, imu_data, gps_poses):
+    # indices_to_remove = []
+    # for i in range(1, len(imu_timestamps) - 1):
+    #     dt2 = (imu_timestamps[i + 1] - imu_timestamps[i]) / np.timedelta64(1, 's')
+    #     dt1 = (imu_timestamps[i] - imu_timestamps[i - 1]) / np.timedelta64(1, 's')
+    #
+    #     if dt1 > 0.05 and dt2 < 0:
+    #         logger.print("Negative timestep detected idx [%d -> %d -> %d]" % (i - 1, i, i + 1))
+    #         indices_to_remove.append(i)
+    #
+    # imu_timestamps = np.delete(imu_timestamps, indices_to_remove, 0)
+    # imu_data = np.delete(imu_data, indices_to_remove, 0)
+    # gps_poses = np.delete(gps_poses, indices_to_remove, 0)
+    # logger.print("Negative timesteps removed.")
+
+    imu_timestamps, indices = np.unique(imu_timestamps, return_index=True)
+    indices_sort = np.argsort(imu_timestamps)
+    imu_data = imu_data[indices, :][indices_sort, :]
+    gps_poses = gps_poses[indices, :][indices_sort, :]
+
+    # double check
+    for i in range(1, len(imu_timestamps)):
+        dt = (imu_timestamps[i] - imu_timestamps[i - 1]) / np.timedelta64(1, 's')
+        if dt > (1.5 / 100):
+            logger.print("WARNING: Larger than usual timestep of %.5fs detected idx [%d -> %d]" % (dt, i - 1, i))
+        assert (dt > 0)
+
+    return imu_timestamps, imu_data, gps_poses
+
+
+def find_timestamps_in_between(timestamp, timestamps_to_search):
+    # ensure they are in between
+    assert (timestamp >= timestamps_to_search[0])
+    assert (timestamp <= timestamps_to_search[-1])
+
+    index = 0
+    while timestamps_to_search[index] <= timestamp:
+        index += 1
+    return index - 1, index
+
+
 def check_time_discontinuities(raw_seq_dir):
     oxts_dir = os.path.join(raw_seq_dir, "oxts")
+    cam_timestamps = read_timestamps(os.path.join(os.path.join(raw_seq_dir, "image_02"), "timestamps.txt"))
     imu_timestamps = read_timestamps(os.path.join(oxts_dir, "timestamps.txt"))
 
     for i in range(1, len(imu_timestamps)):
         dt = (imu_timestamps[i] - imu_timestamps[i - 1]) / np.timedelta64(1, 's')
         if dt > (1.5 / 100.0):
-            print("Timestamp skip %.5fs, idx %d => %d, time %s => %s" %
+            print("+ve timestep skip %8.5fs, idx [%6d -> %6d], time [%30s -> %30s]" %
                   (dt, i - 1, i, imu_timestamps[i - 1], imu_timestamps[i]))
         elif dt < (0.5 / 100.0):
-            print("Negative timestamp skip %.2fs, idx %d => %d, time %s => %s" %
+            print("-ve timestep skip %8.5fs, idx [%6d -> %6d], time [%30s -> %30s]" %
                   (dt, i - 1, i, imu_timestamps[i - 1], imu_timestamps[i]))
 
 
@@ -145,7 +187,6 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     # load IMU data
     imu_data = []
     imu_data_files = sorted(os.listdir(os.path.join(oxts_dir, "data")))
-    assert (len(imu_data_files) == len(gps_poses))
     start_time = time.time()
     for i in range(0, len(imu_data_files)):
         print("Loading IMU data files %d/%d (%.2f%%)" %
@@ -156,7 +197,9 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
 
     # imu timestamps
     imu_timestamps = read_timestamps(os.path.join(oxts_dir, "timestamps.txt"))
+    assert (len(imu_data) == len(gps_poses))
     assert (len(imu_timestamps) == len(gps_poses))
+    imu_timestamps, imu_data, gps_poses = remove_negative_timesteps(imu_timestamps, imu_data, gps_poses)
 
     # load image data
     cam_timestamps = read_timestamps(os.path.join(image_dir, "timestamps.txt"))
@@ -171,25 +214,39 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     cam_timestamps = (cam_timestamps - imu_timestamps[0]) / np.timedelta64(1, 's')
     imu_timestamps = (imu_timestamps - imu_timestamps[0]) / np.timedelta64(1, 's')
 
-    first_idx_imu_slice_start = 0
+    # take subset of the camera images int the range of images we are interested in
+    image_paths = image_paths[cam_subset_range[0]: cam_subset_range[1] + 1]
+    cam_timestamps = cam_timestamps[cam_subset_range[0]: cam_subset_range[1] + 1]
+
+    # take a subset of imu data corresponds to camera images
+    idx_imu_data_start = find_timestamps_in_between(cam_timestamps[0], imu_timestamps)[0]
+    idx_imu_data_end = find_timestamps_in_between(cam_timestamps[-1], imu_timestamps)[1]
+    # idx_imu_data_start = 0
+    # while imu_timestamps[idx_imu_data_start] < cam_timestamps[0]:
+    #     idx_imu_data_start += 1
+    # idx_imu_data_start -= 1
+    # idx_imu_data_end = 0
+    # while imu_timestamps[idx_imu_data_end] < cam_timestamps[-1]:
+    #     idx_imu_data_end += 1
+    imu_timestamps = imu_timestamps[idx_imu_data_start:idx_imu_data_end + 1]
+    imu_data = imu_data[idx_imu_data_start:idx_imu_data_end + 1]
+    gps_poses = gps_poses[idx_imu_data_start:idx_imu_data_end + 1]
+
     idx_imu_slice_start = 0
     idx_imu_slice_end = 0
     data_frames = []
     start_time = time.time()
-    for k in range(cam_subset_range[0], cam_subset_range[1]):
-        print("Processing IMU data files %d/%d (%.2f%%)" %
-              (k + 1 - cam_subset_range[0], cam_subset_range[1] - cam_subset_range[0] + 1,
-               100 * (k + 1 - cam_subset_range[0]) / (cam_subset_range[1] - cam_subset_range[0]) + 1), end='\r')
+    for k in range(0, len(cam_timestamps) - 1):
+        print("Processing IMU data files %d/%d (%.2f%%)" % (
+            k + 1, len(cam_timestamps), 100 * (k + 1) / len(cam_timestamps)), end='\r')
 
         t_k = cam_timestamps[k]
         t_kp1 = cam_timestamps[k + 1]
 
         # the start value does not need to be recomputed, since you can get that from the previous time step, but
         # i am a lazy person, this will work
-        while imu_timestamps[idx_imu_slice_start] < t_k:
-            idx_imu_slice_start += 1
-        if k == cam_subset_range[0]:
-            first_idx_imu_slice_start = idx_imu_slice_start - 1
+        idx_imu_slice_start = find_timestamps_in_between(t_k, imu_timestamps)[1]
+
         assert (imu_timestamps[idx_imu_slice_start - 1] <= t_k <= imu_timestamps[idx_imu_slice_start])
         # interpolate
         tk_i = imu_timestamps[idx_imu_slice_start - 1]
@@ -199,8 +256,7 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
             interpolate(imu_data[idx_imu_slice_start - 1], imu_data[idx_imu_slice_start],
                         gps_poses[idx_imu_slice_start - 1], gps_poses[idx_imu_slice_start], alpha_k)
 
-        while imu_timestamps[idx_imu_slice_end] < t_kp1:
-            idx_imu_slice_end += 1
+        idx_imu_slice_end = find_timestamps_in_between(t_kp1, imu_timestamps)[1]
         assert (imu_timestamps[idx_imu_slice_end - 1] <= t_kp1 <= imu_timestamps[idx_imu_slice_end])
         # interpolate
         tkp1_i = imu_timestamps[idx_imu_slice_end - 1]
@@ -234,9 +290,8 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
             assert (
                 np.allclose(data_frames[-1].accel_measurements[0], data_frames[-2].accel_measurements[-1], atol=1e-13))
 
-    last_idx_imu_slice_end = idx_imu_slice_end
     # add the last frame without any IMU data
-    data_frames.append(Frame(image_paths[cam_subset_range[1]], t_kp1, T_i_vkp1, T_cam_imu, v_vkp1,
+    data_frames.append(Frame(image_paths[-1], t_kp1, T_i_vkp1, T_cam_imu, v_vkp1,
                              np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3])))
 
     logger.print("Processing data took %.2fs" % (time.time() - start_time))
@@ -377,18 +432,15 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
         # vel_from_gps_rel_poses.append(log_SE3(T_vk_vkp1)[0:3] / dt)
     vel_from_gps_rel_poses = np.array(vel_from_gps_rel_poses)
 
-    plotter.plot(([imu_timestamps[first_idx_imu_slice_start + 1:last_idx_imu_slice_end + 1],
-                   vel_from_gps_rel_poses[first_idx_imu_slice_start:last_idx_imu_slice_end, 0]],
+    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 0]],
                   [p_timestamps, p_velocities[:, 0]],
                   [p_imu_timestamps, p_accel_int[:, 0]],),
                  "t [s]", "v [m/s]", "Velocity X Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
-    plotter.plot(([imu_timestamps[first_idx_imu_slice_start + 1:last_idx_imu_slice_end + 1],
-                   vel_from_gps_rel_poses[first_idx_imu_slice_start:last_idx_imu_slice_end, 1]],
+    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 1]],
                   [p_timestamps, p_velocities[:, 1]],
                   [p_imu_timestamps, p_accel_int[:, 1]],),
                  "t [s]", "v [m/s]", "Velocity Y Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
-    plotter.plot(([imu_timestamps[first_idx_imu_slice_start + 1:last_idx_imu_slice_end + 1],
-                   vel_from_gps_rel_poses[first_idx_imu_slice_start:last_idx_imu_slice_end, 2]],
+    plotter.plot(([imu_timestamps[1:], vel_from_gps_rel_poses[:, 2]],
                   [p_timestamps, p_velocities[:, 2]],
                   [p_imu_timestamps, p_accel_int[:, 2]],),
                  "t [s]", "v [m/s]", "Velocity Z Cmp Plot", labels=["gps_rel", "dat_vel", "dat_accel_int"])
