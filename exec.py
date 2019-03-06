@@ -5,7 +5,7 @@ from params import par
 import preprocess
 
 choices = ["gen_trajectory_rel", "plot_trajectory", "np_traj_to_kitti", "kitti_eval", "calc_error", "plot_error",
-           "preprocess_kitti_raw", "check_time_discontinuities"]
+           "preprocess_kitti_raw", "check_time_discontinuities", "calc_image_mean_std"]
 
 top_level_arg_parser = argparse.ArgumentParser(description='Execute scripts')
 top_level_arg_parser.add_argument('script', type=str, help='The program to run', choices=choices)
@@ -70,5 +70,12 @@ elif top_level_arg_parsed.script == "check_time_discontinuities":
     arg_parser.add_argument('kitti_raw_dir', type=str, help='KITTI raw data path (extract)')
     arg_parsed = arg_parser.parse_args(args=args)
     preprocess.check_time_discontinuities(arg_parsed.kitti_raw_dir)
+
+elif top_level_arg_parsed.script == "calc_image_mean_std":
+    arg_parser = argparse.ArgumentParser(description='Calculate the image channel mean and std')
+    arg_parser.add_argument('--seqs', type=str, nargs="+", help="Select sequences",
+                            default=par.train_seqs)
+    arg_parsed = arg_parser.parse_args(args=args)
+    preprocess.calc_image_mean_std(arg_parsed.seqs)
 else:
     print("Invalid selection!")

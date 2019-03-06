@@ -1,6 +1,4 @@
-KITTI/images/
-KITTI/devkit/
-KITTI/pose_GT/
+KITTI
 *.png
 records/
 result/
@@ -19,3 +17,4 @@ test_data
 datainfo
 *.gch
 eval/kitti_eval/cpp/evaluate_odometry
+data

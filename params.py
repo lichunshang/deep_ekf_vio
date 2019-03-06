@@ -20,7 +20,7 @@ class Parameters(object):
 
         # Path
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
-        self.data_dir = os.path.join(self.project_dir, "KITTI")
+        self.data_dir = os.path.join(self.project_dir, "data")
         self.results_dir = os.path.join(self.project_dir, "results")
         self.image_dir = os.path.join(self.data_dir, 'images')
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
@@ -32,7 +32,6 @@ class Parameters(object):
         # self.valid_seqs = ['06']
         self.train_seqs = ['00', '01', '02', '05', '08', '09']
         self.valid_seqs = ['04', '06', '07', '10']
-
 
         self.img_w = 320 * 2
         self.img_h = 96 * 2

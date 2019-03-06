@@ -28,20 +28,39 @@ gps2pose_convert=(
 2011_09_30/2011_09_30_drive_0034_extract
 )
 
+if [[ -z "$1" ]]
+then
 for SEQ_DIR in "${gps2pose_convert[@]}"
 do
     echo "============================================="
     echo "Convert GPS lat/long/alt yaw/pitch/roll to Cartesian using MATLAB Script..."
 	matlab -nodisplay -nodesktop -sd $MATLAB_SCRIPTS_DIR -r "run_OxtsToPoseTxt('$KITTI_DATASET_DIR/$SEQ_DIR'); exit"
 done
+fi
 
 # now generate the sequences
 seq_data=(
-2011_10_03/2011_10_03_drive_0027_extract K00 368 4548
+2011_10_03/2011_10_03_drive_0027_extract K00_0 20 351
+2011_10_03/2011_10_03_drive_0027_extract K00_1 368 1917
+2011_10_03/2011_10_03_drive_0027_extract K00_2 1933 1959
+2011_10_03/2011_10_03_drive_0027_extract K00_3 1975 2119
+2011_10_03/2011_10_03_drive_0027_extract K00_4 2136 2279
+2011_10_03/2011_10_03_drive_0027_extract K00_5 2296 2691
+2011_10_03/2011_10_03_drive_0027_extract K00_6 2707 2948
+2011_10_03/2011_10_03_drive_0027_extract K00_7 2986 4548
+#
 2011_10_03/2011_10_03_drive_0042_extract K01 5 1105
-2011_10_03/2011_10_03_drive_0034_extract K02 5 4667
+#
+2011_10_03/2011_10_03_drive_0034_extract K02_0 5 3160
+2011_10_03/2011_10_03_drive_0034_extract K02_1 3176 3267
+2011_10_03/2011_10_03_drive_0034_extract K02_2 3284 3312
+2011_10_03/2011_10_03_drive_0034_extract K02_3 3329 4667
+#
 2011_09_30/2011_09_30_drive_0016_extract K04 5 283
-2011_09_30/2011_09_30_drive_0018_extract K05 5 2766
+#
+2011_09_30/2011_09_30_drive_0018_extract K05_0 5 1503
+2011_09_30/2011_09_30_drive_0018_extract K05_1 1520 2766
+#
 2011_09_30/2011_09_30_drive_0020_extract K06 18 1108
 2011_09_30/2011_09_30_drive_0027_extract K07 5 1110
 2011_09_30/2011_09_30_drive_0028_extract K08 1400 5181
