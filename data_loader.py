@@ -44,9 +44,9 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
 
     for seq in sequences:
         start_t = time.time()
-        gt_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
-        image_paths = sorted(glob.glob(os.path.join(par.image_dir, seq, "*.png")))
-        assert (len(gt_poses) == len(image_paths))  # make sure the number of images corresponds to number of poses
+        df = pd.read_pickle(os.path.join(par.data_dir, seq, "data.pickle"))
+        gt_poses = df.loc[:, "T_i_vk"]
+        image_paths = df.loc[:, "image_path"]
 
         if sample_times > 1:
             sample_interval = int(np.ceil(seq_len / sample_times))

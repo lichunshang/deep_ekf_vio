@@ -114,20 +114,6 @@ def interpolate(imu_data_i, imu_data_j, pose_i, pose_j, alpha):
 
 
 def remove_negative_timesteps(imu_timestamps, imu_data, gps_poses):
-    # indices_to_remove = []
-    # for i in range(1, len(imu_timestamps) - 1):
-    #     dt2 = (imu_timestamps[i + 1] - imu_timestamps[i]) / np.timedelta64(1, 's')
-    #     dt1 = (imu_timestamps[i] - imu_timestamps[i - 1]) / np.timedelta64(1, 's')
-    #
-    #     if dt1 > 0.05 and dt2 < 0:
-    #         logger.print("Negative timestep detected idx [%d -> %d -> %d]" % (i - 1, i, i + 1))
-    #         indices_to_remove.append(i)
-    #
-    # imu_timestamps = np.delete(imu_timestamps, indices_to_remove, 0)
-    # imu_data = np.delete(imu_data, indices_to_remove, 0)
-    # gps_poses = np.delete(gps_poses, indices_to_remove, 0)
-    # logger.print("Negative timesteps removed.")
-
     imu_timestamps, indices = np.unique(imu_timestamps, return_index=True)
     indices_sort = np.argsort(imu_timestamps)
     imu_data = imu_data[indices, :][indices_sort, :]

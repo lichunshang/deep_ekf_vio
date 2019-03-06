@@ -55,7 +55,7 @@ def calc_image_mean_std(sequences):
         num_pixels += img.shape[1] * img.shape[2]
 
     print()
-    
+
     std = np.sqrt(var_sum / (num_pixels - 1))
 
     logger.print("Mean: [%f, %f, %f]" % (mean[0], mean[1], mean[2]))
