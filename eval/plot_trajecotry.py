@@ -1,8 +1,7 @@
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import se3_math
-from params import par
+from data_loader import SequenceData
 from log import logger, Logger
 import os
 
@@ -25,7 +24,7 @@ def plot_trajectory(working_dir):
         sequence = os.path.splitext(pose_est_file)[0]
 
         trajectory = np.load(os.path.join(pose_est_dir, "%s.npy" % sequence))
-        trajectory_gt = np.load(os.path.join(par.pose_dir, sequence + ".npy"))
+        trajectory_gt = SequenceData(sequence).get_poses()
 
         trans_xyz = np.array([se3_math.r_from_T(T) for T in trajectory])
         rot_xyz = np.array([se3_math.log_SO3(se3_math.C_from_T(T)) for T in trajectory])

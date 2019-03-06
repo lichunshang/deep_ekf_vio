@@ -3,33 +3,16 @@ import numpy as np
 import os
 import transformations
 from se3_math import log_SO3, exp_SO3, interpolate_SE3, interpolate_SO3, log_SE3
+from data_loader import SequenceData
 import matplotlib.pyplot as plt
 import time
-import pandas
+import pandas as pd
 
 if "DISPLAY" not in os.environ:
     plt.switch_backend("Agg")
 
 lat, lon, alt, roll, pitch, yaw, vn, ve, vf, vl, vu, ax, ay, az, af, al, au, wx, wy, wz, wf, wl, wu, \
 posacc, velacc, navstat, numsats, posmode, velmode, orimode = list(range(0, 30))
-
-
-class Frame(object):
-    def __init__(self, image_path, timestamp, T_i_vk, T_cam_imu, v_vk_i_vk,
-                 imu_poses, imu_timestamps, accel_measurements, gyro_measurements):
-        self.image_path = image_path
-        self.timestamp = timestamp
-        self.T_i_vk = T_i_vk  # inertial to vehicle frame pose
-        self.T_cam_imu = T_cam_imu  # calibration from imu to camera
-        self.v_vk_i_vk = v_vk_i_vk  # velocity expressed in vehicle frame
-        self.imu_timestamps = imu_timestamps
-        self.imu_poses = imu_poses
-        self.accel_measurements = accel_measurements
-        self.gyro_measurements = gyro_measurements
-
-        assert (len(imu_timestamps) == len(accel_measurements))
-        assert (len(imu_timestamps) == len(gyro_measurements))
-        assert (len(imu_timestamps) == len(imu_poses))
 
 
 class Plotter(object):
@@ -264,8 +247,8 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
         gyro_measurements_k_kp1 = np.concatenate([[w_vk],
                                                   imu_data[idx_imu_slice_start: idx_imu_slice_end - 1, wx:wz + 1],
                                                   [w_vkp1]])
-        frame_k = Frame(image_paths[k], t_k, T_i_vk, T_cam_imu, v_vk,
-                        imu_poses, imu_timestamps_k_kp1, accel_measurements_k_kp1, gyro_measurements_k_kp1)
+        frame_k = SequenceData.Frame(image_paths[k], t_k, T_i_vk, T_cam_imu, v_vk,
+                                     imu_poses, imu_timestamps_k_kp1, accel_measurements_k_kp1, gyro_measurements_k_kp1)
         data_frames.append(frame_k)
 
         # assertions for sanity check
@@ -280,24 +263,12 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
                 np.allclose(data_frames[-1].accel_measurements[0], data_frames[-2].accel_measurements[-1], atol=1e-13))
 
     # add the last frame without any IMU data
-    data_frames.append(Frame(image_paths[-1], t_kp1, T_i_vkp1, T_cam_imu, v_vkp1,
-                             np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3])))
+    data_frames.append(SequenceData.Frame(image_paths[-1], t_kp1, T_i_vkp1, T_cam_imu, v_vkp1,
+                                          np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3])))
 
     logger.print("Processing data took %.2fs" % (time.time() - start_time))
 
-    start_time = time.time()
-    data = {"image_path": [f.image_path for f in data_frames],
-            "timestamp": [f.timestamp for f in data_frames],
-            "T_i_vk": [f.T_i_vk for f in data_frames],
-            "T_cam_imu": [f.T_cam_imu for f in data_frames],
-            "v_vk_i_vk": [f.v_vk_i_vk for f in data_frames],
-            "imu_timestamps": [f.imu_timestamps for f in data_frames],
-            "imu_poses": [f.imu_poses for f in data_frames],
-            "accel_measurements": [f.accel_measurements for f in data_frames],
-            "gyro_measurements": [f.gyro_measurements for f in data_frames]}
-    pandas_df = pandas.DataFrame(data, columns=data.keys())
-    pandas_df.to_pickle(os.path.join(output_dir, "data.pickle"))
-    logger.print("Saving pandas took %.2fs" % (time.time() - start_time))
+    data = SequenceData.save_as_pd(data_frames, output_dir)
 
     # ============================== FIGURES FOR SANITY TESTS ==============================
     # plot trajectory

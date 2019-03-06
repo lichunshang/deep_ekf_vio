@@ -27,6 +27,58 @@ class Subsequence(object):
         assert (self.length == len(gt_poses))
 
 
+class SequenceData(object):
+    class Frame(object):
+        def __init__(self, image_path, timestamp, T_i_vk, T_cam_imu, v_vk_i_vk,
+                     imu_poses, imu_timestamps, accel_measurements, gyro_measurements):
+            self.image_path = image_path
+            self.timestamp = timestamp
+            self.T_i_vk = T_i_vk  # inertial to vehicle frame pose
+            self.T_cam_imu = T_cam_imu  # calibration from imu to camera
+            self.v_vk_i_vk = v_vk_i_vk  # velocity expressed in vehicle frame
+            self.imu_timestamps = imu_timestamps
+            self.imu_poses = imu_poses
+            self.accel_measurements = accel_measurements
+            self.gyro_measurements = gyro_measurements
+
+            assert (len(imu_timestamps) == len(accel_measurements))
+            assert (len(imu_timestamps) == len(gyro_measurements))
+            assert (len(imu_timestamps) == len(imu_poses))
+
+    def __init__(self, seq):
+        self.seq = seq
+        self.seq_dir = os.path.join(par.data_dir, seq)
+        self.pd_path = os.path.join(par.data_dir, seq, "data.pickle")
+        self.df = pd.read_pickle(self.pd_path)
+
+    def get_poses(self):
+        return self.df.loc[:, "T_i_vk"].values
+
+    def get_images_paths(self):
+        return self.df.loc[:, "image_path"].values
+
+    def get(self, i):
+        raise NotImplementedError("Not implemented")
+
+    @staticmethod
+    def save_as_pd(data_frames, output_dir):
+        start_time = time.time()
+        data = {"image_path": [f.image_path for f in data_frames],
+                "timestamp": [f.timestamp for f in data_frames],
+                "T_i_vk": [f.T_i_vk for f in data_frames],
+                "T_cam_imu": [f.T_cam_imu for f in data_frames],
+                "v_vk_i_vk": [f.v_vk_i_vk for f in data_frames],
+                "imu_timestamps": [f.imu_timestamps for f in data_frames],
+                "imu_poses": [f.imu_poses for f in data_frames],
+                "accel_measurements": [f.accel_measurements for f in data_frames],
+                "gyro_measurements": [f.gyro_measurements for f in data_frames]}
+        df = pd.DataFrame(data, columns=data.keys())
+        df.to_pickle(os.path.join(output_dir, "data.pickle"))
+        logger.print("Saving pandas took %.2fs" % (time.time() - start_time))
+
+        return df
+
+
 def convert_subseqs_list_to_panda(subseqs):
     # Convert to pandas data frames
     data = {'seq_len': [subseq.length for subseq in subseqs],
@@ -44,9 +96,9 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
 
     for seq in sequences:
         start_t = time.time()
-        df = pd.read_pickle(os.path.join(par.data_dir, seq, "data.pickle"))
-        gt_poses = df.loc[:, "T_i_vk"]
-        image_paths = df.loc[:, "image_path"]
+        seq_data = SequenceData(seq)
+        gt_poses = seq_data.get_poses()
+        image_paths = seq_data.get_images_paths()
 
         if sample_times > 1:
             sample_interval = int(np.ceil(seq_len / sample_times))

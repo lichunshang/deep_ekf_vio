@@ -1,6 +1,5 @@
 import numpy as np
-import os
-from params import par
+from data_loader import SequenceData
 
 
 def calc_trajectory_dist(poses):
@@ -59,7 +58,7 @@ class KittiErrorCalc(object):
         self.gt_poses = {}
 
         for seq in sequences:
-            gt_abs_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
+            gt_abs_poses = SequenceData(seq).get_poses()
             self.gt_poses[seq] = gt_abs_poses
 
     def accumulate_error(self, seq, est):

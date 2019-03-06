@@ -22,7 +22,6 @@ class Parameters(object):
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
         self.data_dir = os.path.join(self.project_dir, "data")
         self.results_dir = os.path.join(self.project_dir, "results")
-        self.image_dir = os.path.join(self.data_dir, 'images')
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 

@@ -3,7 +3,7 @@ import torch
 import os
 import time
 import se3_math
-from data_loader import get_subseqs, SubseqDataset
+from data_loader import get_subseqs, SubseqDataset, SequenceData
 from params import par
 from model import DeepVO
 from torch.utils.data import DataLoader
@@ -61,7 +61,7 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
         dataset = SubseqDataset(subseqs, (par.img_h, par.img_w), par.img_means, par.img_stds, par.minus_point_5,
                                 training=False)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
-        gt_abs_poses = np.load(os.path.join(par.pose_dir, seq + ".npy"))
+        gt_abs_poses = SequenceData(seq).get_poses()
 
         predicted_abs_poses = gen_trajectory_rel_iter(M_deepvo, dataloader, prop_lstm_states)
 

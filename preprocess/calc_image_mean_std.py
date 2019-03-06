@@ -1,10 +1,10 @@
 import os
-import pandas
 import torchvision
 import numpy as np
 from PIL import Image
 from params import par
 from log import logger
+from data_loader import SequenceData
 
 
 def calc_image_mean_std(sequences):
@@ -21,9 +21,7 @@ def calc_image_mean_std(sequences):
     for i, seq in enumerate(sequences):
         print("Collecting image paths %d/%d (%.2f%%)" %
               (i, len(sequences), i * 100 / len(sequences)), end="\r")
-        seq_data_path = os.path.join(par.data_dir, seq, "data.pickle")
-        dataframe = pandas.read_pickle(seq_data_path)
-        image_paths += list(dataframe.loc[:, "image_path"].values)
+        image_paths += list(SequenceData(seq).get_images_paths())
     print()
 
     for i, path in enumerate(image_paths):
