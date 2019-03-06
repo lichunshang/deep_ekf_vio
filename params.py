@@ -1,6 +1,8 @@
 import os
 import datetime
 import torch
+import fnmatch
+import re
 
 
 class AttrDict(dict):
@@ -25,12 +27,8 @@ class Parameters(object):
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        # self.train_seqs = ['00', '02', '08', '09',]
-        # self.valid_seqs = ['04', '05', '06', "07", "10"]
-        # self.train_seqs = ['01']
-        # self.valid_seqs = ['06']
-        self.train_seqs = ['00', '01', '02', '05', '08', '09']
-        self.valid_seqs = ['04', '06', '07', '10']
+        self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
+        self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
 
         self.img_w = 320 * 2
         self.img_h = 96 * 2
@@ -90,6 +88,18 @@ class Parameters(object):
         if not Parameters.__instance:
             Parameters.__instance = Parameters()
         return Parameters.__instance
+
+    def wc(self, seqs):
+        available_seqs = [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
+        ret_seqs = []
+        for seq in seqs:
+            regex = re.compile(fnmatch.translate(seq))
+            start_cnt = len(ret_seqs)
+            for available_seq in sorted(available_seqs):
+                if regex.match(available_seq):
+                    ret_seqs.append(available_seq)
+            assert (len(ret_seqs) > start_cnt)
+        return ret_seqs
 
 
 par = Parameters.get_instance()
