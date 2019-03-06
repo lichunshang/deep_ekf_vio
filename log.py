@@ -38,6 +38,8 @@ class Logger(object):
         else:
             self.tensorboard = None
 
+        self.print("Logging results to %s" % self.record_file_handle.name)
+
     def log_parameters(self):
         # Write all hyperparameters
         self.print("---------- PARAMETERS -----------")
