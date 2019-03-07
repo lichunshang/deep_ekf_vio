@@ -149,23 +149,9 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
     return subseq_list
 
 
-class ImageCache(object):
-    __cache = {}
-
-    @staticmethod
-    def get(key, func):
-        if par.cache_image:
-            if key in ImageCache.__cache:
-                return ImageCache.__cache[key]
-            else:
-                img = func(key)
-                ImageCache.__cache[key] = img
-                return img
-        else:
-            return func(key)
-
-
 class SubseqDataset(Dataset):
+    __cache = {}  # cache using across multiple SubseqDataset objects
+
     def __init__(self, subseqs, img_size=None, img_mean=None, img_std=(1, 1, 1),
                  minus_point_5=False, training=True):
 
@@ -197,6 +183,18 @@ class SubseqDataset(Dataset):
         self.subseqs = subseqs
         self.load_image_func = lambda p: self.pre_runtime_transformer(Image.open(p))
 
+        if par.cache_image:
+            total_images = self.subseqs[0].length * len(subseqs)
+            counter = 0
+            start_t = time.time()
+            for subseq in self.subseqs:
+                for path in subseq.image_paths:
+                    if path not in SubseqDataset.__cache:
+                        SubseqDataset.__cache[path] = self.load_image_func(path)
+                    counter += 1
+                    print("Processed %d/%d (%.2f%%)" % (counter, total_images, counter / total_images * 100), end="\r")
+            logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
+
     def __getitem__(self, index):
         subseq = self.subseqs[index]
 
@@ -215,7 +213,11 @@ class SubseqDataset(Dataset):
         image_sequence = []
         for img_path in subseq.image_paths:
 
-            image = ImageCache.get(img_path, self.load_image_func)
+            if par.cache_image:
+                image = SubseqDataset.__cache[img_path]
+            else:
+                image = self.load_image_func(img_path)
+
             if "flippedlr" in subseq.type:
                 image = image.transpose(Image.FLIP_LEFT_RIGHT)
             image = self.runtime_transformer(image)
