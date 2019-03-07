@@ -18,7 +18,7 @@ class Parameters(object):
         self.timestamp = datetime.datetime.today()
 
         self.n_processors = 8
-        self.n_gpu = 2
+        self.n_gpu = 1
 
         # Path
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
@@ -52,6 +52,7 @@ class Parameters(object):
         self.epochs = 200
         self.batch_size = 2
         self.pin_mem = True
+        self.cache_image = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 0.0001}
 

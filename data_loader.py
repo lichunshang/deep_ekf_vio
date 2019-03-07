@@ -1,5 +1,4 @@
 import os
-import glob
 import pandas as pd
 import numpy as np
 import torch
@@ -10,7 +9,6 @@ from log import logger
 from torchvision import transforms
 import time
 from params import par
-from cache import image_cache
 
 
 class Subsequence(object):
@@ -103,7 +101,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
         if sample_times > 1:
             sample_interval = int(np.ceil(seq_len / sample_times))
             start_frames = list(range(0, seq_len, sample_interval))
-            print('Sample start from frame {}'.format(start_frames))
+            logger.print('Sample start from frame {}'.format(start_frames))
         else:
             start_frames = [0]
 
@@ -146,9 +144,25 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             # collect the sub-sequences
             subseq_list += subseqs_buffer
 
-        print('Folder %s finish in %.2g sec' % (seq, time.time() - start_t))
+        logger.print('Folder %s finish in %.2g sec' % (seq, time.time() - start_t))
 
     return subseq_list
+
+
+class ImageCache(object):
+    __cache = {}
+
+    @staticmethod
+    def get(key, func):
+        if par.cache_image:
+            if key in ImageCache.__cache:
+                return ImageCache.__cache[key]
+            else:
+                img = func(key)
+                ImageCache.__cache[key] = img
+                return img
+        else:
+            return func(key)
 
 
 class SubseqDataset(Dataset):
@@ -180,18 +194,8 @@ class SubseqDataset(Dataset):
         # logger.print("minus_point_5:", self.minus_point_5)
         # logger.print("normalizer:", self.normalizer)
 
-        # organize data
         self.subseqs = subseqs
-        total_images = self.subseqs[0].length * len(subseqs)
-        counter = 0
-        start_t = time.time()
-        for subseq in self.subseqs:
-            for path in subseq.image_paths:
-                if not image_cache.exists(path):
-                    image_cache.store(path, self.pre_runtime_transformer(Image.open(path)))
-                counter += 1
-                print("Processed %d/%d (%.2f%%)" % (counter, total_images, counter / total_images * 100), end="\r")
-        logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
+        self.load_image_func = lambda p: self.pre_runtime_transformer(Image.open(p))
 
     def __getitem__(self, index):
         subseq = self.subseqs[index]
@@ -211,7 +215,7 @@ class SubseqDataset(Dataset):
         image_sequence = []
         for img_path in subseq.image_paths:
 
-            image = image_cache.get(img_path)
+            image = ImageCache.get(img_path, self.load_image_func)
             if "flippedlr" in subseq.type:
                 image = image.transpose(Image.FLIP_LEFT_RIGHT)
             image = self.runtime_transformer(image)
