@@ -18,7 +18,7 @@ class Parameters(object):
         self.timestamp = datetime.datetime.today()
 
         self.n_processors = 8
-        self.n_gpu = 1
+        self.n_gpu = 2
 
         # Path
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
