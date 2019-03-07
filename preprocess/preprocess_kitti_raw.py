@@ -6,7 +6,6 @@ from se3_math import log_SO3, exp_SO3, interpolate_SE3, interpolate_SO3, log_SE3
 from data_loader import SequenceData
 import matplotlib.pyplot as plt
 import time
-import pandas as pd
 
 if "DISPLAY" not in os.environ:
     plt.switch_backend("Agg")
@@ -196,7 +195,7 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
                  100 * (i + 1 - idx_imu_data_start) / len(imu_timestamps)), end='\r')
         imu_data.append(np.loadtxt(os.path.join(oxts_dir, "data", imu_data_files[i])))
     imu_data = np.array(imu_data)
-    logger.print("Loading IMU data took %.2fs" % (time.time() - start_time))
+    logger.print("\nLoading IMU data took %.2fs" % (time.time() - start_time))
     assert (len(imu_data) == len(gps_poses))
 
     # imu_data = imu_data[idx_imu_data_start:idx_imu_data_end + 1]
@@ -266,9 +265,9 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
     data_frames.append(SequenceData.Frame(image_paths[-1], t_kp1, T_i_vkp1, T_cam_imu, v_vkp1,
                                           np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3])))
 
-    logger.print("Processing data took %.2fs" % (time.time() - start_time))
+    logger.print("\nProcessing data took %.2fs" % (time.time() - start_time))
 
-    data = SequenceData.save_as_pd(data_frames, output_dir)
+    _, data = SequenceData.save_as_pd(data_frames, output_dir)
 
     # ============================== FIGURES FOR SANITY TESTS ==============================
     # plot trajectory

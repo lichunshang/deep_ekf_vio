@@ -74,7 +74,7 @@ class SequenceData(object):
         df.to_pickle(os.path.join(output_dir, "data.pickle"))
         logger.print("Saving pandas took %.2fs" % (time.time() - start_time))
 
-        return df
+        return df, data
 
 
 def convert_subseqs_list_to_panda(subseqs):
