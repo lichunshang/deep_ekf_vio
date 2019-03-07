@@ -1,5 +1,6 @@
 import torchvision
 import numpy as np
+import time
 from PIL import Image
 from params import par
 from log import logger
@@ -19,12 +20,13 @@ def calc_image_mean_std(sequences):
 
     for i, seq in enumerate(sequences):
         print("Collecting image paths %d/%d (%.2f%%)" %
-              (i, len(sequences), i * 100 / len(sequences)), end="\r")
+              (i + 1, len(sequences), (i + 1) * 100 / len(sequences)), end="\r")
         image_paths += list(SequenceData(seq).get_images_paths())
     print()
 
+    start_time = time.time()
     for i, path in enumerate(image_paths):
-        print("Computing mean %d/%d (%.2f%%)" % (i, len(image_paths), i * 100 / len(image_paths)), end="\r")
+        print("Computing mean %d/%d (%.2f%%)" % (i + 1, len(image_paths), (i + 1) * 100 / len(image_paths)), end="\r")
         img = np.array(to_tensor(Image.open(path)))
 
         if par.minus_point_5:
@@ -32,14 +34,15 @@ def calc_image_mean_std(sequences):
 
         mean_sum += np.mean(img, (1, 2,))
         image_count += 1
-    print()
+    print("\nTook %.2fs" % (time.time() - start_time))
 
     mean = mean_sum / image_count
 
     num_pixels = 0
+    start_time = time.time()
     for i, path in enumerate(image_paths):
         print("Computing standard deviation %d/%d (%.2f%%)" %
-              (i, len(image_paths), i * 100 / len(image_paths)), end="\r")
+              (i + 1, len(image_paths), (i + 1) * 100 / len(image_paths)), end="\r")
         img = np.array(to_tensor(Image.open(path)))
 
         if par.minus_point_5:
@@ -50,8 +53,7 @@ def calc_image_mean_std(sequences):
         img[2, :, :] = img[2, :, :] - mean[2]
         var_sum += np.sum(np.square(img), (1, 2,))
         num_pixels += img.shape[1] * img.shape[2]
-
-    print()
+    print("\nTook %.2fs" % (time.time() - start_time))
 
     std = np.sqrt(var_sum / (num_pixels - 1))
 
