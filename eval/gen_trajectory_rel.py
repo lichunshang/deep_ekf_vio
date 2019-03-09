@@ -6,7 +6,6 @@ import se3_math
 from data_loader import get_subseqs, SubseqDataset, SequenceData
 from params import par
 from model import DeepVO
-from torch.utils.data import DataLoader
 from log import logger
 
 

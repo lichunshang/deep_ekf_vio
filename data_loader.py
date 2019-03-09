@@ -245,5 +245,13 @@ class SubseqDataset(Dataset):
 
         return seq_len_list, seq_list, type_list, id_list, id_next_list
 
+    @staticmethod
+    def decode_imu_data(imu_data):
+        t = imu_data[0]
+        gyro = imu_data[1:4]
+        accel = imu_data[4:7]
+
+        return
+
     def __len__(self):
         return len(self.subseqs)

@@ -21,7 +21,7 @@ def T_from_Ct(C, r):
 
 
 def skew3(v):
-    assert (len(v.shape) == 1 and v.shape[0] == 3)
+    assert (type(v) == np.ndarray and len(v.shape) == 1 and v.shape[0] == 3) or (type(v) == type([]) and len(v) == 3)
 
     m = np.zeros([3, 3])
     m[0, 1] = -v[2]
@@ -41,6 +41,33 @@ def unskew3(m):
 
 
 def log_SO3(C):
+    return log_SO3_old(C)
+
+
+def log_SO3_eigen(C):
+    assert (len(C.shape) == 2 and C.shape[0] == 3 and C.shape[1] == 3)
+
+    phi_norm = np.arccos(np.clip((np.trace(C) - 1) / 2, -1.0, 1.0))
+    w, v = np.linalg.eig(C)
+    a = None
+    for i in range(len(v)):
+        if np.abs(w[i] - 1.0) < 1e-12:
+            a = v[:, i]
+            assert (np.linalg.norm(np.imag(a)) < 1e-12)
+            a = np.real(a)
+
+    assert (a is not None)
+    if np.allclose(exp_SO3(phi_norm * a), C, atol=1e-12):
+        return phi_norm * a
+    elif np.allclose(exp_SO3(-phi_norm * a), C, atol=1e-12):
+        return -phi_norm * a
+    else:
+        print(exp_SO3(phi_norm * a) - C)
+        print(exp_SO3(-phi_norm * a) - C)
+        raise ValueError("Invalid logarithmic mapping")
+
+
+def log_SO3_old(C):
     assert (len(C.shape) == 2 and C.shape[0] == 3 and C.shape[1] == 3)
 
     arccos = (np.trace(C) - 1) / 2

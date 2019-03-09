@@ -24,6 +24,103 @@ def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
         )
 
 
+class TorchSE3(object):
+    @staticmethod
+    def exp_SO3(phi):
+        phi_norm = torch.norm(phi)
+
+        if phi_norm > 1e-8:
+            unit_phi = phi / phi_norm
+            unit_phi_skewed = TorchSE3.skew3(unit_phi)
+            C = torch.eye(3, 3) + torch.sin(phi_norm) * unit_phi_skewed + \
+                (1 - torch.cos(phi_norm)) * torch.mm(unit_phi_skewed, unit_phi_skewed)
+        else:
+            phi_skewed = TorchSE3.skew3(phi)
+            C = torch.eye(3, 3) + phi_skewed + 0.5 * torch.mm(phi_skewed, phi_skewed)
+
+        return C
+
+    # assumes small rotations
+    @staticmethod
+    def log_SO3(C):
+        phi_norm = torch.acos(torch.clamp((torch.trace(C) - 1) / 2, -1.0, 1.0))
+        if torch.sin(phi_norm) > 1e-6:
+            phi = phi_norm * TorchSE3.unskew3(C - C.transpose(0, 1)) / (2 * torch.sin(phi_norm))
+        else:
+            phi = 0.5 * TorchSE3.unskew3(C - C.transpose(0, 1))
+
+        return phi
+
+    @staticmethod
+    def log_SO3_eigen(C):
+        phi_norm = torch.acos(torch.clamp((torch.trace(C) - 1) / 2, -1.0, 1.0))
+
+        # eig is not very food for C close to identity, will only keep around 3 decimals places
+        w, v = torch.eig(C, eigenvectors=True)
+        a = torch.tensor([0., 0., 0.])
+        for i in range(0, w.size(0)):
+            if torch.abs(w[i, 0] - 1.0) < 1e-6 and torch.abs(w[i, 1] - 0.0) < 1e-6:
+                a = v[:, i]
+
+        assert (torch.abs(torch.norm(a) - 1.0) < 1e-6)
+
+        if torch.allclose(TorchSE3.exp_SO3(phi_norm * a), C, atol=1e-3):
+            return phi_norm * a
+        elif torch.allclose(TorchSE3.exp_SO3(-phi_norm * a), C, atol=1e-3):
+            return -phi_norm * a
+        else:
+            raise ValueError("Invalid logarithmic mapping")
+
+    @staticmethod
+    def skew3(v):
+        m = torch.zeros(3, 3)
+        m[0, 1] = -v[2]
+        m[0, 2] = v[1]
+        m[1, 0] = v[2]
+
+        m[1, 2] = -v[0]
+        m[2, 0] = -v[1]
+        m[2, 1] = v[0]
+
+        return m
+
+    @staticmethod
+    def unskew3(m):
+        return torch.stack([m[2, 1], m[0, 2], m[1, 0]])
+
+    @staticmethod
+    def J_left_SO3_inv(phi):
+        phi_norm = torch.norm(phi)
+        if torch.abs(phi_norm) > 1e-6:
+            a = phi / phi_norm
+            cot_half_phi_norm = 1.0 / torch.tan(phi_norm / 2)
+            J_inv = (phi_norm / 2) * cot_half_phi_norm * torch.eye(3, 3) + \
+                    (1 - (phi_norm / 2) * cot_half_phi_norm) * \
+                    torch.mm(a, a.transpose(0, 1)) - (phi_norm / 2) * TorchSE3.skew3(a)
+        else:
+            J_inv = torch.eye(3, 3) - 0.5 * TorchSE3.skew3(phi)
+        return J_inv
+
+
+class IMUKalmanFilter(nn.Module):
+    def __init__(self):
+        super(IMUKalmanFilter, self).__init__()
+
+    def predict_one_step(self, dt, accel_meas, gyro_meas, prev_state, prev_covar):
+        pass
+
+    def predict(self, imu_meas, prev_state, prev_covar):
+        # phi_matrix = []
+        for tau in range(0, len(imu_meas)):
+            pass
+
+    def update(self):
+        pass
+
+    def forward(self, imu_meas, prev_state, prev_covar, vis_meas, vis_meas_covar):
+        pass
+
+
 class DeepVO(nn.Module):
     def __init__(self, imsize1, imsize2, batchNorm):
         super(DeepVO, self).__init__()
