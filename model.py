@@ -90,6 +90,7 @@ class TorchSE3(object):
 
     @staticmethod
     def J_left_SO3_inv(phi):
+        phi = TorchSE3.make_proper_vector(phi)
         phi_norm = torch.norm(phi)
         if torch.abs(phi_norm) > 1e-6:
             a = phi / phi_norm
@@ -100,6 +101,25 @@ class TorchSE3(object):
         else:
             J_inv = torch.eye(3, 3) - 0.5 * TorchSE3.skew3(phi)
         return J_inv
+
+    @staticmethod
+    def J_left_SO3(phi):
+        phi = TorchSE3.make_proper_vector(phi)
+        phi_norm = torch.norm(phi)
+        if torch.abs(phi_norm) > 1e-6:
+            a = phi / phi_norm
+            J = (torch.sin(phi_norm) / phi_norm) * torch.eye(3, 3) + \
+                (1 - (torch.sin(phi_norm) / phi_norm)) * torch.mm(a, a.transpose(0, 1)) + \
+                ((1 - torch.cos(phi_norm)) / phi_norm) * TorchSE3.skew3(a)
+        else:
+            J = torch.eye(3, 3) + 0.5 * TorchSE3.skew3(phi)
+        return J
+
+    @staticmethod
+    def make_proper_vector(v):
+        if v.dim() <= 1:
+            return torch.unsqueeze(v, dim=1)
+        return v
 
 
 class IMUKalmanFilter(nn.Module):
