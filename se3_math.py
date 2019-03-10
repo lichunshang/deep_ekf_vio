@@ -21,7 +21,7 @@ def T_from_Ct(C, r):
 
 
 def skew3(v):
-    assert (type(v) == np.ndarray and len(v.shape) == 1 and v.shape[0] == 3) or (type(v) == type([]) and len(v) == 3)
+    assert (type(v) == np.ndarray and v.size == 3) or (type(v) == type([]) and len(v) == 3)
 
     m = np.zeros([3, 3])
     m[0, 1] = -v[2]
@@ -97,6 +97,7 @@ def log_SO3_old(C):
 
 
 def left_jacobi_SO3(phi):
+    phi = np.reshape(phi, [3, 1])
     phi_norm = np.linalg.norm(phi)
     if np.abs(phi_norm) > 1e-8:
         a = phi / phi_norm
@@ -108,6 +109,7 @@ def left_jacobi_SO3(phi):
 
 
 def left_jacobi_SO3_inv(phi):
+    phi = np.reshape(phi, [3, 1])
     phi_norm = np.linalg.norm(phi)
     if np.abs(phi_norm) > 1e-8:
         a = phi / phi_norm
