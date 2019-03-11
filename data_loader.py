@@ -50,10 +50,10 @@ class SequenceData(object):
         self.df = pd.read_pickle(self.pd_path)
 
     def get_poses(self):
-        return self.df.loc[:, "T_i_vk"].values
+        return np.array(list(self.df.loc[:, "T_i_vk"].values))
 
     def get_images_paths(self):
-        return self.df.loc[:, "image_path"].values
+        return list(self.df.loc[:, "image_path"].values)
 
     def get(self, i):
         raise NotImplementedError("Not implemented")

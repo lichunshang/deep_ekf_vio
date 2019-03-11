@@ -32,7 +32,7 @@ class Parameters(object):
 
         self.img_w = 320 * 2
         self.img_h = 96 * 2
-        self.img_means = (-0.151812640483464, -0.13357509111350818, -0.14181910364786987)
+        self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
 
@@ -105,11 +105,3 @@ class Parameters(object):
 
 par = Parameters.get_instance()
 
-# elapsed time = 0.766002893447876
-# Numbers of frames in training dataset: 17437
-# mean_tensor =  [-0.151812640483464, -0.13357509111350818, -0.14181910364786987]
-# mean_np =  [88.78708011161852, 93.43778497818349, 91.33551888646076]
-# std_tensor =  [0.3174070577943728, 0.31982824445835345, 0.32372934976798146]
-# std_np =  [80.93941240862273, 81.557427180421, 82.55097977909139]
-
-# self.img_stds = (1, 1, 1)  # (0.309122, 0.315710, 0.3226514)
