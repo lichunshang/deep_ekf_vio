@@ -41,7 +41,7 @@ def plot_errors(working_dir):
                                  "seq_%s_%02d_%s_rel_err_plt.png" % (
                                      sequence, j, "_".join(labels[j].lower().split())))))
             plt.clf()
-            plt.hist(err, bins=np.linspace(start=np.min(err), stop=np.max(err), num=100), density=True)
+            plt.hist(err, bins=np.linspace(start=np.min(err), stop=np.max(err), num=100), normed=True)
 
             ticks = plt.xticks()[0]
             lnspc = np.linspace(min(ticks), max(ticks), len(err))

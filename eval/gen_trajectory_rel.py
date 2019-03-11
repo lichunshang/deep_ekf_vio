@@ -6,12 +6,11 @@ import se3_math
 from data_loader import get_subseqs, SubseqDataset, SequenceData
 from params import par
 from model import DeepVO
-from torch.utils.data import DataLoader
 from log import logger
 
 
-def gen_trajectory_rel_iter(model, dataloader, prop_lstm_states):
-    predicted_abs_poses = [np.eye(4, 4), ]
+def gen_trajectory_rel_iter(model, dataloader, prop_lstm_states, initial_pose=np.eye(4, 4)):
+    predicted_abs_poses = [np.array(initial_pose), ]
     lstm_states = None  # none defaults to zero
     for i, batch in enumerate(dataloader):
         print('%d/%d (%.2f%%)' % (i, len(dataloader), i * 100 / len(dataloader)), end="\r")
@@ -63,7 +62,8 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
         gt_abs_poses = SequenceData(seq).get_poses()
 
-        predicted_abs_poses = gen_trajectory_rel_iter(M_deepvo, dataloader, prop_lstm_states)
+        predicted_abs_poses = gen_trajectory_rel_iter(M_deepvo, dataloader, prop_lstm_states,
+                                                      initial_pose=gt_abs_poses[0, :, :])
 
         np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "est_poses", seq + ".npy")),
                 predicted_abs_poses)

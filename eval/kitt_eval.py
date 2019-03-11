@@ -50,7 +50,7 @@ def print_error_table(errors, ave_errors):
                  "," + str(ave_errors[0]) + "," + str(ave_errors[1] * 180 / np.pi))
 
 
-def kitti_eval(working_dir, train_sequences, val_sequences):
+def kitti_eval(working_dir, train_sequences, val_sequences, min_num_frames=200):
     logger.initialize(working_dir=working_dir, use_tensorboard=False)
     logger.print("================ Evaluate KITTI ================")
     logger.print("Working on directory:", working_dir)
@@ -60,8 +60,9 @@ def kitti_eval(working_dir, train_sequences, val_sequences):
 
     available_seqs = []
     for f in sorted(os.listdir(kitti_dir)):
-        if f.endswith(".txt"):
-            available_seqs.append(f[0:2])
+        # must have at least 200 entries for evaluation
+        if f.endswith(".txt") and sum(1 for line in open(os.path.join(kitti_dir, f))) > min_num_frames:
+            available_seqs.append(f.replace("_est.txt", "").replace("_gt.txt", ""))
 
     assert (len(available_seqs) // 2 == len(set(available_seqs)))
     available_seqs = list(set(available_seqs))
@@ -97,9 +98,16 @@ def kitti_eval(working_dir, train_sequences, val_sequences):
     logger.print("Finished running KITTI evaluation!")
 
     # print the errors
-    train_errors, ave_train_errors = compute_error_for_each_seq(os.path.join(kitti_dir, "train"))
-    val_errors, ave_val_errors = compute_error_for_each_seq(os.path.join(kitti_dir, "valid"))
     logger.print("Training errors are:")
-    print_error_table(train_errors, ave_train_errors)
+    if list(set(available_seqs) & set(train_sequences)):
+        train_errors, ave_train_errors = compute_error_for_each_seq(os.path.join(kitti_dir, "train"))
+        print_error_table(train_errors, ave_train_errors)
+    else:
+        logger.print("No training errors data")
+
     logger.print("Validation errors are:")
-    print_error_table(val_errors, ave_val_errors)
+    if list(set(available_seqs) & set(val_sequences)):
+        val_errors, ave_val_errors = compute_error_for_each_seq(os.path.join(kitti_dir, "valid"))
+        print_error_table(val_errors, ave_val_errors)
+    else:
+        logger.print("No validation errors data")
