@@ -32,11 +32,11 @@ class TorchSE3(object):
         if phi_norm > 1e-8:
             unit_phi = phi / phi_norm
             unit_phi_skewed = TorchSE3.skew3(unit_phi)
-            C = torch.eye(3, 3) + torch.sin(phi_norm) * unit_phi_skewed + \
+            C = torch.eye(3, 3, device=phi.device) + torch.sin(phi_norm) * unit_phi_skewed + \
                 (1 - torch.cos(phi_norm)) * torch.mm(unit_phi_skewed, unit_phi_skewed)
         else:
             phi_skewed = TorchSE3.skew3(phi)
-            C = torch.eye(3, 3) + phi_skewed + 0.5 * torch.mm(phi_skewed, phi_skewed)
+            C = torch.eye(3, 3, device=phi.device) + phi_skewed + 0.5 * torch.mm(phi_skewed, phi_skewed)
 
         return C
 
@@ -52,12 +52,12 @@ class TorchSE3(object):
         return phi
 
     @staticmethod
-    def log_SO3_eigen(C):
+    def log_SO3_eigen(C):  # no autodiff
         phi_norm = torch.acos(torch.clamp((torch.trace(C) - 1) / 2, -1.0, 1.0))
 
         # eig is not very food for C close to identity, will only keep around 3 decimals places
         w, v = torch.eig(C, eigenvectors=True)
-        a = torch.tensor([0., 0., 0.])
+        a = torch.tensor([0., 0., 0.], device=C.device)
         for i in range(0, w.size(0)):
             if torch.abs(w[i, 0] - 1.0) < 1e-6 and torch.abs(w[i, 1] - 0.0) < 1e-6:
                 a = v[:, i]
@@ -73,7 +73,7 @@ class TorchSE3(object):
 
     @staticmethod
     def skew3(v):
-        m = torch.zeros(3, 3)
+        m = torch.zeros(3, 3, device=v.device)
         m[0, 1] = -v[2]
         m[0, 2] = v[1]
         m[1, 0] = v[2]
@@ -95,11 +95,11 @@ class TorchSE3(object):
         if torch.abs(phi_norm) > 1e-6:
             a = phi / phi_norm
             cot_half_phi_norm = 1.0 / torch.tan(phi_norm / 2)
-            J_inv = (phi_norm / 2) * cot_half_phi_norm * torch.eye(3, 3) + \
+            J_inv = (phi_norm / 2) * cot_half_phi_norm * torch.eye(3, 3, device=phi.device) + \
                     (1 - (phi_norm / 2) * cot_half_phi_norm) * \
                     torch.mm(a, a.transpose(0, 1)) - (phi_norm / 2) * TorchSE3.skew3(a)
         else:
-            J_inv = torch.eye(3, 3) - 0.5 * TorchSE3.skew3(phi)
+            J_inv = torch.eye(3, 3, device=phi.device) - 0.5 * TorchSE3.skew3(phi)
         return J_inv
 
     @staticmethod
@@ -108,11 +108,11 @@ class TorchSE3(object):
         phi_norm = torch.norm(phi)
         if torch.abs(phi_norm) > 1e-6:
             a = phi / phi_norm
-            J = (torch.sin(phi_norm) / phi_norm) * torch.eye(3, 3) + \
+            J = (torch.sin(phi_norm) / phi_norm) * torch.eye(3, 3, device=phi.device) + \
                 (1 - (torch.sin(phi_norm) / phi_norm)) * torch.mm(a, a.transpose(0, 1)) + \
                 ((1 - torch.cos(phi_norm)) / phi_norm) * TorchSE3.skew3(a)
         else:
-            J = torch.eye(3, 3) + 0.5 * TorchSE3.skew3(phi)
+            J = torch.eye(3, 3, device=phi.device) + 0.5 * TorchSE3.skew3(phi)
         return J
 
 
