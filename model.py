@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from data_loader import SubseqDataset
 from params import par
 from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
@@ -119,20 +120,162 @@ class TorchSE3(object):
 class IMUKalmanFilter(nn.Module):
     def __init__(self):
         super(IMUKalmanFilter, self).__init__()
-
-    def predict_one_step(self, dt, accel_meas, gyro_meas, prev_state, prev_covar):
-        pass
+        self.imu_noise = torch.zeros(12, 12)
+        self.C_cal = torch.eye(3, 3)
+        self.C_cal_transpose = self.C_cal.transpose(0, 1)
+        self.r_cal = torch.zeros(3, 1)
 
     def predict(self, imu_meas, prev_state, prev_covar):
-        # phi_matrix = []
-        for tau in range(0, len(imu_meas)):
-            pass
+        C_accum = torch.eye(3, 3, device=imu_meas.device)
+        r_accum = torch.zeros(3, 1, device=imu_meas.device)
+        v_accum = torch.zeros(3, 1, device=imu_meas.device)
+        t_accum = torch.tensor(0, device=imu_meas.device)
+        pred_covar = prev_covar
 
-    def update(self):
-        pass
+        g_k, C_k, r_k, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state(prev_state)
+        for tau in range(0, len(imu_meas) - 1):
+            t, gyro_meas, accel_meas = SubseqDataset.decode_imu_data(imu_meas[tau, :])
+            tp1, _, _ = SubseqDataset.decode_imu_data(imu_meas[tau + 1, :])
 
-    def forward(self, imu_meas, prev_state, prev_covar, vis_meas, vis_meas_covar):
-        pass
+            gyro_meas = gyro_meas.view(3, 1)
+            accel_meas = accel_meas.view(3, 1)
+            dt = tp1 - t
+
+            dt2 = dt * dt
+            w = gyro_meas - bw_k
+            w_skewed = TorchSE3.skew3(w)
+            C_accum_transpose = C_accum.transpose(0, 1)
+            a = accel_meas - ba_k
+            v = torch.mm(C_accum_transpose, v_k - g_k * t_accum + v_accum)
+            v_skewed = TorchSE3.skew3(v)
+            I3 = torch.eye(3, 3, device=imu_meas.device)
+            exp_int_w = TorchSE3.exp_SO3(dt * w)
+
+            # propagate uncertainty, 2nd order
+            F = torch.zeros(18, 18, device=imu_meas.device)
+            F[3:6, 3:6] = -w_skewed
+            F[3:6, 12:15] = -I3
+            F[6:9, 3:6] = -torch.mm(C_accum, v_skewed)
+            F[6:9, 9:12] = C_accum
+            F[9:12, 0:3] = -C_accum_transpose
+            F[9:12, 3:6] = -TorchSE3.skew3(torch.mm(C_accum_transpose, g_k))
+            F[9:12, 9:12] = -w_skewed
+            F[9:12, 12:15] = -v_skewed
+            F[9:12, 15:18] = -I3
+
+            G = torch.zeros(18, 12, device=imu_meas.device)
+            G[3:6, 0:3] = -I3
+            G[9:12, 0:3] = -v_skewed
+            G[9:12, 6:9] = -I3
+            G[12:15, 3:6] = I3
+            G[15:18, 3:6] = I3
+
+            Phi = torch.eye(18, 18, device=imu_meas.device) + F * dt + 0.5 * F * dt2
+            Phi[3:6, 3:6] = exp_int_w
+            Phi[9:12, 9:12] = exp_int_w
+
+            mm = torch.mm
+            Q = mm(mm(mm(mm(Phi, G), self.imu_noise), G.transpose(0, 1)), Phi.transpose(0, 1)) * dt
+            pred_covar = mm(mm(Phi, pred_covar), Phi.transpose(0, 1)) + Q
+
+            # propagate nominal states
+            r_accum = r_accum + 0.5 * torch.mm(C_accum, (dt2 * a))
+            v_accum = v_accum + torch.mm(C_accum, (dt * a))
+            C_accum = torch.mm(C_accum, exp_int_w)
+            t_accum += dt
+
+        pred_state = IMUKalmanFilter.encode_state(g_k,
+                                                  C_accum,
+                                                  v_k * t_accum - 0.5 * g_k * t_accum * t_accum + r_accum,
+                                                  torch.mm(C_accum.transpose(0, 1), v_k - g_k * t_accum + v_accum),
+                                                  bw_k, ba_k)
+
+        return pred_state, pred_covar
+
+    def update(self, pred_state, pred_covar, vis_meas, vis_meas_covar):
+        mm = torch.mm
+        se3 = TorchSE3
+        g_pred, C_pred, r_pred, v_pred, bw_pred, ba_pred = IMUKalmanFilter.decode_state(pred_state)
+
+        vis_meas_rot = vis_meas[3:6]
+        vis_meas_trans = vis_meas[0:3].view(3, 1)
+        residual_rot = se3.log_SO3(mm(mm(mm(se3.exp_SO3(vis_meas_rot), self.C_cal_transpose), C_pred), self.C_cal))
+        residual_trans = vis_meas_trans - mm(mm(mm(self.C_cal_transpose, C_pred), self.r_cal)) - \
+                         mm(self.C_cal_transpose, r_pred - self.r_cal)
+
+        H = torch.zeros(6, 18, device=pred_state.device)
+        H[0:3, 3:6] = mm(mm(se3.J_left_SO3_inv(-residual_rot), self.C_cal_transpose), C_pred)
+        H[3:6, 3:6] = mm(mm(self.C_cal_transpose, C_pred), se3.skew3(r_pred))
+        H[3:6, 6:9] = -self.C_cal_transpose
+
+        S = mm(mm(H, pred_covar), H.transpose(0, 1)) + vis_meas_covar
+        K = mm(mm(pred_covar, H), S.inverse())
+        residual = torch.cat([residual_rot.view(3, 1), residual_trans], dim=1)
+        est_error = mm(K, residual)
+
+        I18 = torch.eye(18, 18, device=pred_state.device)
+        I_m_KH = I18 - mm(K, H)
+        est_covar = mm(mm(I_m_KH, pred_covar), I_m_KH.transpose(0, 1)) + mm(mm(K, vis_meas_covar), K.transpose(0, 1))
+
+        est_state = IMUKalmanFilter.encode_state(g_pred + est_error[0:3],
+                                                 mm(C_pred, se3.exp_SO3(est_error[3:6])),
+                                                 r_pred + est_error[6:9],
+                                                 v_pred + est_error[9:12],
+                                                 bw_pred + est_error[12:15],
+                                                 ba_pred + est_error[15:18])
+        return est_state, est_covar
+
+    def composition(self, prev_pose, est_state, est_covar):
+        g, C, r, v, bw, ba = IMUKalmanFilter.decode_state(est_state)
+        C_transpose = C.transpose(0, 1)
+
+        new_pose = torch.eye(4, 4, device=prev_pose.device)
+        new_pose[0:3] = torch.mm(C_transpose, prev_pose[0:3, 0:3])
+        new_pose[0:3] = torch.mm(C_transpose, prev_pose[0:3, 3] - r)
+        new_g = torch.mm(C_transpose, g)
+
+        new_state = IMUKalmanFilter.encode_state(new_g,
+                                                 torch.eye(3, 3, device=prev_pose.device),
+                                                 torch.zeros(3, device=prev_pose.device),
+                                                 v, bw, ba)
+        U = torch.zeros(18, 18, device=prev_pose.device)
+        U[0:3, 0:3] = C_transpose
+        U[0:3, 3:6] = TorchSE3.skew3(new_g)
+        new_covar = torch.mm(torch.mm(U, est_covar), U.transpose(0, 1))
+
+        return new_pose, new_state, new_covar
+
+    def forward(self, imu_meas, prev_pose, prev_state, prev_covar, vis_meas, vis_meas_covar):
+        pred_state, pred_covar = self.predict(imu_meas, prev_state, prev_covar)
+        est_state, est_covar = self.update(pred_state, pred_covar, vis_meas, vis_meas_covar)
+        new_pose, new_state, new_covar = self.composition(prev_pose, est_state, est_covar)
+        return new_pose, new_state, new_covar
+
+    @staticmethod
+    def decode_error_state(state_vector):
+        g = state_vector[0:3]
+        C = state_vector[3:6]
+        r = state_vector[6:9]
+        v = state_vector[9:12]
+        bw = state_vector[12:15]
+        ba = state_vector[15:18]
+
+        return g, C, r, v, bw, ba
+
+    @staticmethod
+    def decode_state(state_vector):
+        g = state_vector[0:3]
+        C = state_vector[3:12].view(3, 3)
+        r = state_vector[12:15]
+        v = state_vector[15:18]
+        bw = state_vector[18:21]
+        ba = state_vector[21:24]
+
+        return g, C, r, v, bw, ba
+
+    @staticmethod
+    def encode_state(g, C, r, v, bw, ba):
+        return torch.stack((g.view(3), C.view(9), r.view(3), v.view(3), bw.view(3), ba.view(3),))
 
 
 class DeepVO(nn.Module):
