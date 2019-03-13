@@ -1,2 +1,0 @@
-================ Evaluate KITTI ================
-Working on directory: home/cs4li/Dev/deep_ekf_vio/results/train_20190127-17-01-57_baseline_SO3/saved.model.valid.traj_eval@len=64
