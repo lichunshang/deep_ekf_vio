@@ -124,11 +124,7 @@ class IMUKalmanFilter(nn.Module):
         self.C_cal = T_cal[0:3, 0:3]
         self.C_cal_transpose = self.C_cal.transpose(0, 1)
         self.r_cal = T_cal[0:3, 3]
-
-    @staticmethod
-    def F_G_Phi():
-        pass
-
+    
     def predict(self, imu_meas, prev_state, prev_covar):
         C_accum = torch.eye(3, 3, device=imu_meas.device)
         r_accum = torch.zeros(3, 1, device=imu_meas.device)
@@ -171,11 +167,11 @@ class IMUKalmanFilter(nn.Module):
             G[12:15, 3:6] = I3
             G[15:18, 9:12] = I3
 
-            Phi = torch.eye(18, 18, device=imu_meas.device) + F * dt + 0.5 * F * dt2
+            mm = torch.mm
+            Phi = torch.eye(18, 18, device=imu_meas.device) + F * dt + 0.5 * mm(F, F) * dt2
             Phi[3:6, 3:6] = exp_int_w.transpose(0, 1)
             Phi[9:12, 9:12] = Phi[3:6, 3:6]
 
-            mm = torch.mm
             Q = mm(mm(mm(mm(Phi, G), self.imu_noise), G.transpose(0, 1)), Phi.transpose(0, 1)) * dt
             pred_covar = mm(mm(Phi, pred_covar), Phi.transpose(0, 1)) + Q
 
