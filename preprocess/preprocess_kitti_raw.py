@@ -2,8 +2,9 @@ from log import logger
 import numpy as np
 import os
 import transformations
-from se3_math import log_SO3, exp_SO3, interpolate_SE3, interpolate_SO3, log_SE3
+from se3_math import log_SO3, exp_SO3, interpolate_SE3, interpolate_SO3
 from data_loader import SequenceData
+from utils import Plotter
 import matplotlib.pyplot as plt
 import time
 
@@ -12,37 +13,6 @@ if "DISPLAY" not in os.environ:
 
 lat, lon, alt, roll, pitch, yaw, vn, ve, vf, vl, vu, ax, ay, az, af, al, au, wx, wy, wz, wf, wl, wu, \
 posacc, velacc, navstat, numsats, posmode, velmode, orimode = list(range(0, 30))
-
-
-class Plotter(object):
-    def __init__(self, output_dir):
-        self.output_dir = output_dir
-        self.counter = 0
-
-    def plot(self, plots, xlabel, ylabel, title, labels=None, equal_axes=False):
-        if not labels:
-            labels_txt = [None] * len(plots)
-        else:
-            labels_txt = labels
-        assert (len(plots) == len(labels_txt))
-
-        plt.clf()
-        for i in range(0, len(plots)):
-            plt.plot(*plots[i], label=labels_txt[i])
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.title(title)
-
-        if equal_axes:
-            plt.axis("equal")
-
-        if labels:
-            plt.legend()
-
-        plt.grid()
-        filename = "%02d_%s.png" % (self.counter, "_".join(title.lower().split()))
-        plt.savefig(os.path.join(self.output_dir, filename))
-        self.counter += 1
 
 
 def read_timestamps(ts_file):

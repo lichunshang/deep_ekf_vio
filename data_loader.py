@@ -248,10 +248,10 @@ class SubseqDataset(Dataset):
     @staticmethod
     def decode_imu_data(imu_data):
         t = imu_data[0]
-        gyro = imu_data[1:4]
-        accel = imu_data[4:7]
+        gyro = imu_data[1:4].view(3, 1)
+        accel = imu_data[4:7].view(3, 1)
 
-        return
+        return t, gyro, accel
 
     def __len__(self):
         return len(self.subseqs)

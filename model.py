@@ -118,18 +118,22 @@ class TorchSE3(object):
 
 
 class IMUKalmanFilter(nn.Module):
-    def __init__(self):
+    def __init__(self, imu_noise, T_cal):
         super(IMUKalmanFilter, self).__init__()
-        self.imu_noise = torch.zeros(12, 12)
-        self.C_cal = torch.eye(3, 3)
+        self.imu_noise = imu_noise
+        self.C_cal = T_cal[0:3, 0:3]
         self.C_cal_transpose = self.C_cal.transpose(0, 1)
-        self.r_cal = torch.zeros(3, 1)
+        self.r_cal = T_cal[0:3, 3]
+
+    @staticmethod
+    def F_G_Phi():
+        pass
 
     def predict(self, imu_meas, prev_state, prev_covar):
         C_accum = torch.eye(3, 3, device=imu_meas.device)
         r_accum = torch.zeros(3, 1, device=imu_meas.device)
         v_accum = torch.zeros(3, 1, device=imu_meas.device)
-        t_accum = torch.tensor(0, device=imu_meas.device)
+        t_accum = torch.tensor(0.0, device=imu_meas.device)
         pred_covar = prev_covar
 
         g_k, C_k, r_k, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state(prev_state)
@@ -137,10 +141,7 @@ class IMUKalmanFilter(nn.Module):
             t, gyro_meas, accel_meas = SubseqDataset.decode_imu_data(imu_meas[tau, :])
             tp1, _, _ = SubseqDataset.decode_imu_data(imu_meas[tau + 1, :])
 
-            gyro_meas = gyro_meas.view(3, 1)
-            accel_meas = accel_meas.view(3, 1)
             dt = tp1 - t
-
             dt2 = dt * dt
             w = gyro_meas - bw_k
             w_skewed = TorchSE3.skew3(w)
@@ -168,11 +169,11 @@ class IMUKalmanFilter(nn.Module):
             G[9:12, 0:3] = -v_skewed
             G[9:12, 6:9] = -I3
             G[12:15, 3:6] = I3
-            G[15:18, 3:6] = I3
+            G[15:18, 9:12] = I3
 
             Phi = torch.eye(18, 18, device=imu_meas.device) + F * dt + 0.5 * F * dt2
-            Phi[3:6, 3:6] = exp_int_w
-            Phi[9:12, 9:12] = exp_int_w
+            Phi[3:6, 3:6] = exp_int_w.transpose(0, 1)
+            Phi[9:12, 9:12] = Phi[3:6, 3:6]
 
             mm = torch.mm
             Q = mm(mm(mm(mm(Phi, G), self.imu_noise), G.transpose(0, 1)), Phi.transpose(0, 1)) * dt
@@ -230,8 +231,8 @@ class IMUKalmanFilter(nn.Module):
         C_transpose = C.transpose(0, 1)
 
         new_pose = torch.eye(4, 4, device=prev_pose.device)
-        new_pose[0:3] = torch.mm(C_transpose, prev_pose[0:3, 0:3])
-        new_pose[0:3] = torch.mm(C_transpose, prev_pose[0:3, 3] - r)
+        new_pose[0:3, 0:3] = torch.mm(C_transpose, prev_pose[0:3, 0:3])
+        new_pose[0:3, 3] = torch.mm(C_transpose, prev_pose[0:3, 3].view(3, 1) - r).view(3)
         new_g = torch.mm(C_transpose, g)
 
         new_state = IMUKalmanFilter.encode_state(new_g,
@@ -241,6 +242,7 @@ class IMUKalmanFilter(nn.Module):
         U = torch.zeros(18, 18, device=prev_pose.device)
         U[0:3, 0:3] = C_transpose
         U[0:3, 3:6] = TorchSE3.skew3(new_g)
+        U[9:18, 9:18] = torch.eye(9, 9, device=prev_pose.device)
         new_covar = torch.mm(torch.mm(U, est_covar), U.transpose(0, 1))
 
         return new_pose, new_state, new_covar
@@ -264,18 +266,18 @@ class IMUKalmanFilter(nn.Module):
 
     @staticmethod
     def decode_state(state_vector):
-        g = state_vector[0:3]
+        g = state_vector[0:3].view(3, 1)
         C = state_vector[3:12].view(3, 3)
-        r = state_vector[12:15]
-        v = state_vector[15:18]
-        bw = state_vector[18:21]
-        ba = state_vector[21:24]
+        r = state_vector[12:15].view(3, 1)
+        v = state_vector[15:18].view(3, 1)
+        bw = state_vector[18:21].view(3, 1)
+        ba = state_vector[21:24].view(3, 1)
 
         return g, C, r, v, bw, ba
 
     @staticmethod
     def encode_state(g, C, r, v, bw, ba):
-        return torch.stack((g.view(3), C.view(9), r.view(3), v.view(3), bw.view(3), ba.view(3),))
+        return torch.cat((g.view(3), C.view(9), r.view(3), v.view(3), bw.view(3), ba.view(3),))
 
 
 class DeepVO(nn.Module):

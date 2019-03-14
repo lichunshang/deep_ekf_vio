@@ -23,9 +23,10 @@ class Parameters(object):
         # Path
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
         self.data_dir = os.path.join(self.project_dir, "data")
-        self.results_dir = os.path.join(self.project_dir, "results")
+        self.results_coll_dir = os.path.join(self.project_dir, "results")
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
-        self.results_dir = os.path.join(self.results_dir, "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
+        self.results_dir = os.path.join(self.results_coll_dir,
+                                        "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
         self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
         self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
@@ -104,4 +105,3 @@ class Parameters(object):
 
 
 par = Parameters.get_instance()
-

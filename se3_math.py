@@ -40,60 +40,39 @@ def unskew3(m):
     return np.array([m[2, 1], m[0, 2], m[1, 0]])
 
 
-def log_SO3(C):
-    return log_SO3_old(C)
-
-
+# have problem with values close to zero it seems
 def log_SO3_eigen(C):
     assert (len(C.shape) == 2 and C.shape[0] == 3 and C.shape[1] == 3)
 
     phi_norm = np.arccos(np.clip((np.trace(C) - 1) / 2, -1.0, 1.0))
     w, v = np.linalg.eig(C)
-    a = None
-    for i in range(len(v)):
-        if np.abs(w[i] - 1.0) < 1e-12:
-            a = v[:, i]
-            assert (np.linalg.norm(np.imag(a)) < 1e-12)
-            a = np.real(a)
+    e_sel_idx = np.argmin(np.abs(w - 1))  # pick the eigen value closest to 1
+    a = np.real(v[:, e_sel_idx])
 
-    assert (a is not None)
-    if np.allclose(exp_SO3(phi_norm * a), C, atol=1e-12):
-        return phi_norm * a
-    elif np.allclose(exp_SO3(-phi_norm * a), C, atol=1e-12):
-        return -phi_norm * a
-    else:
-        print(exp_SO3(phi_norm * a) - C)
-        print(exp_SO3(-phi_norm * a) - C)
-        raise ValueError("Invalid logarithmic mapping")
+    # pick the phi that produces the closest rotation matrix
+    phis = [phi_norm * a, -phi_norm * a]
+    m_sel_idx = np.argmin([np.linalg.norm(exp_SO3(phis[0]) - C),
+                           np.linalg.norm(exp_SO3(phis[1]) - C)])
+    return phis[m_sel_idx]
 
 
-def log_SO3_old(C):
+def log_SO3(C):
     assert (len(C.shape) == 2 and C.shape[0] == 3 and C.shape[1] == 3)
 
-    arccos = (np.trace(C) - 1) / 2
+    phi_norm = np.arccos(np.clip((np.trace(C) - 1) / 2, -1.0, 1.0))
 
-    if arccos > 1:
-        phi = 0.0
-        # logger.print("WARNING: invalid arccos: %f\n" % arccos)
-        # logger.print("%s\n" % str(C))
-    elif arccos < -1:
-        phi = np.pi
-        # logger.print("WARNING: invalid arccos: %f\n" % arccos)
-        # logger.print("%s\n" % str(C))
+    assert (phi_norm >= 0 and np.sin(phi_norm) >= 0)
+
+    if phi_norm < np.pi / 2 and np.sin(phi_norm) > 1e-6:
+        u = unskew3(C - np.transpose(C)) / (2 * np.sin(phi_norm))
+        phi = phi_norm * u
+    elif phi_norm < np.pi / 2:
+        phi = 0.5 * unskew3(C - C.transpose())
     else:
-        phi = np.arccos((np.trace(C) - 1) / 2)
+        phi = log_SO3_eigen(C)
+        # phi = unskew3(scipy.linalg.logm(C))
 
-    assert (phi >= 0 and np.sin(phi) >= 0)
-
-    if phi < np.pi / 2 and np.sin(phi) > 1e-6:
-        u = unskew3(C - np.transpose(C)) / (2 * np.sin(phi))
-        theta = phi * u
-    elif phi < np.pi / 2:
-        theta = 0.5 * unskew3(C - C.transpose())
-    else:
-        theta = unskew3(scipy.linalg.logm(C))
-
-    return theta
+    return phi
 
 
 def left_jacobi_SO3(phi):
