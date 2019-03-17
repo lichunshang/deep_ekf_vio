@@ -121,13 +121,13 @@ class IMUKalmanFilter(nn.Module):
     def __init__(self, imu_noise, T_cal):
         super(IMUKalmanFilter, self).__init__()
         self.imu_noise = imu_noise
-        self.C_cal = T_cal[0:3, 0:3]
+        self.C_cal = T_cal[0:3, 0:3]  # T_vc, T_imu_cam
         self.C_cal_transpose = self.C_cal.transpose(0, 1)
         self.r_cal = T_cal[0:3, 3].view(3, 1)
 
     def force_symmetrical(self, M):
         M_upper = torch.triu(M)
-        return M_upper + M_upper.transpose(0, 1)
+        return M_upper + M_upper.transpose(0, 1) * (1 - torch.eye(*M_upper.size()))
 
     def predict_one_step(self, t_accum, C_accum, r_accum, v_accum, dt, g_k, v_k, bw_k, ba_k, covar,
                          gyro_meas, accel_meas):
@@ -168,7 +168,7 @@ class IMUKalmanFilter(nn.Module):
 
         Q = mm(mm(mm(mm(Phi, G), self.imu_noise), G.transpose(0, 1)), Phi.transpose(0, 1)) * dt
         covar = mm(mm(Phi, covar), Phi.transpose(0, 1)) + Q
-        covar = self.force_symmetrical(covar)
+        # covar = self.force_symmetrical(covar)
 
         # propagate nominal states
         r_accum = r_accum + 0.5 * torch.mm(C_accum, (dt2 * a))
@@ -190,13 +190,13 @@ class IMUKalmanFilter(nn.Module):
             t, gyro_meas, accel_meas = SubseqDataset.decode_imu_data(imu_meas[tau, :])
             tp1, _, _ = SubseqDataset.decode_imu_data(imu_meas[tau + 1, :])
             dt = tp1 - t
-            t_accum, C_accum, r_accum, v_accum, covar, _, _, _, _ = \
+            t_accum, C_accum, r_accum, v_accum, pred_covar, _, _, _, _ = \
                 self.predict_one_step(t_accum, C_accum, r_accum, v_accum, dt, g_k, v_k, bw_k, ba_k, pred_covar,
                                       gyro_meas, accel_meas)
 
         pred_state = IMUKalmanFilter.encode_state(g_k,
-                                                  C_accum,
-                                                  v_k * t_accum - 0.5 * g_k * t_accum * t_accum + r_accum,
+                                                  torch.mm(C_k, C_accum),
+                                                  r_k + v_k * t_accum - 0.5 * g_k * t_accum * t_accum + r_accum,
                                                   torch.mm(C_accum.transpose(0, 1), v_k - g_k * t_accum + v_accum),
                                                   bw_k, ba_k)
 
@@ -261,15 +261,30 @@ class IMUKalmanFilter(nn.Module):
         U[0:3, 3:6] = TorchSE3.skew3(new_g)
         U[9:18, 9:18] = torch.eye(9, 9, device=prev_pose.device)
         new_covar = torch.mm(torch.mm(U, est_covar), U.transpose(0, 1))
-        new_covar = self.force_symmetrical(new_covar)
+        # new_covar = self.force_symmetrical(new_covar)
 
         return new_pose, new_state, new_covar
 
     def forward(self, imu_meas, prev_pose, prev_state, prev_covar, vis_meas, vis_meas_covar):
-        pred_state, pred_covar = self.predict(imu_meas, prev_state, prev_covar)
-        est_state, est_covar = self.update(pred_state, pred_covar, vis_meas, vis_meas_covar)
-        new_pose, new_state, new_covar = self.composition(prev_pose, est_state, est_covar)
-        return new_pose, new_state, new_covar
+        # loop through the batches
+
+        num_batches = vis_meas.size(0)
+        poses = []
+        states = []
+        covars = []
+        for i in range(0, num_batches):
+            pred_state, pred_covar = self.predict(imu_meas[i], prev_state[i], prev_covar[i])
+            # est_state, est_covar = self.update(pred_state, pred_covar, vis_meas[i], vis_meas_covar[i])
+            # new_pose, new_state, new_covar = self.composition(prev_pose[i], est_state, est_covar)
+            T = torch.eye(4, 4)
+            g, C, r, v, bw, ba = IMUKalmanFilter.decode_state(pred_state)
+            T[0:3, 0:3] = C
+            T[0:3, 3] = r.view(3)
+            poses.append(T.inverse())
+            states.append(pred_state)
+            covars.append(pred_covar)
+
+        return torch.stack(poses), torch.stack(states), torch.stack(covars)
 
     @staticmethod
     def decode_error_state(state_vector):
