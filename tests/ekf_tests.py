@@ -119,25 +119,25 @@ class Test_EKF(unittest.TestCase):
                      "y [m]", "z [m]", "YZ Plot", labels=["gt_poses", "imu_int_pose"], equal_axes=True)
 
         plotter.plot(([timestamps, gt_poses[:, 0, 3]], [timestamps, est_positions[:, 0]],),
-                     "t [s]", "p [m]", "Pos X", labels=["gt", "imu_int"])
+                     "t [s]", "p [m]", "Pos X", labels=["gt", "est"])
         plotter.plot(([timestamps, gt_poses[:, 1, 3]], [timestamps, est_positions[:, 1]],),
-                     "t [s]", "p [m]", "Pos Y", labels=["gt", "imu_int"])
+                     "t [s]", "p [m]", "Pos Y", labels=["gt", "est"])
         plotter.plot(([timestamps, gt_poses[:, 2, 3]], [timestamps, est_positions[:, 2]],),
-                     "t [s]", "p [m]", "Pos Z", labels=["gt", "imu_int"])
+                     "t [s]", "p [m]", "Pos Z", labels=["gt", "est"])
 
         plotter.plot(([timestamps, gt_vels[:, 0]], [timestamps, est_vels[:, 0]],),
-                     "t [s]", "v [m/s]", "Vel X", labels=["gt_vel", "imu_int_vel"])
+                     "t [s]", "v [m/s]", "Vel X", labels=["gt", "est"])
         plotter.plot(([timestamps, gt_vels[:, 1]], [timestamps, est_vels[:, 1]],),
-                     "t [s]", "v [m/s]", "Vel Y", labels=["gt_vel", "imu_int_vel"])
+                     "t [s]", "v [m/s]", "Vel Y", labels=["gt", "est"])
         plotter.plot(([timestamps, gt_vels[:, 2]], [timestamps, est_vels[:, 2]],),
-                     "t [s]", "v [m/s]", "Vel Z", labels=["gt_vel", "imu_int_vel"])
+                     "t [s]", "v [m/s]", "Vel Z", labels=["gt", "est"])
 
         plotter.plot(([timestamps, gt_rots[:, 0]], [timestamps, est_rots[:, 0]],),
-                     "t [s]", "rot [rad]", "Rot X", labels=["gt_rot", "imu_int_rot"])
+                     "t [s]", "rot [rad]", "Rot X", labels=["gt", "est"])
         plotter.plot(([timestamps, gt_rots[:, 1]], [timestamps, est_rots[:, 1]],),
-                     "t [s]", "rot [rad]", "Rot Y", labels=["gt_rot", "imu_int_rot"])
+                     "t [s]", "rot [rad]", "Rot Y", labels=["gt", "est"])
         plotter.plot(([timestamps, gt_rots[:, 2]], [timestamps, est_rots[:, 2]],),
-                     "t [s]", "rot [rad]", "Rot Z", labels=["gt_rot", "imu_int_rot"])
+                     "t [s]", "rot [rad]", "Rot Z", labels=["gt", "set"])
 
         plotter.plot(([timestamps, gt_gravities[:, 0]], [timestamps, est_gravities[:, 0]],),
                      "t [s]", "accel [m/s^2]", "Gravity X", labels=["gt", "est"])
@@ -336,8 +336,8 @@ class Test_EKF(unittest.TestCase):
         req_grad = False
         imu_noise = torch.diag(torch.tensor([1e-5, 1e-5, 1e-5,
                                              1e-8, 1e-8, 1e-8,
-                                             1e-1, 1e-1, 1e-1,
-                                             1e-5, 1e-5, 1e-5])).to(device)
+                                             1e2, 1e2, 1e2,
+                                             1e2, 1e2, 1e2])).to(device)
         vis_meas_covar = torch.diag(torch.tensor([1e-3, 1e-3, 1e-3,
                                                   1e-3, 1e-3, 1e-3])).to(device)
         init_covar = np.eye(18, 18)
