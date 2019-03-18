@@ -17,6 +17,7 @@ class Plotter(object):
         plt.clf()
         for i in range(0, len(plots)):
             plt.plot(*plots[i], label=labels_txt[i])
+
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         plt.title(title)
