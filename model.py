@@ -168,7 +168,7 @@ class IMUKalmanFilter(nn.Module):
 
         Q = mm(mm(mm(mm(Phi, G), self.imu_noise), G.transpose(0, 1)), Phi.transpose(0, 1)) * dt
         covar = mm(mm(Phi, covar), Phi.transpose(0, 1)) + Q
-        # covar = self.force_symmetrical(covar)
+        covar = self.force_symmetrical(covar)
 
         # propagate nominal states
         r_accum = r_accum + 0.5 * torch.mm(C_accum, (dt2 * a))
@@ -205,8 +205,8 @@ class IMUKalmanFilter(nn.Module):
     def meas_residual_and_jacobi(self, C_pred, r_pred, vis_meas):
         mm = torch.mm
         se3 = TorchSE3
-        vis_meas_rot = vis_meas[3:6]
-        vis_meas_trans = vis_meas[0:3].view(3, 1)
+        vis_meas_rot = vis_meas[3:6, :]
+        vis_meas_trans = vis_meas[0:3, :]
         residual_rot = se3.log_SO3(mm(mm(mm(se3.exp_SO3(vis_meas_rot), self.C_cal_transpose),
                                          C_pred.transpose(0, 1)), self.C_cal))
         residual_trans = vis_meas_trans - mm(mm(self.C_cal_transpose, C_pred), self.r_cal) - \
@@ -225,6 +225,7 @@ class IMUKalmanFilter(nn.Module):
         g_pred, C_pred, r_pred, v_pred, bw_pred, ba_pred = IMUKalmanFilter.decode_state(pred_state)
         residual, H = self.meas_residual_and_jacobi(C_pred, r_pred, vis_meas)
 
+        H = -H  # this is required for EKF, since the way we derived the Jacobian are for batch methods
         H_transpose = H.transpose(0, 1)
 
         S = mm(mm(H, pred_covar), H_transpose) + vis_meas_covar
@@ -235,12 +236,19 @@ class IMUKalmanFilter(nn.Module):
         I18 = torch.eye(18, 18, device=pred_state.device)
         est_covar = mm(I18 - mm(K, H), pred_covar)
 
-        est_state = IMUKalmanFilter.encode_state(g_pred + est_error[0:3],
-                                                 mm(C_pred, TorchSE3.exp_SO3(est_error[3:6])),
-                                                 r_pred + est_error[6:9],
-                                                 v_pred + est_error[9:12],
-                                                 bw_pred + est_error[12:15],
-                                                 ba_pred + est_error[15:18])
+        g_err = est_error[0:3]
+        C_err = est_error[3:6]
+        r_err = est_error[6:9]
+        v_err = est_error[9:12]
+        bw_err = est_error[12:15]
+        ba_err = est_error[15:18]
+
+        est_state = IMUKalmanFilter.encode_state(g_pred + g_err,
+                                                 mm(C_pred, TorchSE3.exp_SO3(C_err)),
+                                                 r_pred + r_err,
+                                                 v_pred + v_err,
+                                                 bw_pred + bw_err,
+                                                 ba_pred + ba_err)
         return est_state, est_covar
 
     def composition(self, prev_pose, est_state, est_covar):
@@ -261,7 +269,7 @@ class IMUKalmanFilter(nn.Module):
         U[0:3, 3:6] = TorchSE3.skew3(new_g)
         U[9:18, 9:18] = torch.eye(9, 9, device=prev_pose.device)
         new_covar = torch.mm(torch.mm(U, est_covar), U.transpose(0, 1))
-        # new_covar = self.force_symmetrical(new_covar)
+        new_covar = self.force_symmetrical(new_covar)
 
         return new_pose, new_state, new_covar
 
@@ -274,15 +282,12 @@ class IMUKalmanFilter(nn.Module):
         covars = []
         for i in range(0, num_batches):
             pred_state, pred_covar = self.predict(imu_meas[i], prev_state[i], prev_covar[i])
-            # est_state, est_covar = self.update(pred_state, pred_covar, vis_meas[i], vis_meas_covar[i])
-            # new_pose, new_state, new_covar = self.composition(prev_pose[i], est_state, est_covar)
-            T = torch.eye(4, 4)
-            g, C, r, v, bw, ba = IMUKalmanFilter.decode_state(pred_state)
-            T[0:3, 0:3] = C
-            T[0:3, 3] = r.view(3)
-            poses.append(T.inverse())
-            states.append(pred_state)
-            covars.append(pred_covar)
+            est_state, est_covar = self.update(pred_state, pred_covar, vis_meas[i], vis_meas_covar[i])
+            new_pose, new_state, new_covar = self.composition(prev_pose[i], est_state, est_covar)
+
+            poses.append(new_pose)
+            states.append(new_state)
+            covars.append(new_covar)
 
         return torch.stack(poses), torch.stack(states), torch.stack(covars)
 

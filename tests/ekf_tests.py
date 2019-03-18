@@ -269,7 +269,7 @@ class Test_EKF(unittest.TestCase):
 
         C_pred = TorchSE3.exp_SO3(torch.tensor([0.1, 3, -0.3])).to(device)
         r_pred = torch.tensor([-1.05, 20, -1.]).view(3, 1).to(device)
-        vis_meas = torch.tensor([4., -6., 8., -7., 5., -9.]).to(device)
+        vis_meas = torch.tensor([4., -6., 8., -7., 5., -9.]).to(device).view(6, 1)
         residual, H = ekf.meas_residual_and_jacobi(C_pred, r_pred, vis_meas)
 
         e = 1e-6
@@ -313,11 +313,13 @@ class Test_EKF(unittest.TestCase):
         vis_meas_covar = torch.diag(torch.tensor([1e-3, 1e-3, 1e-3,
                                                   1e-3, 1e-3, 1e-3])).to(device)
         init_covar = np.eye(18, 18)
-        init_covar[0:3, 0:3] = np.zeros([3, 3])
-        init_covar[15:18, 15:18] = np.zeros([3, 3])
-        init_covar[12:15, 12:15] = np.zeros([3, 3])
+        init_covar[0:3, 0:3] = np.zeros([3, 3])  # g
+        init_covar[3:9, 3:9] = np.zeros([6, 6])  # C,r
+        init_covar[12:15, 12:15] = np.zeros([3, 3])  # bw
+        init_covar[15:18, 15:18] = np.zeros([3, 3])  # ba
 
         df = SequenceData(seq).df
+        # df = df.loc[0:30, :]
 
         timestamps = list(df.loc[:, "timestamp"].values)
         imu_timestamps = list(df.loc[:, "imu_timestamps"].values)
@@ -337,16 +339,12 @@ class Test_EKF(unittest.TestCase):
         g = np.array([0, 0, 9.808679801065017])
         states = [IMUKalmanFilter.encode_state(torch.tensor(gt_poses[0, 0:3, 0:3].transpose().dot(g),
                                                             dtype=torch.float32),  # g
-                                               torch.tensor(gt_poses[0, 0:3, 0:3], dtype=torch.float32),
-                                               # torch.eye(3, 3),  # C
-                                               # torch.tensor(gt_poses[0, 0:3, 3], dtype=torch.float32),
+                                               torch.eye(3, 3),  # C
                                                torch.zeros(3),  # r
-                                               torch.tensor(gt_vels[0], dtype=torch.float32),
-                                               # torch.tensor(gt_vels[0], dtype=torch.float32),  # v
+                                               torch.tensor(gt_vels[0], dtype=torch.float32),  # v
                                                torch.zeros(3),  # bw
                                                torch.zeros(3)).to(device)]  # ba
         poses = [torch.tensor(np.linalg.inv(gt_poses[0]), dtype=torch.float32).to(device), ]
-        # poses = [torch.eye(4, 4, dtype=torch.float32).to(device), ]
         covars = [torch.tensor(init_covar, dtype=torch.float32).to(device), ]
 
         states[0].requires_grad = req_grad
@@ -358,18 +356,18 @@ class Test_EKF(unittest.TestCase):
                                                     gyro_measurements[i], accel_measurements[i]], axis=1),
                                     dtype=torch.float32).to(device)
 
-            # T_rel = np.linalg.inv(gt_poses[i]).dot(gt_poses[i + 1])
-            # T_rel_vis = np.linalg.inv(T_imu_cam).dot(T_rel).dot(T_imu_cam)
-            # vis_meas = np.concatenate([T_rel_vis[0:3, 3], se3_math.log_SO3(T_rel_vis[0:3, 0:3])])
-            T_rel_vis = np.linalg.inv(gt_poses[0]).dot(gt_poses[i + 1])
+            T_rel = np.linalg.inv(gt_poses[i]).dot(gt_poses[i + 1])
+            T_rel_vis = np.linalg.inv(T_imu_cam).dot(T_rel).dot(T_imu_cam)
             vis_meas = np.concatenate([T_rel_vis[0:3, 3], se3_math.log_SO3(T_rel_vis[0:3, 0:3])])
+            # T_rel_vis = np.linalg.inv(gt_poses[0]).dot(gt_poses[i + 1])
+            # vis_meas = np.concatenate([T_rel_vis[0:3, 3], se3_math.log_SO3(T_rel_vis[0:3, 0:3])])
             vis_meas = torch.tensor(vis_meas, dtype=torch.float32).to(device)
 
             pose, state, covar = ekf.forward(torch.unsqueeze(imu_data, dim=0),
                                              torch.unsqueeze(poses[-1], dim=0),
                                              torch.unsqueeze(states[-1], dim=0),
                                              torch.unsqueeze(covars[-1], dim=0),
-                                             torch.unsqueeze(vis_meas, dim=0),
+                                             torch.unsqueeze(vis_meas.view(6, 1), dim=0),
                                              torch.unsqueeze(vis_meas_covar, dim=0))
 
             states.append(state[0])
