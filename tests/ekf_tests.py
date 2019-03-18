@@ -105,6 +105,13 @@ class Test_EKF(unittest.TestCase):
                       [est_positions[:, 1], est_positions[:, 2]],),
                      "y [m]", "z [m]", "YZ Plot", labels=["gt_poses", "imu_int_pose"], equal_axes=True)
 
+        plotter.plot(([timestamps, gt_poses[:, 0, 3]], [timestamps, est_positions[:, 0]],),
+                     "t [s]", "p [m]", "Pos X", labels=["gt", "imu_int"])
+        plotter.plot(([timestamps, gt_poses[:, 1, 3]], [timestamps, est_positions[:, 1]],),
+                     "t [s]", "p [m]", "Pos Y", labels=["gt", "imu_int"])
+        plotter.plot(([timestamps, gt_poses[:, 2, 3]], [timestamps, est_positions[:, 2]],),
+                     "t [s]", "p [m]", "Pos Z", labels=["gt", "imu_int"])
+
         plotter.plot(([timestamps, gt_vels[:, 0]], [timestamps, est_vels[:, 0]],),
                      "t [s]", "v [m/s]", "Vel X", labels=["gt_vel", "imu_int_vel"])
         plotter.plot(([timestamps, gt_vels[:, 1]], [timestamps, est_vels[:, 1]],),
@@ -219,7 +226,8 @@ class Test_EKF(unittest.TestCase):
         self.assertEqual(len(imu_timestamps), len(gt_poses))
 
         g = np.array([0, 0, 9.808679801065017])
-        states = [IMUKalmanFilter.encode_state(torch.tensor(gt_poses[0, 0:3, 0:3].dot(g), dtype=torch.float32),  # g
+        states = [IMUKalmanFilter.encode_state(torch.tensor(gt_poses[0, 0:3, 0:3].transpose().dot(g),
+                                                            dtype=torch.float32),  # g
                                                torch.eye(3, 3),  # C
                                                torch.zeros(3),  # r
                                                torch.tensor(gt_vels[0], dtype=torch.float32),  # v
@@ -327,13 +335,18 @@ class Test_EKF(unittest.TestCase):
         self.assertEqual(len(imu_timestamps), len(gt_poses))
 
         g = np.array([0, 0, 9.808679801065017])
-        states = [IMUKalmanFilter.encode_state(torch.tensor(gt_poses[0, 0:3, 0:3].dot(g), dtype=torch.float32),  # g
-                                               torch.eye(3, 3),  # C
+        states = [IMUKalmanFilter.encode_state(torch.tensor(gt_poses[0, 0:3, 0:3].transpose().dot(g),
+                                                            dtype=torch.float32),  # g
+                                               torch.tensor(gt_poses[0, 0:3, 0:3], dtype=torch.float32),
+                                               # torch.eye(3, 3),  # C
+                                               # torch.tensor(gt_poses[0, 0:3, 3], dtype=torch.float32),
                                                torch.zeros(3),  # r
-                                               torch.tensor(gt_vels[0], dtype=torch.float32),  # v
+                                               torch.tensor(gt_vels[0], dtype=torch.float32),
+                                               # torch.tensor(gt_vels[0], dtype=torch.float32),  # v
                                                torch.zeros(3),  # bw
                                                torch.zeros(3)).to(device)]  # ba
         poses = [torch.tensor(np.linalg.inv(gt_poses[0]), dtype=torch.float32).to(device), ]
+        # poses = [torch.eye(4, 4, dtype=torch.float32).to(device), ]
         covars = [torch.tensor(init_covar, dtype=torch.float32).to(device), ]
 
         states[0].requires_grad = req_grad
@@ -368,8 +381,8 @@ class Test_EKF(unittest.TestCase):
 
 if __name__ == '__main__':
     # Test_EKF().test_pred_K04_cuda_graph()
-    Test_EKF().test_predict_K06_plotted()
+    # Test_EKF().test_predict_K06_plotted()
     # Test_EKF().test_process_model_F_G_Q_covar()
     # Test_EKF().test_meas_jacobian_numerically()
-    # Test_EKF().test_ekf_all_K06_plotted()
+    Test_EKF().test_ekf_all_K06_plotted()
     # unittest.main()
