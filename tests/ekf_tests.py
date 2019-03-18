@@ -335,16 +335,16 @@ class Test_EKF(unittest.TestCase):
         device = "cpu"
         req_grad = False
         imu_noise = torch.diag(torch.tensor([1e-5, 1e-5, 1e-5,
-                                             0, 0, 0,
+                                             1e-8, 1e-8, 1e-8,
                                              1e-1, 1e-1, 1e-1,
-                                             0, 0, 0])).to(device)
+                                             1e-5, 1e-5, 1e-5])).to(device)
         vis_meas_covar = torch.diag(torch.tensor([1e-3, 1e-3, 1e-3,
                                                   1e-3, 1e-3, 1e-3])).to(device)
         init_covar = np.eye(18, 18)
-        init_covar[0:3, 0:3] = np.zeros([3, 3])  # g
+        # init_covar[0:3, 0:3] = np.zeros([3, 3])  # g
         init_covar[3:9, 3:9] = np.zeros([6, 6])  # C,r
-        init_covar[12:15, 12:15] = np.zeros([3, 3])  # bw
-        init_covar[15:18, 15:18] = np.zeros([3, 3])  # ba
+        init_covar[12:15, 12:15] = np.eye(3, 3) * 1e-8  # bw
+        # init_covar[15:18, 15:18] = np.eye(3, 3) * 1e-2  # ba
 
         df = SequenceData(seq).df
         # df = df.loc[0:30, :]
@@ -355,8 +355,8 @@ class Test_EKF(unittest.TestCase):
         accel_measurements = list(df.loc[:, "accel_measurements"].values)
         gt_poses = np.array(list(df.loc[:, "T_i_vk"].values))
         gt_vels = np.array(list(df.loc[:, "v_vk_i_vk"].values))
-        # T_imu_cam = np.linalg.inv(df.loc[0, "T_cam_imu"])
-        T_imu_cam = np.eye(4, 4)
+        T_imu_cam = np.linalg.inv(df.loc[0, "T_cam_imu"])
+        # T_imu_cam = np.eye(4, 4)
 
         ekf = IMUKalmanFilter(imu_noise, torch.tensor(T_imu_cam, dtype=torch.float32).to(device))
 
@@ -365,6 +365,7 @@ class Test_EKF(unittest.TestCase):
         self.assertEqual(len(imu_timestamps), len(gt_poses))
 
         g = np.array([0, 0, 9.808679801065017])
+        g = np.array([0, 0, 9.80665])
         states = [IMUKalmanFilter.encode_state(torch.tensor(gt_poses[0, 0:3, 0:3].transpose().dot(g),
                                                             dtype=torch.float32),  # g
                                                torch.eye(3, 3),  # C
@@ -387,8 +388,6 @@ class Test_EKF(unittest.TestCase):
             T_rel = np.linalg.inv(gt_poses[i]).dot(gt_poses[i + 1])
             T_rel_vis = np.linalg.inv(T_imu_cam).dot(T_rel).dot(T_imu_cam)
             vis_meas = np.concatenate([T_rel_vis[0:3, 3], se3_math.log_SO3(T_rel_vis[0:3, 0:3])])
-            # T_rel_vis = np.linalg.inv(gt_poses[0]).dot(gt_poses[i + 1])
-            # vis_meas = np.concatenate([T_rel_vis[0:3, 3], se3_math.log_SO3(T_rel_vis[0:3, 0:3])])
             vis_meas = torch.tensor(vis_meas, dtype=torch.float32).to(device)
 
             pose, state, covar = ekf.forward(torch.unsqueeze(imu_data, dim=0),
