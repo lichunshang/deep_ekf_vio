@@ -171,7 +171,7 @@ class IMUKalmanFilter(nn.Module):
         covar = self.force_symmetrical(covar)
 
         # propagate nominal states
-        r_accum = r_accum + 0.5 * torch.mm(C_accum, (dt2 * a))
+        r_accum = r_accum + v_accum * dt + 0.5 * torch.mm(C_accum, (dt2 * a))
         v_accum = v_accum + torch.mm(C_accum, (dt * a))
         C_accum = torch.mm(C_accum, exp_int_w)
         t_accum += dt
@@ -205,8 +205,8 @@ class IMUKalmanFilter(nn.Module):
     def meas_residual_and_jacobi(self, C_pred, r_pred, vis_meas):
         mm = torch.mm
         se3 = TorchSE3
-        vis_meas_rot = vis_meas[3:6, :]
-        vis_meas_trans = vis_meas[0:3, :]
+        vis_meas_rot = vis_meas[0:3, :]
+        vis_meas_trans = vis_meas[3:6, :]
         residual_rot = se3.log_SO3(mm(mm(mm(se3.exp_SO3(vis_meas_rot), self.C_cal_transpose),
                                          C_pred.transpose(0, 1)), self.C_cal))
         residual_trans = vis_meas_trans - mm(mm(self.C_cal_transpose, C_pred), self.r_cal) - \
