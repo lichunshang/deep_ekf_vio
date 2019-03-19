@@ -7,22 +7,28 @@ from PIL import Image
 from torch.utils.data import Dataset
 from log import logger
 from torchvision import transforms
+import copy
 import time
 from params import par
 
 
 class Subsequence(object):
-    def __init__(self, image_paths, length, seq, type, idx, idx_next, gt_poses):
-        self.image_paths = image_paths[:]
+
+    def __init__(self, frames, length, seq, type, idx, idx_next):
+        assert (length == len(frames))
+        assert (length == len(frames))
+        self.gt_poses = np.array([f.T_i_vk for f in frames])
+        self.gt_velocities = np.array([f.v_vk_i_vk for f in frames])
+        self.image_paths = [f.image_path for f in frames]
+        self.imu_timestamps = [f.imu_timestamps for f in frames]
+        self.accel_measurements = [f.accel_measurements for f in frames]
+        self.gyro_measurements = [f.gyro_measurements for f in frames]
+
         self.length = length
         self.type = type
         self.id = idx
         self.id_next = idx_next  # id to the next subsequence
-        self.gt_poses = gt_poses
         self.seq = seq
-
-        assert (self.length == len(image_paths))
-        assert (self.length == len(gt_poses))
 
 
 class SequenceData(object):
@@ -56,7 +62,23 @@ class SequenceData(object):
         return list(self.df.loc[:, "image_path"].values)
 
     def get(self, i):
-        raise NotImplementedError("Not implemented")
+        image_path = self.df.loc[i, "image_path"]
+        timestamp = self.df.loc[i, "timestamp"]
+        T_i_vk = self.df.loc[i, "T_i_vk"]
+        T_cam_imu = self.df.loc[i, "T_cam_imu"]
+        v_vk_i_vk = self.df.loc[i, "v_vk_i_vk"]
+        imu_poses = self.df.loc[i, "imu_poses"]
+        imu_timestamps = self.df.loc[i, "imu_timestamps"]
+        accel_measurements = self.df.loc[i, "accel_measurements"]
+        gyro_measurements = self.df.loc[i, "gyro_measurements"]
+        return SequenceData.Frame(image_path, timestamp, T_i_vk, T_cam_imu, v_vk_i_vk,
+                                  imu_poses, imu_timestamps, accel_measurements, gyro_measurements)
+
+    def as_frames(self):
+        frames = []
+        for i in range(len(self.df)):
+            frames.append(self.get(i))
+        return frames
 
     @staticmethod
     def save_as_pd(data_frames, output_dir):
@@ -95,8 +117,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
     for seq in sequences:
         start_t = time.time()
         seq_data = SequenceData(seq)
-        gt_poses = seq_data.get_poses()
-        image_paths = seq_data.get_images_paths()
+        frames = seq_data.as_frames()
 
         if sample_times > 1:
             sample_interval = int(np.ceil(seq_len / sample_times))
@@ -110,23 +131,23 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             subseqs_buffer = []
             # The original image and data
             sub_seqs_vanilla = []
-            for i in range(st, len(image_paths), jump):
-                if i + seq_len <= len(image_paths):  # this will discard a few frames at the end
-                    subseq = Subsequence(image_paths[i:i + seq_len], length=seq_len, seq=seq, type="vanilla", idx=i,
-                                         idx_next=i + jump, gt_poses=gt_poses[i:i + seq_len])
+            for i in range(st, len(frames), jump):
+                if i + seq_len <= len(frames):  # this will discard a few frames at the end
+                    subseq = Subsequence(frames[i:i + seq_len], length=seq_len, seq=seq, type="vanilla",
+                                         idx=i, idx_next=i + jump)
                     sub_seqs_vanilla.append(subseq)
             subseqs_buffer += sub_seqs_vanilla
 
             if training and par.data_aug_transforms.enable:
                 if par.data_aug_transforms.lr_flip:
                     subseq_flipped_buffer = []
-                    H = np.diag([-1, 1, 1])  # reflection matrix, flip x, across the yz plane
+                    H = np.diag([1, -1, 1])  # reflection matrix, flip y, across the xz plane
                     for subseq in sub_seqs_vanilla:
-                        flipped_gt_poses = [se3_math.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())),
-                                                               H.dot(T[0:3, 3])) for T in subseq.gt_poses]
-                        subseq_flipped = Subsequence(subseq.image_paths, length=subseq.length, seq=seq,
-                                                     type=subseq.type + "_flippedlr", idx=subseq.id,
-                                                     idx_next=subseq.id_next, gt_poses=flipped_gt_poses)
+                        subseq_flipped = copy.deepcopy(subseq)
+                        subseq_flipped.gt_poses = \
+                            np.array([se3_math.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())), H.dot(T[0:3, 3]))
+                                      for T in subseq.gt_poses])
+                        subseq_flipped.type = subseq.type + "_flippedlr"
                         subseq_flipped_buffer.append(subseq_flipped)
                     subseqs_buffer += subseq_flipped_buffer
 
@@ -134,10 +155,12 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
                 if par.data_aug_transforms.reverse:
                     subseqs_rev_buffer = []
                     for subseq in subseqs_buffer:
-                        subseq_rev = Subsequence(list(reversed(subseq.image_paths)), length=subseq.length, seq=seq,
-                                                 type=subseq.type + "_reversed",
-                                                 idx=subseq.id_next, idx_next=subseq.id,
-                                                 gt_poses=np.flip(subseq.gt_poses, axis=0))
+                        subseq_rev = copy.deepcopy(subseq)
+                        subseq_rev.image_paths = list(reversed(subseq.image_paths))
+                        subseq_rev.gt_poses = np.flip(subseq.gt_poses, axis=0)
+                        subseq_rev.type = subseq.type + "_reversed"
+                        subseq_rev.id = subseq.id_next
+                        subseq_rev.id_next = subseq.id
                         subseqs_rev_buffer.append(subseq_rev)
                     subseqs_buffer += subseqs_rev_buffer
 

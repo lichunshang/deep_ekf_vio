@@ -127,7 +127,7 @@ class IMUKalmanFilter(nn.Module):
 
     def force_symmetrical(self, M):
         M_upper = torch.triu(M)
-        return M_upper + M_upper.transpose(0, 1) * (1 - torch.eye(*M_upper.size()))
+        return M_upper + M_upper.transpose(0, 1) * (1 - torch.eye(*M_upper.size(), device=M.device))
 
     def predict_one_step(self, t_accum, C_accum, r_accum, v_accum, dt, g_k, v_k, bw_k, ba_k, covar,
                          gyro_meas, accel_meas):

@@ -420,5 +420,5 @@ if __name__ == '__main__':
     # Test_EKF().test_predict_K06_plotted()
     # Test_EKF().test_process_model_F_G_Q_covar()
     # Test_EKF().test_meas_jacobian_numerically()
-    Test_EKF().test_ekf_all_plotted()
-    # unittest.main()
+    # Test_EKF().test_ekf_all_plotted()
+    unittest.main()
