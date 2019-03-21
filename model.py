@@ -273,23 +273,37 @@ class IMUKalmanFilter(nn.Module):
 
         return new_pose, new_state, new_covar
 
-    def forward(self, imu_meas, prev_pose, prev_state, prev_covar, vis_meas, vis_meas_covar):
+    def forward(self, imu_data_idxs, imu_data, prev_pose, prev_state, prev_covar, vis_meas, vis_meas_covar):
         # loop through the batches
 
         num_batches = vis_meas.size(0)
-        poses = []
-        states = []
-        covars = []
+        num_timesteps = vis_meas.size(1)
+
+        poses_over_batches = []
+        states_over_batches = []
+        covars_over_batches = []
         for i in range(0, num_batches):
-            pred_state, pred_covar = self.predict(imu_meas[i], prev_state[i], prev_covar[i])
-            est_state, est_covar = self.update(pred_state, pred_covar, vis_meas[i], vis_meas_covar[i])
-            new_pose, new_state, new_covar = self.composition(prev_pose[i], est_state, est_covar)
+            poses_over_timesteps = [prev_pose[i]]
+            states_over_timesteps = [prev_state[i]]
+            covars_over_timesteps = [prev_covar[i]]
+            for j in range(0, num_timesteps):
+                imu_meas = imu_data[i, imu_data_idxs[i, j]:imu_data_idxs[i, j + 1]]
+                pred_state, pred_covar = self.predict(imu_meas, states_over_timesteps[-1], covars_over_timesteps[-1])
+                est_state, est_covar = self.update(pred_state, pred_covar,
+                                                   vis_meas[i, j].view(6, 1), vis_meas_covar[i, j])
+                new_pose, new_state, new_covar = self.composition(poses_over_timesteps[-1], est_state, est_covar)
 
-            poses.append(new_pose)
-            states.append(new_state)
-            covars.append(new_covar)
+                poses_over_timesteps.append(new_pose)
+                states_over_timesteps.append(new_state)
+                covars_over_timesteps.append(new_covar)
 
-        return torch.stack(poses), torch.stack(states), torch.stack(covars)
+            poses_over_batches.append(torch.stack(poses_over_timesteps))
+            states_over_batches.append(torch.stack(states_over_timesteps))
+            covars_over_batches.append(torch.stack(covars_over_timesteps))
+
+        return torch.stack(poses_over_batches), \
+               torch.stack(states_over_batches), \
+               torch.stack(covars_over_batches)
 
     @staticmethod
     def decode_error_state(state_vector):
@@ -419,3 +433,29 @@ class DeepVO(nn.Module):
 
     def bias_parameters(self):
         return [param for name, param in self.named_parameters() if 'bias' in name]
+
+
+class E2EVIO(nn.Module):
+    def __init__(self):
+        super(E2EVIO, self).__init__()
+
+        self.vo_module = DeepVO(par.img_h, par.img_w, par.batch_norm)
+
+        imu_covar = torch.diag(torch.tensor([1e-5, 1e-5, 1e-5,
+                                             1e-8, 1e-8, 1e-8,
+                                             1e-1, 1e-1, 1e-1,
+                                             1e-3, 1e-3, 1e-3])).cuda()
+        T_cal = torch.eye(4, 4).cuda()
+        self.ekf_module = IMUKalmanFilter(imu_covar, T_cal)
+
+    def forward(self, images, imu_data_idxs, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar):
+        vis_meas, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
+
+        vis_meas_covar = torch.diag(torch.tensor([1e-2, 1e-2, 1e-2,
+                                                  1e-2, 1e-2, 1e-2])).repeat(vis_meas.shape[0],
+                                                                             vis_meas.shape[0], 1, 1).cuda()
+        poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data_idxs, imu_data,
+                                                                prev_pose, prev_state, prev_covar,
+                                                                vis_meas, vis_meas_covar)
+
+        return vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars

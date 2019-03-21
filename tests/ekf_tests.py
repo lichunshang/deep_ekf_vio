@@ -325,10 +325,36 @@ class Test_EKF(unittest.TestCase):
 
         torch.set_default_tensor_type('torch.FloatTensor')
 
+    def test_ekf_K04_cuda_graph(self):
+        imu_covar = torch.diag(torch.tensor([1e-5, 1e-5, 1e-5,
+                                             1e-8, 1e-8, 1e-8,
+                                             1e-1, 1e-1, 1e-1,
+                                             1e-3, 1e-3, 1e-3])).to("cuda")
+        vis_meas_covar = torch.diag(torch.tensor([1e-2, 1e-2, 1e-2,
+                                                  1e0, 1e0, 1e0])).to("cuda")
+        init_covar = np.eye(18, 18)
+        _, _, _, poses, states, covars = \
+            self.ekf_test_case("K04", init_covar, imu_covar, vis_meas_covar, "cuda", req_grad=True)
+
+        self.assertTrue(states[1].requires_grad)
+        self.assertTrue(states[1].is_cuda)
+        self.assertTrue(covars[1].requires_grad)
+        self.assertTrue(covars[1].is_cuda)
+        self.assertTrue(poses[1].requires_grad)
+        self.assertTrue(poses[1].is_cuda)
+
+        self.assertTrue(states[-1].requires_grad)
+        self.assertTrue(states[-1].is_cuda)
+        self.assertTrue(covars[-1].requires_grad)
+        self.assertTrue(covars[-1].is_cuda)
+        self.assertTrue(poses[-1].requires_grad)
+        self.assertTrue(poses[-1].is_cuda)
+
     def test_ekf_all_plotted(self):
         output_dir = os.path.join(par.results_coll_dir, "test_ekf_all_plotted")
         logger.initialize(output_dir, use_tensorboard=False)
 
+        # seqs = ["K06", ]
         seqs = ["K01", "K04", "K06", "K07", "K08", "K09", "K10"]
 
         device = "cpu"
@@ -352,7 +378,44 @@ class Test_EKF(unittest.TestCase):
                 self.ekf_test_case(seq, init_covar, imu_covar, vis_meas_covar, device, req_grad)
             self.plot_ekf_data(os.path.join(output_dir, seq), timestamps, gt_poses, gt_vels, poses, states)
 
-    def ekf_test_case(self, seq, init_covar, imu_covar, vis_meas_covar, device, req_grad):
+    def test_ekf_K06_with_artificial_biases_plotted(self):
+        output_dir = os.path.join(par.results_coll_dir, "test_ekf_K06_with_artificial_biases_plotted")
+        logger.initialize(output_dir, use_tensorboard=False)
+
+        device = "cpu"
+        req_grad = False
+        imu_covar = torch.diag(torch.tensor([1e-5, 1e-5, 1e-5,
+                                             1e-8, 1e-8, 1e-8,
+                                             1e-1, 1e-1, 1e-1,
+                                             1e-3, 1e-3, 1e-3])).to(device)
+        vis_meas_covar = torch.diag(torch.tensor([1e-2, 1e-2, 1e-2,
+                                                  1e0, 1e0, 1e0])).to(device)
+        init_covar = np.eye(18, 18)
+        init_covar[0:3, 0:3] = np.eye(3, 3) * 1e-8  # g
+        init_covar[3:9, 3:9] = np.zeros([6, 6])  # C,r
+        init_covar[9:12, 9:12] = np.eye(3, 3) * 1e-2  # v
+        init_covar[12:15, 12:15] = np.eye(3, 3) * 1e-8  # bw
+        init_covar[15:18, 15:18] = np.eye(3, 3) * 1e2  # ba
+
+        timestamps, gt_poses, gt_vels, poses, states, covars = \
+            self.ekf_test_case("K06", init_covar, imu_covar, vis_meas_covar, device, req_grad,
+                               accel_bias_inject=np.array([0.1, -0.2, 0.3]))
+        self.plot_ekf_data(os.path.join(output_dir, "accel_bias"), timestamps, gt_poses, gt_vels, poses, states)
+
+        init_covar = np.eye(18, 18)
+        init_covar[0:3, 0:3] = np.eye(3, 3) * 1e-8  # g
+        init_covar[3:9, 3:9] = np.zeros([6, 6])  # C,r
+        init_covar[9:12, 9:12] = np.eye(3, 3) * 1e-2  # v
+        init_covar[12:15, 12:15] = np.eye(3, 3) * 1e2  # bw
+        init_covar[15:18, 15:18] = np.eye(3, 3) * 1e-2  # ba
+
+        timestamps, gt_poses, gt_vels, poses, states, covars = \
+            self.ekf_test_case("K06", init_covar, imu_covar, vis_meas_covar, device, req_grad,
+                               gyro_bias_inject=np.array([-0.1, 0.2, -0.3]))
+        self.plot_ekf_data(os.path.join(output_dir, "gyro_bias"), timestamps, gt_poses, gt_vels, poses, states)
+
+    def ekf_test_case(self, seq, init_covar, imu_covar, vis_meas_covar, device, req_grad,
+                      accel_bias_inject=np.zeros(3), gyro_bias_inject=np.zeros(3)):
         df = SequenceData(seq).df
         # df = df.loc[0:30, :]
 
@@ -373,46 +436,46 @@ class Test_EKF(unittest.TestCase):
 
         g = np.array([0, 0, 9.808679801065017])
         # g = np.array([0, 0, 9.80665])
-        states = [IMUKalmanFilter.encode_state(torch.tensor(gt_poses[0, 0:3, 0:3].transpose().dot(g),
-                                                            dtype=torch.float32),  # g
-                                               torch.eye(3, 3),  # C
-                                               torch.zeros(3),  # r
-                                               torch.tensor(gt_vels[0], dtype=torch.float32),  # v
-                                               torch.zeros(3),  # bw
-                                               torch.zeros(3)).to(device)]  # ba
-        poses = [torch.tensor(np.linalg.inv(gt_poses[0]), dtype=torch.float32).to(device), ]
-        covars = [torch.tensor(init_covar, dtype=torch.float32).to(device), ]
+        init_state = IMUKalmanFilter.encode_state(torch.tensor(gt_poses[0, 0:3, 0:3].transpose().dot(g),
+                                                               dtype=torch.float32),  # g
+                                                  torch.eye(3, 3),  # C
+                                                  torch.zeros(3),  # r
+                                                  torch.tensor(gt_vels[0], dtype=torch.float32),  # v
+                                                  torch.zeros(3),  # bw
+                                                  torch.zeros(3)).to(device)  # ba
+        init_pose = torch.tensor(np.linalg.inv(gt_poses[0]), dtype=torch.float32).to(device)
+        init_covar = torch.tensor(init_covar, dtype=torch.float32).to(device)
 
-        states[0].requires_grad = req_grad
-        covars[0].requires_grad = req_grad
-        poses[0].requires_grad = req_grad
+        # collect the data
+        imu_data = []
+        imu_data_idxs = [0]
+        for i in range(0, len(imu_timestamps)):
+            imu_data.append(np.concatenate([np.expand_dims(imu_timestamps[i], 1),
+                                            gyro_measurements[i] + gyro_bias_inject,
+                                            accel_measurements[i] + accel_bias_inject], axis=1))
+            imu_data_idxs.append(imu_data_idxs[-1] + len(imu_timestamps[i]))
+        imu_data = torch.tensor(np.concatenate(imu_data), dtype=torch.float32).to(device)
+        imu_data_idxs = torch.tensor(imu_data_idxs, dtype=torch.int16)
 
+        vis_meas = []
         for i in range(0, len(imu_timestamps) - 1):
-            imu_data = torch.tensor(np.concatenate([np.expand_dims(imu_timestamps[i], 1),
-                                                    gyro_measurements[i], accel_measurements[i]], axis=1),
-                                    dtype=torch.float32).to(device)
-
             T_rel = np.linalg.inv(gt_poses[i]).dot(gt_poses[i + 1])
             T_rel_vis = np.linalg.inv(T_imu_cam).dot(T_rel).dot(T_imu_cam)
-            vis_meas = np.concatenate([se3_math.log_SO3(T_rel_vis[0:3, 0:3]), T_rel_vis[0:3, 3]])
-            vis_meas = torch.tensor(vis_meas, dtype=torch.float32).to(device)
+            vis_meas.append(torch.tensor(np.concatenate([se3_math.log_SO3(T_rel_vis[0:3, 0:3]), T_rel_vis[0:3, 3]]),
+                                         dtype=torch.float32, requires_grad=req_grad).to(device))
+        vis_meas = torch.stack(vis_meas)
+        vis_meas_covars = vis_meas_covar.repeat(vis_meas.shape[0], 1, 1).to(device)
+        vis_meas_covars.requires_grad = req_grad
 
-            pose, state, covar = ekf.forward(torch.unsqueeze(imu_data, dim=0),
-                                             torch.unsqueeze(poses[-1], dim=0),
-                                             torch.unsqueeze(states[-1], dim=0),
-                                             torch.unsqueeze(covars[-1], dim=0),
-                                             torch.unsqueeze(vis_meas.view(6, 1), dim=0),
-                                             torch.unsqueeze(vis_meas_covar, dim=0))
+        poses, states, covars = ekf.forward(torch.unsqueeze(imu_data_idxs, dim=0),
+                                            torch.unsqueeze(imu_data, dim=0),
+                                            torch.unsqueeze(init_pose, dim=0),
+                                            torch.unsqueeze(init_state, dim=0),
+                                            torch.unsqueeze(init_covar, dim=0),
+                                            torch.unsqueeze(vis_meas, dim=0),
+                                            torch.unsqueeze(vis_meas_covars, dim=0))
 
-            states.append(state[0])
-            covars.append(covar[0])
-            poses.append(pose[0])
-
-            g, C, r, v, bw, ba = IMUKalmanFilter.decode_state(state[0])
-            self.assertTrue(torch.allclose(C, torch.eye(3, 3), atol=0))
-            self.assertTrue(torch.allclose(r, torch.zeros(3), atol=0))
-
-        return timestamps, gt_poses, gt_vels, poses, states, covars
+        return timestamps, gt_poses, gt_vels, poses[0], states[0], covars[0]
 
 
 if __name__ == '__main__':
@@ -421,4 +484,6 @@ if __name__ == '__main__':
     # Test_EKF().test_process_model_F_G_Q_covar()
     # Test_EKF().test_meas_jacobian_numerically()
     # Test_EKF().test_ekf_all_plotted()
+    # Test_EKF().test_ekf_K04_cuda_graph()
+    # Test_EKF().test_ekf_K06_with_artificial_biases_plotted()
     unittest.main()
