@@ -233,6 +233,13 @@ class SubseqDataset(Dataset):
                     print("Processed %d/%d (%.2f%%)" % (counter, total_images, counter / total_images * 100), end="\r")
             logger.print("Image preprocessing took %.2fs" % (time.time() - start_t))
 
+        # since IMU data might have different length, find the longest length of IMU data so we can pad the
+        # the rest with zeros
+        imu_data_lengths = []
+        for s in self.subseqs:
+            imu_data_lengths.append(sum([len(t) for t in s.imu_timestamps]))
+        self.max_imu_data_length = max(imu_data_lengths)
+
     def __getitem__(self, index):
         subseq = self.subseqs[index]
 
@@ -276,7 +283,7 @@ class SubseqDataset(Dataset):
             images.append(image)
         images = torch.stack(images, 0)
 
-        init_g = torch.tensor(subseq.gt_poses[0, 0:3, 0:3].tranpose().dot(subseq.g_i), dtype=torch.float32)
+        init_g = torch.tensor(subseq.gt_poses[0, 0:3, 0:3].transpose().dot(subseq.g_i), dtype=torch.float32)
 
         if par.cal_override_enable:
             T_imu_cam = torch.tensor(par.T_imu_cam_override, dtype=torch.float32)
@@ -288,10 +295,13 @@ class SubseqDataset(Dataset):
                                                         torch.zeros(3),  # r
                                                         gt_velocities[0],  # v
                                                         torch.zeros(3),  # bw
-                                                        torch.zeros(3)).cuda()  # ba
+                                                        torch.zeros(3))  # ba
+
+        imu_data_padded = torch.zeros(self.max_imu_data_length, imu_data.shape[1])
+        imu_data_padded[0:len(imu_data), :] = imu_data
 
         return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
-               images, imu_data_idxs, imu_data, init_state, T_imu_cam, gt_poses, gt_rel_poses
+               images, imu_data_idxs, imu_data_padded, init_state, T_imu_cam, gt_poses, gt_rel_poses
 
     @staticmethod
     def decode_batch_meta_info(batch_meta_info):
