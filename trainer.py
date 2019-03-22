@@ -4,7 +4,7 @@ import numpy as np
 import os
 import time
 from params import par
-from model import DeepVO
+from model import DeepVO, IMUKalmanFilter
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
 from log import logger
 from torch.utils.data import DataLoader
@@ -77,21 +77,32 @@ class _TrainAssistant(object):
 
         return torch.stack(lstm_states, dim=0)
 
-    def get_loss(self, t_x_meta, x, y):
+    def get_loss(self, data):
+        meta_data, images, imu_data_idxs, imu_data, gt_poses, gt_rel_poses, gt_velocities = data
+
         prev_lstm_states = None
         if par.stateful_training:
-            prev_lstm_states = self.retrieve_lstm_state(t_x_meta)
+            prev_lstm_states = self.retrieve_lstm_state(meta_data)
             prev_lstm_states = prev_lstm_states.cuda()
 
-        predicted, lstm_states = self.model.forward(x, prev_lstm_states)
+        g = torch.tensor([0, 0, 9.808679801065017]).view(3, 1)
+        prev_pose = gt_poses[0]
+        prev_state = IMUKalmanFilter.encode_state(torch.mm(gt_poses[0, 0:3, 0:3].transpose(0, 1), g),  # g
+                                                  torch.eye(3, 3),  # C
+                                                  torch.zeros(3),  # r
+                                                  gt_velocities[0],  # v
+                                                  torch.zeros(3),  # bw
+                                                  torch.zeros(3)).cuda()  # ba
+        predicted, lstm_states = self.model.forward(images, imu_data_idxs, imu_data,
+                                                    prev_lstm_states, prev_pose, prev_state)
 
         if par.stateful_training:
             lstm_states = lstm_states.detach().cpu()
-            self.update_lstm_state(t_x_meta, lstm_states)
+            self.update_lstm_state(meta_data, lstm_states)
 
         # Weighted MSE Loss
-        angle_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:6], y[:, :, 3:6])
-        trans_loss = torch.nn.functional.mse_loss(predicted[:, :, 0:3], y[:, :, 0:3])
+        angle_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        trans_loss = torch.nn.functional.mse_loss(predicted[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         loss = (100 * angle_loss + trans_loss)
 
         # log the loss
@@ -120,9 +131,9 @@ class _TrainAssistant(object):
 
         return loss
 
-    def step(self, t_x_meta, x, y, optimizer):
+    def step(self, data, optimizer):
         optimizer.zero_grad()
-        loss = self.get_loss(t_x_meta, x, y)
+        loss = self.get_loss(data)
         loss.backward()
         if self.clip is not None:
             if isinstance(self.model, torch.nn.DataParallel):
@@ -160,6 +171,10 @@ def train(resume_model_path, resume_optimizer_path):
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
     logger.print('Number of samples in validation dataset: %d' % len(valid_subseqs))
+
+    # it = iter(train_dl)
+    # r = it.next()
+    # print("hello")
 
     # Model
     e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)
@@ -208,11 +223,9 @@ def train(resume_model_path, resume_optimizer_path):
         loss_mean = 0
         t_loss_list = []
         count = 0
-        for t_x_meta, t_x, t_y in train_dl:
+        for data in train_dl:
             print("%d/%d (%.2f%%)" % (count, len(train_dl), 100 * count / len(train_dl)), end='\r')
-            t_x = t_x.cuda(non_blocking=par.pin_mem)
-            t_y = t_y.cuda(non_blocking=par.pin_mem)
-            ls = e2e_vio_ta.step(t_x_meta, t_x, t_y, optimizer).data.cpu().numpy()
+            ls = e2e_vio_ta.step(data, optimizer).data.cpu().numpy()
             t_loss_list.append(float(ls))
             loss_mean += float(ls)
             count += 1
@@ -225,10 +238,8 @@ def train(resume_model_path, resume_optimizer_path):
         e2e_vio_model.eval()
         loss_mean_valid = 0
         v_loss_list = []
-        for v_x_meta, v_x, v_y in valid_dl:
-            v_x = v_x.cuda(non_blocking=par.pin_mem)
-            v_y = v_y.cuda(non_blocking=par.pin_mem)
-            v_ls = e2e_vio_ta.get_loss(v_x_meta, v_x, v_y).data.cpu().numpy()
+        for data in valid_dl:
+            v_ls = e2e_vio_ta.get_loss(data).data.cpu().numpy()
             v_loss_list.append(float(v_ls))
             loss_mean_valid += float(v_ls)
         logger.print('Valid take {:.1f} sec'.format(time.time() - st_t))

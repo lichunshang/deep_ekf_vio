@@ -81,7 +81,7 @@ class SequenceData(object):
         return frames
 
     @staticmethod
-    def save_as_pd(data_frames, output_dir):
+    def save_as_pd(data_frames, g_i, T_cam_imu, output_dir):
         start_time = time.time()
         data = {"image_path": [f.image_path for f in data_frames],
                 "timestamp": [f.timestamp for f in data_frames],
@@ -94,9 +94,17 @@ class SequenceData(object):
                 "gyro_measurements": [f.gyro_measurements for f in data_frames]}
         df = pd.DataFrame(data, columns=data.keys())
         df.to_pickle(os.path.join(output_dir, "data.pickle"))
+
+        constants = {
+            "g_i": g_i,
+            "T_cam_imu": T_cam_imu
+        }
+
+        np.save(os.path.join(output_dir, "constants.npy"), constants)
+
         logger.print("Saving pandas took %.2fs" % (time.time() - start_time))
 
-        return df, data
+        return df, data, constants
 
 
 def convert_subseqs_list_to_panda(subseqs):
@@ -157,7 +165,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
                     for subseq in subseqs_buffer:
                         subseq_rev = copy.deepcopy(subseq)
                         subseq_rev.image_paths = list(reversed(subseq.image_paths))
-                        subseq_rev.gt_poses = np.flip(subseq.gt_poses, axis=0)
+                        subseq_rev.gt_poses = np.flip(subseq.gt_poses, axis=0).copy()
                         subseq_rev.type = subseq.type + "_reversed"
                         subseq_rev.id = subseq.id_next
                         subseq_rev.id_next = subseq.id
@@ -221,9 +229,11 @@ class SubseqDataset(Dataset):
     def __getitem__(self, index):
         subseq = self.subseqs[index]
 
-        # get relative poses
         gt_rel_poses = []
+        imu_data = []
+        imu_data_idxs = [0]  # this is needed to have varying imu data length
         for i in range(1, len(subseq.gt_poses)):
+            # get relative poses
             T_i_vkm1 = subseq.gt_poses[i - 1]
             T_i_vk = subseq.gt_poses[i]
             T_vkm1_vk = se3_math.reorthogonalize_SE3(np.linalg.inv(T_i_vkm1).dot(T_i_vk))
@@ -231,9 +241,18 @@ class SubseqDataset(Dataset):
             phi_vkm1_vk = se3_math.log_SO3(T_vkm1_vk[0:3, 0:3])
             gt_rel_poses.append(np.concatenate([r_vk_vkm1_vkm1, phi_vkm1_vk, ]))
 
-        gt_rel_poses = torch.FloatTensor(gt_rel_poses)
+            imu_data.append(np.concatenate([np.expand_dims(subseq.imu_timestamps[i], 1),
+                                            subseq.gyro_measurements[i], subseq.accel_measurements[i]], axis=1))
+            imu_data_idxs.append(imu_data_idxs[-1] + len(subseq.imu_timestamps[i]))
 
-        image_sequence = []
+        gt_rel_poses = torch.tensor(gt_rel_poses, dtype=torch.float32)
+        gt_poses = torch.tensor(subseq.gt_poses, dtype=torch.float32)
+        gt_velocities = torch.tensor(subseq.gt_velocities, dtype=torch.float32)
+        imu_data = torch.tensor(np.concatenate(imu_data))
+        imu_data_idxs = torch.tensor(imu_data_idxs, dtype=torch.int16)
+
+        # process images
+        images = []
         for img_path in subseq.image_paths:
 
             if par.cache_image:
@@ -247,10 +266,11 @@ class SubseqDataset(Dataset):
             if self.minus_point_5:
                 image = image - 0.5  # from [0, 1] -> [-0.5, 0.5]
             image = self.normalizer(image)
-            image_sequence.append(image)
-        image_sequence = torch.stack(image_sequence, 0)
+            images.append(image)
+        images = torch.stack(images, 0)
 
-        return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), image_sequence, gt_rel_poses
+        return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
+               images, imu_data_idxs, imu_data, gt_poses, gt_rel_poses, gt_velocities
 
     @staticmethod
     def decode_batch_meta_info(batch_meta_info):

@@ -274,7 +274,7 @@ class IMUKalmanFilter(nn.Module):
         return new_pose, new_state, new_covar
 
     def forward(self, imu_data_idxs, imu_data, prev_pose, prev_state, prev_covar, vis_meas, vis_meas_covar):
-        # loop through the batches
+
 
         num_batches = vis_meas.size(0)
         num_timesteps = vis_meas.size(1)
