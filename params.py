@@ -3,6 +3,7 @@ import datetime
 import torch
 import fnmatch
 import re
+import numpy as np
 
 
 class AttrDict(dict):
@@ -18,9 +19,9 @@ class Parameters(object):
         self.timestamp = datetime.datetime.today()
 
         self.n_processors = 8
-        self.n_gpu = 2
+        self.n_gpu = 1
 
-        # Path
+        # Path Parameters
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
         self.data_dir = os.path.join(self.project_dir, "data")
         self.results_coll_dir = os.path.join(self.project_dir, "results")
@@ -30,17 +31,19 @@ class Parameters(object):
 
         self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
         self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
+        # self.train_seqs = self.wc(['K06'])
+        # self.valid_seqs = ['K07']
 
-        self.img_w = 320 * 2
-        self.img_h = 96 * 2
+        self.seq_len = 128
+        self.sample_times = 3
+
+        # VO Model parameters
+        self.img_w = 320
+        self.img_h = 96
         self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
 
-        self.seq_len = 112
-        self.sample_times = 3
-
-        # Model
         self.rnn_hidden_size = 1000
         self.rnn_num_layers = 2
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
@@ -48,16 +51,40 @@ class Parameters(object):
         self.rnn_dropout_between = 0  # 0: no dropout
         self.clip = None
         self.batch_norm = True
+        self.stateful_training = False
 
-        # Training
+        # EKF parameters
+        self.enable_ekf = True
+        self.T_imu_cam_override = np.eye(4, 4)
+        self.cal_override_enable = True
+        #
+        self.init_covar_diag_sqrt = np.array([1e-4, 1e-4, 1e-4,  # g
+                                              0, 0, 0, 0, 0, 0,  # C, r
+                                              1e-2, 1e-2, 1e-2,  # v
+                                              1e-8, 1e-8, 1e-8,  # bw
+                                              1e-1, 1e-1, 1e-1])  # ba
+        self.train_init_covar = False
+        self.init_covar_diag_eps = 1e-12
+        #
+        self.imu_noise_covar_diag_sqrt = np.array([1e-2, 1e-2, 1e-2,
+                                                   1e-4, 1e-4, 1e-4,
+                                                   1e-1, 1e-1, 1e-1,
+                                                   1e-3, 1e-3, 1e-3])
+        self.train_imu_noise_covar = False
+        self.imu_noise_covar_diag_eps = 1e-12
+        #
+        self.vis_meas_fixed_covar = np.array([1e-1, 1e-1, 1e-1,
+                                              1e-1, 1e-1, 1e-1])
+        self.vis_meas_covar_use_fixed = True
+        self.vis_meas_covar_diag_eps = 1e-12
+
+        # Training parameters
         self.epochs = 200
-        self.batch_size = 2
+        self.batch_size = 4
         self.pin_mem = True
-        self.cache_image = True
+        self.cache_image = False
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 0.0001}
-
-        self.stateful_training = False
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({
@@ -70,7 +97,7 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
-            "enable": True,
+            "enable": False,
             "lr_flip": True,
             "reverse": True,
         })

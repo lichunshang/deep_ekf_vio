@@ -156,9 +156,8 @@ class Test_EKF(unittest.TestCase):
 
     def test_process_model_F_G_Q_covar(self):
         device = "cuda"
-        T_cal = torch.eye(4, 4).to(device)
         imu_noise = torch.eye(12, 12).to(device)
-        ekf = IMUKalmanFilter(imu_noise, T_cal)
+        ekf = IMUKalmanFilter()
 
         covar = torch.zeros(18, 18).to(device).to(device)
 
@@ -175,7 +174,8 @@ class Test_EKF(unittest.TestCase):
                                      ba_k=torch.tensor([-0.13, 0.14, -0.15]).view(3, 1).to(device),
                                      covar=covar,
                                      gyro_meas=torch.tensor([1.0, -11, -1.2]).view(3, 1).to(device),
-                                     accel_meas=torch.tensor([-.5, 4, 6]).view(3, 1).to(device))
+                                     accel_meas=torch.tensor([-.5, 4, 6]).view(3, 1).to(device),
+                                     imu_noise_covar=imu_noise)
 
             self.assertTrue(torch.allclose(t_accum.detach().cpu(), torch.tensor(10.05), atol=1e-8))
 
@@ -239,9 +239,8 @@ class Test_EKF(unittest.TestCase):
         df = SequenceData(seq).df
         # df = df.loc[0:30, :]
 
-        T_cal = torch.eye(4, 4).to(device)
         imu_noise = torch.eye(12, 12).to(device)
-        ekf = IMUKalmanFilter(imu_noise, T_cal)
+        ekf = IMUKalmanFilter()
 
         timestamps = list(df.loc[:, "timestamp"].values)
         imu_timestamps = list(df.loc[:, "imu_timestamps"].values)
@@ -274,7 +273,7 @@ class Test_EKF(unittest.TestCase):
             imu_data = torch.tensor(np.concatenate([np.expand_dims(imu_timestamps[i], 1),
                                                     gyro_measurements[i], accel_measurements[i]], axis=1),
                                     dtype=torch.float32).to(device)
-            state, covar = ekf.predict(imu_data, states[-1], covars[-1])
+            state, covar = ekf.predict(imu_data, imu_noise, states[-1], covars[-1])
 
             precomp_covars.append(covar)
 
@@ -289,17 +288,16 @@ class Test_EKF(unittest.TestCase):
     def test_meas_jacobian_numerically(self):
         torch.set_default_tensor_type('torch.DoubleTensor')
         device = "cpu"
-        T_cal = torch.eye(4, 4)
-        T_cal[0:3, 0:3] = TorchSE3.exp_SO3(torch.tensor([1., -2., 3.]))
-        T_cal[0:3, 3] = torch.tensor([-3., 2., 1.])
-        T_cal = T_cal.to(device)
-        imu_noise = torch.eye(12, 12).to(device)
-        ekf = IMUKalmanFilter(imu_noise, T_cal)
+        T_imu_cam = torch.eye(4, 4)
+        T_imu_cam[0:3, 0:3] = TorchSE3.exp_SO3(torch.tensor([1., -2., 3.]))
+        T_imu_cam[0:3, 3] = torch.tensor([-3., 2., 1.])
+        T_imu_cam = T_imu_cam.to(device)
+        ekf = IMUKalmanFilter()
 
         C_pred = TorchSE3.exp_SO3(torch.tensor([0.1, 3, -0.3])).to(device)
         r_pred = torch.tensor([-1.05, 20, -1.]).view(3, 1).to(device)
         vis_meas = torch.tensor([4., -6., 8., -7., 5., -9.]).to(device).view(6, 1)
-        residual, H = ekf.meas_residual_and_jacobi(C_pred, r_pred, vis_meas)
+        residual, H = ekf.meas_residual_and_jacobi(C_pred, r_pred, vis_meas, T_imu_cam)
 
         e = 1e-6
         p = torch.eye(3, 3) * e
@@ -309,15 +307,15 @@ class Test_EKF(unittest.TestCase):
         for i in range(0, 3):
             pb = p[:, i]
             residual_minus_pb, _ = ekf.meas_residual_and_jacobi(torch.mm(C_pred, TorchSE3.exp_SO3(-pb)),
-                                                                r_pred, vis_meas)
+                                                                r_pred, vis_meas, T_imu_cam)
             residual_plus_pb, _ = ekf.meas_residual_and_jacobi(torch.mm(C_pred, TorchSE3.exp_SO3(pb)),
-                                                               r_pred, vis_meas)
+                                                               r_pred, vis_meas, T_imu_cam)
             H_C_numerical[:, i] = (residual_plus_pb - residual_minus_pb).view(6) / (2 * e)
 
         for i in range(0, 3):
             pb = p[:, i].view(3, 1)
-            residual_minus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred - pb, vis_meas)
-            residual_plus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred + pb, vis_meas)
+            residual_minus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred - pb, vis_meas, T_imu_cam)
+            residual_plus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred + pb, vis_meas, T_imu_cam)
             H_r_numerical[:, i] = (residual_plus_pb - residual_minus_pb).view(6) / (2 * e)
 
         self.assertTrue(torch.allclose(H_C_numerical, H[:, 3:6], atol=1e-7))
@@ -416,7 +414,8 @@ class Test_EKF(unittest.TestCase):
 
     def ekf_test_case(self, seq, init_covar, imu_covar, vis_meas_covar, device, req_grad,
                       accel_bias_inject=np.zeros(3), gyro_bias_inject=np.zeros(3)):
-        df = SequenceData(seq).df
+        seq_data = SequenceData(seq)
+        df = seq_data.df
         # df = df.loc[0:30, :]
 
         timestamps = list(df.loc[:, "timestamp"].values)
@@ -425,10 +424,10 @@ class Test_EKF(unittest.TestCase):
         accel_measurements = list(df.loc[:, "accel_measurements"].values)
         gt_poses = np.array(list(df.loc[:, "T_i_vk"].values))
         gt_vels = np.array(list(df.loc[:, "v_vk_i_vk"].values))
-        # T_imu_cam = np.linalg.inv(df.loc[0, "T_cam_imu"])
-        T_imu_cam = np.eye(4, 4)
+        T_imu_cam = np.linalg.inv(seq_data.T_cam_imu)
+        # T_imu_cam = np.eye(4, 4)
 
-        ekf = IMUKalmanFilter(imu_covar, torch.tensor(T_imu_cam, dtype=torch.float32).to(device))
+        ekf = IMUKalmanFilter()
 
         self.assertEqual(len(imu_timestamps), len(gyro_measurements))
         self.assertEqual(len(imu_timestamps), len(accel_measurements))
@@ -469,11 +468,13 @@ class Test_EKF(unittest.TestCase):
 
         poses, states, covars = ekf.forward(torch.unsqueeze(imu_data_idxs, dim=0),
                                             torch.unsqueeze(imu_data, dim=0),
+                                            torch.tensor(imu_covar, dtype=torch.float32).to(device),
                                             torch.unsqueeze(init_pose, dim=0),
                                             torch.unsqueeze(init_state, dim=0),
                                             torch.unsqueeze(init_covar, dim=0),
                                             torch.unsqueeze(vis_meas, dim=0),
-                                            torch.unsqueeze(vis_meas_covars, dim=0))
+                                            torch.unsqueeze(vis_meas_covars, dim=0),
+                                            torch.tensor(T_imu_cam, dtype=torch.float32).to(device))
 
         return timestamps, gt_poses, gt_vels, poses[0], states[0], covars[0]
 

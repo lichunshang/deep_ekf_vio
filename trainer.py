@@ -4,7 +4,7 @@ import numpy as np
 import os
 import time
 from params import par
-from model import DeepVO, IMUKalmanFilter
+from model import E2EVIO
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
 from log import logger
 from torch.utils.data import DataLoader
@@ -78,23 +78,20 @@ class _TrainAssistant(object):
         return torch.stack(lstm_states, dim=0)
 
     def get_loss(self, data):
-        meta_data, images, imu_data_idxs, imu_data, gt_poses, gt_rel_poses, gt_velocities = data
+        meta_data, images, imu_data_idxs, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
 
         prev_lstm_states = None
         if par.stateful_training:
             prev_lstm_states = self.retrieve_lstm_state(meta_data)
             prev_lstm_states = prev_lstm_states.cuda()
 
-        g = torch.tensor([0, 0, 9.808679801065017]).view(3, 1)
-        prev_pose = gt_poses[0]
-        prev_state = IMUKalmanFilter.encode_state(torch.mm(gt_poses[0, 0:3, 0:3].transpose(0, 1), g),  # g
-                                                  torch.eye(3, 3),  # C
-                                                  torch.zeros(3),  # r
-                                                  gt_velocities[0],  # v
-                                                  torch.zeros(3),  # bw
-                                                  torch.zeros(3)).cuda()  # ba
-        predicted, lstm_states = self.model.forward(images, imu_data_idxs, imu_data,
-                                                    prev_lstm_states, prev_pose, prev_state)
+        vis_meas, vis_meas_covar, lstm_states, _, _, _ = self.model.forward(images, imu_data_idxs,
+                                                                            imu_data,
+                                                                            prev_lstm_states,
+                                                                            gt_poses[0],
+                                                                            prev_state, T_imu_cam)
+        predicted = vis_meas
+        y = gt_rel_poses
 
         if par.stateful_training:
             lstm_states = lstm_states.detach().cpu()
@@ -172,12 +169,8 @@ def train(resume_model_path, resume_optimizer_path):
                           pin_memory=par.pin_mem, drop_last=False)
     logger.print('Number of samples in validation dataset: %d' % len(valid_subseqs))
 
-    # it = iter(train_dl)
-    # r = it.next()
-    # print("hello")
-
     # Model
-    e2e_vio_model = DeepVO(par.img_h, par.img_w, par.batch_norm)
+    e2e_vio_model = E2EVIO()
     e2e_vio_model = e2e_vio_model.cuda()
     online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, 50)
 

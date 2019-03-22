@@ -7,6 +7,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from log import logger
 from torchvision import transforms
+import model
 import copy
 import time
 from params import par
@@ -14,7 +15,7 @@ from params import par
 
 class Subsequence(object):
 
-    def __init__(self, frames, length, seq, type, idx, idx_next):
+    def __init__(self, frames, g_i, T_cam_imu, length, seq, type, idx, idx_next):
         assert (length == len(frames))
         assert (length == len(frames))
         self.gt_poses = np.array([f.T_i_vk for f in frames])
@@ -24,6 +25,8 @@ class Subsequence(object):
         self.accel_measurements = [f.accel_measurements for f in frames]
         self.gyro_measurements = [f.gyro_measurements for f in frames]
 
+        self.g_i = g_i
+        self.T_cam_imu = T_cam_imu
         self.length = length
         self.type = type
         self.id = idx
@@ -33,12 +36,11 @@ class Subsequence(object):
 
 class SequenceData(object):
     class Frame(object):
-        def __init__(self, image_path, timestamp, T_i_vk, T_cam_imu, v_vk_i_vk,
+        def __init__(self, image_path, timestamp, T_i_vk, v_vk_i_vk,
                      imu_poses, imu_timestamps, accel_measurements, gyro_measurements):
             self.image_path = image_path
             self.timestamp = timestamp
             self.T_i_vk = T_i_vk  # inertial to vehicle frame pose
-            self.T_cam_imu = T_cam_imu  # calibration from imu to camera
             self.v_vk_i_vk = v_vk_i_vk  # velocity expressed in vehicle frame
             self.imu_timestamps = imu_timestamps
             self.imu_poses = imu_poses
@@ -55,6 +57,12 @@ class SequenceData(object):
         self.pd_path = os.path.join(par.data_dir, seq, "data.pickle")
         self.df = pd.read_pickle(self.pd_path)
 
+        self.constants_path = os.path.join(par.data_dir, seq, "constants.npy")
+        self.constants = np.load(self.constants_path).item()
+
+        self.g_i = self.constants["g_i"]
+        self.T_cam_imu = self.constants["T_cam_imu"]
+
     def get_poses(self):
         return np.array(list(self.df.loc[:, "T_i_vk"].values))
 
@@ -65,13 +73,12 @@ class SequenceData(object):
         image_path = self.df.loc[i, "image_path"]
         timestamp = self.df.loc[i, "timestamp"]
         T_i_vk = self.df.loc[i, "T_i_vk"]
-        T_cam_imu = self.df.loc[i, "T_cam_imu"]
         v_vk_i_vk = self.df.loc[i, "v_vk_i_vk"]
         imu_poses = self.df.loc[i, "imu_poses"]
         imu_timestamps = self.df.loc[i, "imu_timestamps"]
         accel_measurements = self.df.loc[i, "accel_measurements"]
         gyro_measurements = self.df.loc[i, "gyro_measurements"]
-        return SequenceData.Frame(image_path, timestamp, T_i_vk, T_cam_imu, v_vk_i_vk,
+        return SequenceData.Frame(image_path, timestamp, T_i_vk, v_vk_i_vk,
                                   imu_poses, imu_timestamps, accel_measurements, gyro_measurements)
 
     def as_frames(self):
@@ -86,7 +93,6 @@ class SequenceData(object):
         data = {"image_path": [f.image_path for f in data_frames],
                 "timestamp": [f.timestamp for f in data_frames],
                 "T_i_vk": [f.T_i_vk for f in data_frames],
-                "T_cam_imu": [f.T_cam_imu for f in data_frames],
                 "v_vk_i_vk": [f.v_vk_i_vk for f in data_frames],
                 "imu_timestamps": [f.imu_timestamps for f in data_frames],
                 "imu_poses": [f.imu_poses for f in data_frames],
@@ -104,7 +110,7 @@ class SequenceData(object):
 
         logger.print("Saving pandas took %.2fs" % (time.time() - start_time))
 
-        return df, data, constants
+        return df
 
 
 def convert_subseqs_list_to_panda(subseqs):
@@ -141,12 +147,13 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             sub_seqs_vanilla = []
             for i in range(st, len(frames), jump):
                 if i + seq_len <= len(frames):  # this will discard a few frames at the end
-                    subseq = Subsequence(frames[i:i + seq_len], length=seq_len, seq=seq, type="vanilla",
-                                         idx=i, idx_next=i + jump)
+                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.T_cam_imu,
+                                         length=seq_len, seq=seq, type="vanilla", idx=i, idx_next=i + jump)
                     sub_seqs_vanilla.append(subseq)
             subseqs_buffer += sub_seqs_vanilla
 
             if training and par.data_aug_transforms.enable:
+                assert (not par.enable_ekf, "Data aug transforms not compatible with EKF")
                 if par.data_aug_transforms.lr_flip:
                     subseq_flipped_buffer = []
                     H = np.diag([1, -1, 1])  # reflection matrix, flip y, across the xz plane
@@ -269,8 +276,22 @@ class SubseqDataset(Dataset):
             images.append(image)
         images = torch.stack(images, 0)
 
+        init_g = torch.tensor(subseq.gt_poses[0, 0:3, 0:3].tranpose().dot(subseq.g_i), dtype=torch.float32)
+
+        if par.cal_override_enable:
+            T_imu_cam = torch.tensor(par.T_imu_cam_override, dtype=torch.float32)
+        else:
+            T_imu_cam = torch.tensor(np.linalg.inv(subseq.T_cam_imu), dtype=torch.float32)  # EKF takes T_imu_cam
+
+        init_state = model.IMUKalmanFilter.encode_state(init_g,
+                                                        torch.eye(3, 3),  # C
+                                                        torch.zeros(3),  # r
+                                                        gt_velocities[0],  # v
+                                                        torch.zeros(3),  # bw
+                                                        torch.zeros(3)).cuda()  # ba
+
         return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
-               images, imu_data_idxs, imu_data, gt_poses, gt_rel_poses, gt_velocities
+               images, imu_data_idxs, imu_data, init_state, T_imu_cam, gt_poses, gt_rel_poses
 
     @staticmethod
     def decode_batch_meta_info(batch_meta_info):

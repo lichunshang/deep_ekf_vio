@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from data_loader import SubseqDataset
+import data_loader
 from params import par
 from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
@@ -118,19 +118,15 @@ class TorchSE3(object):
 
 
 class IMUKalmanFilter(nn.Module):
-    def __init__(self, imu_noise, T_cal):
+    def __init__(self):
         super(IMUKalmanFilter, self).__init__()
-        self.imu_noise = imu_noise
-        self.C_cal = T_cal[0:3, 0:3]  # T_vc, T_imu_cam
-        self.C_cal_transpose = self.C_cal.transpose(0, 1)
-        self.r_cal = T_cal[0:3, 3].view(3, 1)
 
     def force_symmetrical(self, M):
         M_upper = torch.triu(M)
         return M_upper + M_upper.transpose(0, 1) * (1 - torch.eye(*M_upper.size(), device=M.device))
 
     def predict_one_step(self, t_accum, C_accum, r_accum, v_accum, dt, g_k, v_k, bw_k, ba_k, covar,
-                         gyro_meas, accel_meas):
+                         gyro_meas, accel_meas, imu_noise_covar):
         dt2 = dt * dt
         w = gyro_meas - bw_k
         w_skewed = TorchSE3.skew3(w)
@@ -166,7 +162,7 @@ class IMUKalmanFilter(nn.Module):
         Phi[3:6, 3:6] = exp_int_w.transpose(0, 1)
         Phi[9:12, 9:12] = Phi[3:6, 3:6]
 
-        Q = mm(mm(mm(mm(Phi, G), self.imu_noise), G.transpose(0, 1)), Phi.transpose(0, 1)) * dt
+        Q = mm(mm(mm(mm(Phi, G), imu_noise_covar), G.transpose(0, 1)), Phi.transpose(0, 1)) * dt
         covar = mm(mm(Phi, covar), Phi.transpose(0, 1)) + Q
         covar = self.force_symmetrical(covar)
 
@@ -178,7 +174,7 @@ class IMUKalmanFilter(nn.Module):
 
         return t_accum, C_accum, r_accum, v_accum, covar, F, G, Phi, Q
 
-    def predict(self, imu_meas, prev_state, prev_covar):
+    def predict(self, imu_meas, imu_noise_covar, prev_state, prev_covar):
         C_accum = torch.eye(3, 3, device=imu_meas.device)
         r_accum = torch.zeros(3, 1, device=imu_meas.device)
         v_accum = torch.zeros(3, 1, device=imu_meas.device)
@@ -187,12 +183,12 @@ class IMUKalmanFilter(nn.Module):
 
         g_k, C_k, r_k, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state(prev_state)
         for tau in range(0, len(imu_meas) - 1):
-            t, gyro_meas, accel_meas = SubseqDataset.decode_imu_data(imu_meas[tau, :])
-            tp1, _, _ = SubseqDataset.decode_imu_data(imu_meas[tau + 1, :])
+            t, gyro_meas, accel_meas = data_loader.SubseqDataset.decode_imu_data(imu_meas[tau, :])
+            tp1, _, _ = data_loader.SubseqDataset.decode_imu_data(imu_meas[tau + 1, :])
             dt = tp1 - t
             t_accum, C_accum, r_accum, v_accum, pred_covar, _, _, _, _ = \
                 self.predict_one_step(t_accum, C_accum, r_accum, v_accum, dt, g_k, v_k, bw_k, ba_k, pred_covar,
-                                      gyro_meas, accel_meas)
+                                      gyro_meas, accel_meas, imu_noise_covar)
 
         pred_state = IMUKalmanFilter.encode_state(g_k,
                                                   torch.mm(C_k, C_accum),
@@ -202,28 +198,32 @@ class IMUKalmanFilter(nn.Module):
 
         return pred_state, pred_covar
 
-    def meas_residual_and_jacobi(self, C_pred, r_pred, vis_meas):
+    def meas_residual_and_jacobi(self, C_pred, r_pred, vis_meas, T_imu_cam):
+        C_cal = T_imu_cam[0:3, 0:3]
+        C_cal_transpose = C_cal.transpose(0, 1)
+        r_cal = T_imu_cam[0:3, 3].view(3, 1)
+
         mm = torch.mm
         se3 = TorchSE3
         vis_meas_rot = vis_meas[0:3, :]
         vis_meas_trans = vis_meas[3:6, :]
-        residual_rot = se3.log_SO3(mm(mm(mm(se3.exp_SO3(vis_meas_rot), self.C_cal_transpose),
-                                         C_pred.transpose(0, 1)), self.C_cal))
-        residual_trans = vis_meas_trans - mm(mm(self.C_cal_transpose, C_pred), self.r_cal) - \
-                         mm(self.C_cal_transpose, r_pred - self.r_cal)
+        residual_rot = se3.log_SO3(mm(mm(mm(se3.exp_SO3(vis_meas_rot), C_cal_transpose),
+                                         C_pred.transpose(0, 1)), C_cal))
+        residual_trans = vis_meas_trans - mm(mm(C_cal_transpose, C_pred), r_cal) - \
+                         mm(C_cal_transpose, r_pred - r_cal)
         residual = torch.cat([residual_rot.view(3, 1), residual_trans], dim=0)
 
         H = torch.zeros(6, 18, device=vis_meas.device)
-        H[0:3, 3:6] = -mm(mm(se3.J_left_SO3_inv(-residual_rot), self.C_cal_transpose), C_pred)
-        H[3:6, 3:6] = mm(mm(self.C_cal_transpose, C_pred), se3.skew3(self.r_cal))
-        H[3:6, 6:9] = -self.C_cal_transpose
+        H[0:3, 3:6] = -mm(mm(se3.J_left_SO3_inv(-residual_rot), C_cal_transpose), C_pred)
+        H[3:6, 3:6] = mm(mm(C_cal_transpose, C_pred), se3.skew3(r_cal))
+        H[3:6, 6:9] = -C_cal_transpose
 
         return residual, H
 
-    def update(self, pred_state, pred_covar, vis_meas, vis_meas_covar):
+    def update(self, pred_state, pred_covar, vis_meas, vis_meas_covar, T_imu_cam):
         mm = torch.mm
         g_pred, C_pred, r_pred, v_pred, bw_pred, ba_pred = IMUKalmanFilter.decode_state(pred_state)
-        residual, H = self.meas_residual_and_jacobi(C_pred, r_pred, vis_meas)
+        residual, H = self.meas_residual_and_jacobi(C_pred, r_pred, vis_meas, T_imu_cam)
 
         H = -H  # this is required for EKF, since the way we derived the Jacobian are for batch methods
         H_transpose = H.transpose(0, 1)
@@ -273,8 +273,9 @@ class IMUKalmanFilter(nn.Module):
 
         return new_pose, new_state, new_covar
 
-    def forward(self, imu_data_idxs, imu_data, prev_pose, prev_state, prev_covar, vis_meas, vis_meas_covar):
-
+    def forward(self, imu_data_idxs, imu_data, imu_noise_covar,
+                prev_pose, prev_state, prev_covar,
+                vis_meas, vis_meas_covar, T_imu_cam):
 
         num_batches = vis_meas.size(0)
         num_timesteps = vis_meas.size(1)
@@ -288,9 +289,10 @@ class IMUKalmanFilter(nn.Module):
             covars_over_timesteps = [prev_covar[i]]
             for j in range(0, num_timesteps):
                 imu_meas = imu_data[i, imu_data_idxs[i, j]:imu_data_idxs[i, j + 1]]
-                pred_state, pred_covar = self.predict(imu_meas, states_over_timesteps[-1], covars_over_timesteps[-1])
+                pred_state, pred_covar = self.predict(imu_meas, imu_noise_covar,
+                                                      states_over_timesteps[-1], covars_over_timesteps[-1])
                 est_state, est_covar = self.update(pred_state, pred_covar,
-                                                   vis_meas[i, j].view(6, 1), vis_meas_covar[i, j])
+                                                   vis_meas[i, j].view(6, 1), vis_meas_covar[i, j], T_imu_cam)
                 new_pose, new_state, new_covar = self.composition(poses_over_timesteps[-1], est_state, est_covar)
 
                 poses_over_timesteps.append(new_pose)
@@ -441,21 +443,35 @@ class E2EVIO(nn.Module):
 
         self.vo_module = DeepVO(par.img_h, par.img_w, par.batch_norm)
 
-        imu_covar = torch.diag(torch.tensor([1e-5, 1e-5, 1e-5,
-                                             1e-8, 1e-8, 1e-8,
-                                             1e-1, 1e-1, 1e-1,
-                                             1e-3, 1e-3, 1e-3])).cuda()
-        T_cal = torch.eye(4, 4).cuda()
-        self.ekf_module = IMUKalmanFilter(imu_covar, T_cal)
+        self.imu_noise_covar_diag_sqrt = nn.Parameter(torch.tensor(par.imu_noise_covar_diag_sqrt, dtype=torch.float32))
+        if not par.train_imu_noise_covar:
+            self.imu_noise_covar_diag_sqrt.require_grad = False
 
-    def forward(self, images, imu_data_idxs, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar):
+        self.init_covar_diag_sqrt = nn.Parameter(torch.tensor(par.init_covar_diag_sqrt, dtype=torch.float32))
+        if not par.train_init_covar:
+            self.init_covar_diag_sqrt.require_grad = False
+
+        self.ekf_module = IMUKalmanFilter()
+
+    def forward(self, images, imu_data_idxs, imu_data, prev_lstm_states, prev_pose, prev_state, T_imu_cam):
         vis_meas, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
 
-        vis_meas_covar = torch.diag(torch.tensor([1e-2, 1e-2, 1e-2,
-                                                  1e-2, 1e-2, 1e-2])).repeat(vis_meas.shape[0],
-                                                                             vis_meas.shape[0], 1, 1).cuda()
-        poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data_idxs, imu_data,
-                                                                prev_pose, prev_state, prev_covar,
-                                                                vis_meas, vis_meas_covar)
+        if par.vis_meas_covar_use_fixed:
+            vis_meas_covar = torch.diag(torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32)). \
+                repeat(vis_meas.shape[0],
+                       vis_meas.shape[0], 1, 1).cuda()
+
+        if not par.enable_ekf:
+            return vis_meas, vis_meas_covar, lstm_states, None, None, None
+
+        imu_noise_covar = torch.diag(self.imu_noise_covar_diag_sqrt * self.imu_noise_covar_diag_sqrt +
+                                     par.imu_noise_covar_diag_eps *
+                                     torch.eye(18, 18, device=self.imu_noise_covar_diag_sqrt.device))
+        init_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
+                                par.init_covar_diag_eps * torch.eye(18, 18, device=self.init_covar_diag_sqrt.device))
+
+        poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data_idxs, imu_data, imu_noise_covar,
+                                                                prev_pose, prev_state, init_covar,
+                                                                vis_meas, vis_meas_covar, T_imu_cam)
 
         return vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars

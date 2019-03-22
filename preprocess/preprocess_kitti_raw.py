@@ -216,7 +216,7 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
         gyro_measurements_k_kp1 = np.concatenate([[w_vk],
                                                   imu_data[idx_imu_slice_start: idx_imu_slice_end - 1, wx:wz + 1],
                                                   [w_vkp1]])
-        frame_k = SequenceData.Frame(image_paths[k], t_k, T_i_vk, T_cam_imu, v_vk,
+        frame_k = SequenceData.Frame(image_paths[k], t_k, T_i_vk, v_vk,
                                      imu_poses, imu_timestamps_k_kp1, accel_measurements_k_kp1, gyro_measurements_k_kp1)
         data_frames.append(frame_k)
 
@@ -232,12 +232,13 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
                 np.allclose(data_frames[-1].accel_measurements[0], data_frames[-2].accel_measurements[-1], atol=1e-13))
 
     # add the last frame without any IMU data
-    data_frames.append(SequenceData.Frame(image_paths[-1], t_kp1, T_i_vkp1, T_cam_imu, v_vkp1,
+    data_frames.append(SequenceData.Frame(image_paths[-1], t_kp1, T_i_vkp1, v_vkp1,
                                           np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3])))
 
     logger.print("\nProcessing data took %.2fs" % (time.time() - start_time))
 
-    _, data = SequenceData.save_as_pd(data_frames, output_dir)
+    df = SequenceData.save_as_pd(data_frames, np.array([0, 0, 9.808679801065017]), T_cam_imu, output_dir)
+    data = df.to_dict("list")
 
     # ============================== FIGURES FOR SANITY TESTS ==============================
     # plot trajectory

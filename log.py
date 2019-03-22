@@ -78,10 +78,10 @@ class Logger(object):
         sys.stdout.write(string)
         sys.stdout.write("\n")
         sys.stdout.flush()
-
-        self.record_file_handle.write(string)
-        self.record_file_handle.write("\n")
-        self.record_file_handle.flush()
+        if self.record_file_handle:
+            self.record_file_handle.write(string)
+            self.record_file_handle.write("\n")
+            self.record_file_handle.flush()
 
     def log_training_state(self, tag, epoch, model_state_dict, optimizer_state_dict=None):
         start_time = time.time()
