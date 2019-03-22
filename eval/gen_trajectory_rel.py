@@ -12,12 +12,13 @@ from log import logger
 def gen_trajectory_rel_iter(model, dataloader, prop_lstm_states, initial_pose=np.eye(4, 4)):
     predicted_abs_poses = [np.array(initial_pose), ]
     lstm_states = None  # none defaults to zero
-    for i, batch in enumerate(dataloader):
+    for i, data in enumerate(dataloader):
         print('%d/%d (%.2f%%)' % (i, len(dataloader), i * 100 / len(dataloader)), end="\r")
-        _, x, _ = batch
+
+        images = data[1].cuda()
 
         lstm_states = lstm_states if prop_lstm_states else None
-        predicted_rel_poses, lstm_states = model.forward(x.cuda(), lstm_states)
+        predicted_rel_poses, _, lstm_states, _, _, _ = model.forward(images, None, None, lstm_states, None, None, None)
 
         lstm_states = lstm_states.detach()
         predicted_rel_poses = predicted_rel_poses.detach().cpu().numpy()
