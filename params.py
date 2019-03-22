@@ -19,7 +19,7 @@ class Parameters(object):
         self.timestamp = datetime.datetime.today()
 
         self.n_processors = 8
-        self.n_gpu = 1
+        self.n_gpu = 2
 
         # Path Parameters
         self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
@@ -34,12 +34,12 @@ class Parameters(object):
         # self.train_seqs = self.wc(['K06'])
         # self.valid_seqs = ['K07']
 
-        self.seq_len = 128
+        self.seq_len = 100
         self.sample_times = 3
 
         # VO Model parameters
-        self.img_w = 320
-        self.img_h = 96
+        self.img_w = 320 * 2
+        self.img_h = 96 * 2
         self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
@@ -80,7 +80,7 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 200
-        self.batch_size = 4
+        self.batch_size = 2
         self.pin_mem = True
         self.cache_image = False
         self.optimizer = torch.optim.Adam
