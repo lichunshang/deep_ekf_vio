@@ -85,21 +85,21 @@ class _TrainAssistant(object):
             prev_lstm_states = self.retrieve_lstm_state(meta_data)
             prev_lstm_states = prev_lstm_states.cuda()
 
-        vis_meas, vis_meas_covar, lstm_states, _, _, _ = self.model.forward(images, imu_data_idxs,
-                                                                            imu_data,
+        vis_meas, vis_meas_covar, lstm_states, _, _, _ = self.model.forward(images.cuda(), imu_data_idxs.cuda(),
+                                                                            imu_data.cuda(),
                                                                             prev_lstm_states,
-                                                                            gt_poses[0],
-                                                                            prev_state, T_imu_cam)
+                                                                            gt_poses[0].cuda(),
+                                                                            prev_state.cuda(), T_imu_cam.cuda())
         predicted = vis_meas
-        y = gt_rel_poses
+        y = gt_rel_poses.cuda()
 
         if par.stateful_training:
             lstm_states = lstm_states.detach().cpu()
             self.update_lstm_state(meta_data, lstm_states)
 
         # Weighted MSE Loss
-        angle_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-        trans_loss = torch.nn.functional.mse_loss(predicted[:, :, 0:3], gt_rel_poses[:, :, 0:3])
+        angle_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:6], y[:, :, 3:6])
+        trans_loss = torch.nn.functional.mse_loss(predicted[:, :, 0:3], y[:, :, 0:3])
         loss = (100 * angle_loss + trans_loss)
 
         # log the loss
@@ -180,10 +180,11 @@ def train(resume_model_path, resume_optimizer_path):
         pretrained_w = torch.load(par.pretrained_flownet)
         logger.print('Load FlowNet pretrained model')
         # Use only conv-layer-part of FlowNet as CNN for DeepVO
-        model_dict = e2e_vio_model.state_dict()
-        update_dict = {k: v for k, v in pretrained_w['state_dict'].items() if k in model_dict}
-        model_dict.update(update_dict)
-        e2e_vio_model.load_state_dict(model_dict)
+        vo_model_dict = e2e_vio_model.vo_module.state_dict()
+        update_dict = {k: v for k, v in pretrained_w['state_dict'].items() if k in vo_model_dict}
+        assert (len(update_dict) > 0)
+        vo_model_dict.update(update_dict)
+        e2e_vio_model.vo_module.load_state_dict(vo_model_dict)
 
     # Create optimizer
     optimizer = par.optimizer(e2e_vio_model.parameters(), **par.optimizer_args)

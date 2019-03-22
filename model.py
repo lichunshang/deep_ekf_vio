@@ -292,7 +292,7 @@ class IMUKalmanFilter(nn.Module):
                 pred_state, pred_covar = self.predict(imu_meas, imu_noise_covar,
                                                       states_over_timesteps[-1], covars_over_timesteps[-1])
                 est_state, est_covar = self.update(pred_state, pred_covar,
-                                                   vis_meas[i, j].view(6, 1), vis_meas_covar[i, j], T_imu_cam)
+                                                   vis_meas[i, j].view(6, 1), vis_meas_covar[i, j], T_imu_cam[i])
                 new_pose, new_state, new_covar = self.composition(poses_over_timesteps[-1], est_state, est_covar)
 
                 poses_over_timesteps.append(new_pose)
@@ -454,24 +454,27 @@ class E2EVIO(nn.Module):
         self.ekf_module = IMUKalmanFilter()
 
     def forward(self, images, imu_data_idxs, imu_data, prev_lstm_states, prev_pose, prev_state, T_imu_cam):
+        import time
+        start_t = time.time()
+
         vis_meas, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
 
         if par.vis_meas_covar_use_fixed:
             vis_meas_covar = torch.diag(torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32)). \
                 repeat(vis_meas.shape[0],
-                       vis_meas.shape[0], 1, 1).cuda()
+                       vis_meas.shape[1], 1, 1).cuda()
 
         if not par.enable_ekf:
             return vis_meas, vis_meas_covar, lstm_states, None, None, None
 
         imu_noise_covar = torch.diag(self.imu_noise_covar_diag_sqrt * self.imu_noise_covar_diag_sqrt +
-                                     par.imu_noise_covar_diag_eps *
-                                     torch.eye(18, 18, device=self.imu_noise_covar_diag_sqrt.device))
+                                     par.imu_noise_covar_diag_eps)
         init_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
-                                par.init_covar_diag_eps * torch.eye(18, 18, device=self.init_covar_diag_sqrt.device))
+                                par.init_covar_diag_eps).repeat(vis_meas.shape[0], 1, 1)
 
         poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data_idxs, imu_data, imu_noise_covar,
                                                                 prev_pose, prev_state, init_covar,
                                                                 vis_meas, vis_meas_covar, T_imu_cam)
 
+        print(start_t - time.time(), "s")
         return vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars

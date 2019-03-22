@@ -1,4 +1,3 @@
-import numpy as np
 import os
 import argparse
 import trainer
@@ -7,7 +6,6 @@ from params import par
 from log import logger
 from eval import gen_trajectory_rel, plot_trajectory, kitti_eval, np_traj_to_kitti, calc_error, plot_errors
 
-np.set_printoptions(linewidth=1024)
 logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
 
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')

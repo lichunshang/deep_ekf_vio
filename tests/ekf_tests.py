@@ -12,9 +12,6 @@ import scipy.linalg
 import se3_math
 from utils import Plotter
 
-np.set_printoptions(linewidth=1024)
-torch.set_printoptions(linewidth=1024)
-
 
 class Test_EKF(unittest.TestCase):
 
