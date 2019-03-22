@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import data_loader
+import time
 from params import par
 from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
@@ -454,9 +455,6 @@ class E2EVIO(nn.Module):
         self.ekf_module = IMUKalmanFilter()
 
     def forward(self, images, imu_data_idxs, imu_data, prev_lstm_states, prev_pose, prev_state, T_imu_cam):
-        import time
-        start_t = time.time()
-
         vis_meas, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
 
         if par.vis_meas_covar_use_fixed:
@@ -476,5 +474,4 @@ class E2EVIO(nn.Module):
                                                                 prev_pose, prev_state, init_covar,
                                                                 vis_meas, vis_meas_covar, T_imu_cam)
 
-        print(start_t - time.time(), "s")
         return vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars
