@@ -4,7 +4,7 @@ import numpy as np
 import os
 import time
 from params import par
-from model import E2EVIO
+from model import E2EVIO, TorchSE3
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
 from log import logger
 from torch.utils.data import DataLoader
@@ -85,32 +85,45 @@ class _TrainAssistant(object):
             prev_lstm_states = self.retrieve_lstm_state(meta_data)
             prev_lstm_states = prev_lstm_states.cuda()
 
-        vis_meas, vis_meas_covar, lstm_states, _, _, _ = self.model.forward(images.cuda(), imu_data_idxs.cuda(),
-                                                                            imu_data.cuda(),
-                                                                            prev_lstm_states,
-                                                                            gt_poses[0].cuda(),
-                                                                            prev_state.cuda(), T_imu_cam.cuda())
-        predicted = vis_meas
-        y = gt_rel_poses.cuda()
+        vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars = \
+            self.model.forward(images.cuda(),
+                               imu_data_idxs.cuda(),
+                               imu_data.cuda(),
+                               prev_lstm_states,
+                               gt_poses[0].cuda(),
+                               prev_state.cuda(), T_imu_cam.cuda())
+
+        if par.enable_ekf:
+            loss = self.ekf_loss(poses, gt_poses)
+        else:
+            loss = self.vis_meas_loss(vis_meas, gt_rel_poses.cuda())
 
         if par.stateful_training:
             lstm_states = lstm_states.detach().cpu()
             self.update_lstm_state(meta_data, lstm_states)
 
+        if self.model.training:
+            self.num_train_iterations += 1
+        else:
+            self.num_val_iterations += 1
+
+        return loss
+
+    def vis_meas_loss(self, predicted_rel_poses, gt_rel_poses):
         # Weighted MSE Loss
-        angle_loss = torch.nn.functional.mse_loss(predicted[:, :, 3:6], y[:, :, 3:6])
-        trans_loss = torch.nn.functional.mse_loss(predicted[:, :, 0:3], y[:, :, 0:3])
+        angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         loss = (100 * angle_loss + trans_loss)
 
         # log the loss
         loss_name = "train_loss" if self.model.training else "val_loss"
         iterations = self.num_train_iterations if self.model.training else self.num_val_iterations
-        trans_x_loss = torch.nn.functional.mse_loss(predicted[:, :, 0], y[:, :, 0])
-        trans_y_loss = torch.nn.functional.mse_loss(predicted[:, :, 1], y[:, :, 1])
-        trans_z_loss = torch.nn.functional.mse_loss(predicted[:, :, 2], y[:, :, 2])
-        rot_x_loss = torch.nn.functional.mse_loss(predicted[:, :, 3], y[:, :, 3])
-        rot_y_loss = torch.nn.functional.mse_loss(predicted[:, :, 4], y[:, :, 4])
-        rot_z_loss = torch.nn.functional.mse_loss(predicted[:, :, 5], y[:, :, 5])
+        trans_x_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0], gt_rel_poses[:, :, 0])
+        trans_y_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 1], gt_rel_poses[:, :, 1])
+        trans_z_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 2], gt_rel_poses[:, :, 2])
+        rot_x_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3], gt_rel_poses[:, :, 3])
+        rot_y_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 4], gt_rel_poses[:, :, 4])
+        rot_z_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 5], gt_rel_poses[:, :, 5])
         logger.tensorboard.add_scalar(loss_name + "/total_loss", loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/rot_loss", angle_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/rot_loss/x", rot_x_loss, iterations)
@@ -121,10 +134,35 @@ class _TrainAssistant(object):
         logger.tensorboard.add_scalar(loss_name + "/trans_loss/y", trans_y_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/trans_loss/z", trans_z_loss, iterations)
 
-        if self.model.training:
-            self.num_train_iterations += 1
-        else:
-            self.num_val_iterations += 1
+        return loss
+
+    def ekf_loss(self, est_poses, gt_poses):
+        est_poses_inv = torch.inverse(est_poses)
+        errors = torch.matmul(est_poses_inv, gt_poses)
+        angle_errors_sq = torch.tensor([TorchSE3.log_SO3(errors[i, 0:3, 0:3]) for i in range(0, len(errors))]) ** 2
+        trans_errors_sq = errors[:, 0:3, 3] ** 2
+        angle_loss = torch.mean(angle_errors_sq)
+        trans_loss = torch.mean(trans_errors_sq)
+        loss = (100 * angle_loss + trans_loss)
+
+        last_rot_x_loss = angle_errors_sq[-1, 0]
+        last_rot_y_loss = angle_errors_sq[-1, 1]
+        last_rot_z_loss = angle_errors_sq[-1, 2]
+        last_trans_x_loss = trans_errors_sq[-1, 0]
+        last_trans_y_loss = trans_errors_sq[-1, 1]
+        last_trans_z_loss = trans_errors_sq[-1, 2]
+
+        loss_name = "train_loss" if self.model.training else "val_loss"
+        iterations = self.num_train_iterations if self.model.training else self.num_val_iterations
+        logger.tensorboard.add_scalar(loss_name + "/abs_total_loss", loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/abs_rot_loss", angle_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/x", last_rot_x_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/y", last_rot_y_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/z", last_rot_z_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/abs_trans_loss", trans_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/x", last_trans_x_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/y", last_trans_y_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/z", last_trans_z_loss, iterations)
 
         return loss
 

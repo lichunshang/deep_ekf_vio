@@ -153,7 +153,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             subseqs_buffer += sub_seqs_vanilla
 
             if training and par.data_aug_transforms.enable:
-                assert (not par.enable_ekf, "Data aug transforms not compatible with EKF")
+                assert not par.enable_ekf, "Data aug transforms not compatible with EKF"
                 if par.data_aug_transforms.lr_flip:
                     subseq_flipped_buffer = []
                     H = np.diag([1, -1, 1])  # reflection matrix, flip y, across the xz plane
