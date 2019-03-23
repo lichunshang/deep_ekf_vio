@@ -5,7 +5,7 @@ import time
 import se3_math
 from data_loader import get_subseqs, SubseqDataset, SequenceData
 from params import par
-from model import DeepVO
+from model import E2EVIO
 from log import logger
 
 
@@ -42,11 +42,11 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
 
     # Load model
     logger.print("Constructing model...")
-    M_deepvo = DeepVO(par.img_h, par.img_w, par.batch_norm)
-    M_deepvo = M_deepvo.cuda()
+    model = E2EVIO()
+    model = model.cuda()
     logger.print("Loading model from: ", model_file_path)
-    M_deepvo.load_state_dict(logger.clean_state_dict_key(torch.load(model_file_path)))
-    M_deepvo.eval()
+    model.load_state_dict(logger.clean_state_dict_key(torch.load(model_file_path)))
+    model.eval()
 
     logger.log_parameters()
     logger.print("Using sequence length:", seq_len)
@@ -63,7 +63,7 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
         gt_abs_poses = SequenceData(seq).get_poses()
 
-        predicted_abs_poses = gen_trajectory_rel_iter(M_deepvo, dataloader, prop_lstm_states,
+        predicted_abs_poses = gen_trajectory_rel_iter(model, dataloader, prop_lstm_states,
                                                       initial_pose=gt_abs_poses[0, :, :])
 
         np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "est_poses", seq + ".npy")),
