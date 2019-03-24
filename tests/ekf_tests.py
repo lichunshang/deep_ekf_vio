@@ -1,7 +1,7 @@
 import unittest
 from data_loader import SequenceData
 from model import IMUKalmanFilter
-from model import TorchSE3
+import torch_se3
 import torch
 import numpy as np
 from params import par
@@ -159,7 +159,7 @@ class Test_EKF(unittest.TestCase):
 
         for i in range(0, 5):
             t_accum, C_accum, r_accum, v_accum, covar, F, G, Phi, Q = \
-                ekf.predict_one_step(C_accum=TorchSE3.exp_SO3(torch.tensor([1., 2., 3.])).to(device),
+                ekf.predict_one_step(C_accum=torch_se3.exp_SO3(torch.tensor([1., 2., 3.])).to(device),
                                      r_accum=torch.tensor([-2, 0.25, -0.1]).view(3, 1).to(device),
                                      v_accum=torch.tensor([0.1, -0.1, 0.2]).view(3, 1).to(device),
                                      t_accum=torch.tensor(10.).to(device),
@@ -285,12 +285,12 @@ class Test_EKF(unittest.TestCase):
         torch.set_default_tensor_type('torch.DoubleTensor')
         device = "cpu"
         T_imu_cam = torch.eye(4, 4)
-        T_imu_cam[0:3, 0:3] = TorchSE3.exp_SO3(torch.tensor([1., -2., 3.]))
+        T_imu_cam[0:3, 0:3] = torch_se3.exp_SO3(torch.tensor([1., -2., 3.]))
         T_imu_cam[0:3, 3] = torch.tensor([-3., 2., 1.])
         T_imu_cam = T_imu_cam.to(device)
         ekf = IMUKalmanFilter()
 
-        C_pred = TorchSE3.exp_SO3(torch.tensor([0.1, 3, -0.3])).to(device)
+        C_pred = torch_se3.exp_SO3(torch.tensor([0.1, 3, -0.3])).to(device)
         r_pred = torch.tensor([-1.05, 20, -1.]).view(3, 1).to(device)
         vis_meas = torch.tensor([4., -6., 8., -7., 5., -9.]).to(device).view(6, 1)
         residual, H = ekf.meas_residual_and_jacobi(C_pred, r_pred, vis_meas, T_imu_cam)
@@ -302,9 +302,9 @@ class Test_EKF(unittest.TestCase):
 
         for i in range(0, 3):
             pb = p[:, i]
-            residual_minus_pb, _ = ekf.meas_residual_and_jacobi(torch.mm(C_pred, TorchSE3.exp_SO3(-pb)),
+            residual_minus_pb, _ = ekf.meas_residual_and_jacobi(torch.mm(C_pred, torch_se3.exp_SO3(-pb)),
                                                                 r_pred, vis_meas, T_imu_cam)
-            residual_plus_pb, _ = ekf.meas_residual_and_jacobi(torch.mm(C_pred, TorchSE3.exp_SO3(pb)),
+            residual_plus_pb, _ = ekf.meas_residual_and_jacobi(torch.mm(C_pred, torch_se3.exp_SO3(pb)),
                                                                r_pred, vis_meas, T_imu_cam)
             H_C_numerical[:, i] = (residual_plus_pb - residual_minus_pb).view(6) / (2 * e)
 
@@ -470,7 +470,7 @@ class Test_EKF(unittest.TestCase):
                                             torch.unsqueeze(init_covar, dim=0),
                                             torch.unsqueeze(vis_meas, dim=0),
                                             torch.unsqueeze(vis_meas_covars, dim=0),
-                                            torch.tensor(T_imu_cam, dtype=torch.float32).to(device))
+                                            torch.unsqueeze(torch.tensor(T_imu_cam, dtype=torch.float32), 0).to(device))
 
         return timestamps, gt_poses, gt_vels, poses[0], states[0], covars[0]
 

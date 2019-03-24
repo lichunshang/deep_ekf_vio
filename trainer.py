@@ -3,8 +3,9 @@ import torch.nn.functional
 import numpy as np
 import os
 import time
+import torch_se3
 from params import par
-from model import E2EVIO, TorchSE3
+from model import E2EVIO
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
 from log import logger
 from torch.utils.data import DataLoader
@@ -139,7 +140,7 @@ class _TrainAssistant(object):
     def ekf_loss(self, est_poses, gt_poses):
         est_poses_inv = torch.inverse(est_poses)
         errors = torch.matmul(est_poses_inv, gt_poses)
-        angle_errors_sq = torch.tensor([TorchSE3.log_SO3(errors[i, 0:3, 0:3]) for i in range(0, len(errors))]) ** 2
+        angle_errors_sq = torch.tensor([torch_se3.log_SO3(errors[i, 0:3, 0:3]) for i in range(0, len(errors))]) ** 2
         trans_errors_sq = errors[:, 0:3, 3] ** 2
         angle_loss = torch.mean(angle_errors_sq)
         trans_loss = torch.mean(trans_errors_sq)

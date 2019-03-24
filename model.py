@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import data_loader
+import torch_se3
 import time
 from params import par
 from torch.autograd import Variable
@@ -26,98 +27,6 @@ def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
         )
 
 
-class TorchSE3(object):
-    @staticmethod
-    def exp_SO3(phi):
-        phi_norm = torch.norm(phi)
-
-        if phi_norm > 1e-8:
-            unit_phi = phi / phi_norm
-            unit_phi_skewed = TorchSE3.skew3(unit_phi)
-            C = torch.eye(3, 3, device=phi.device) + torch.sin(phi_norm) * unit_phi_skewed + \
-                (1 - torch.cos(phi_norm)) * torch.mm(unit_phi_skewed, unit_phi_skewed)
-        else:
-            phi_skewed = TorchSE3.skew3(phi)
-            C = torch.eye(3, 3, device=phi.device) + phi_skewed + 0.5 * torch.mm(phi_skewed, phi_skewed)
-
-        return C
-
-    # assumes small rotations
-    @staticmethod
-    def log_SO3(C):
-        phi_norm = torch.acos(torch.clamp((torch.trace(C) - 1) / 2, -1.0, 1.0))
-        if torch.sin(phi_norm) > 1e-6:
-            phi = phi_norm * TorchSE3.unskew3(C - C.transpose(0, 1)) / (2 * torch.sin(phi_norm))
-        else:
-            phi = 0.5 * TorchSE3.unskew3(C - C.transpose(0, 1))
-
-        return phi
-
-    @staticmethod
-    def log_SO3_eigen(C):  # no autodiff
-        phi_norm = torch.acos(torch.clamp((torch.trace(C) - 1) / 2, -1.0, 1.0))
-
-        # eig is not very food for C close to identity, will only keep around 3 decimals places
-        w, v = torch.eig(C, eigenvectors=True)
-        a = torch.tensor([0., 0., 0.], device=C.device)
-        for i in range(0, w.size(0)):
-            if torch.abs(w[i, 0] - 1.0) < 1e-6 and torch.abs(w[i, 1] - 0.0) < 1e-6:
-                a = v[:, i]
-
-        assert (torch.abs(torch.norm(a) - 1.0) < 1e-6)
-
-        if torch.allclose(TorchSE3.exp_SO3(phi_norm * a), C, atol=1e-3):
-            return phi_norm * a
-        elif torch.allclose(TorchSE3.exp_SO3(-phi_norm * a), C, atol=1e-3):
-            return -phi_norm * a
-        else:
-            raise ValueError("Invalid logarithmic mapping")
-
-    @staticmethod
-    def skew3(v):
-        m = torch.zeros(3, 3, device=v.device)
-        m[0, 1] = -v[2]
-        m[0, 2] = v[1]
-        m[1, 0] = v[2]
-
-        m[1, 2] = -v[0]
-        m[2, 0] = -v[1]
-        m[2, 1] = v[0]
-
-        return m
-
-    @staticmethod
-    def unskew3(m):
-        return torch.stack([m[2, 1], m[0, 2], m[1, 0]])
-
-    @staticmethod
-    def J_left_SO3_inv(phi):
-        phi = phi.view(3, 1)
-        phi_norm = torch.norm(phi)
-        if torch.abs(phi_norm) > 1e-6:
-            a = phi / phi_norm
-            cot_half_phi_norm = 1.0 / torch.tan(phi_norm / 2)
-            J_inv = (phi_norm / 2) * cot_half_phi_norm * torch.eye(3, 3, device=phi.device) + \
-                    (1 - (phi_norm / 2) * cot_half_phi_norm) * \
-                    torch.mm(a, a.transpose(0, 1)) - (phi_norm / 2) * TorchSE3.skew3(a)
-        else:
-            J_inv = torch.eye(3, 3, device=phi.device) - 0.5 * TorchSE3.skew3(phi)
-        return J_inv
-
-    @staticmethod
-    def J_left_SO3(phi):
-        phi = phi.view(3, 1)
-        phi_norm = torch.norm(phi)
-        if torch.abs(phi_norm) > 1e-6:
-            a = phi / phi_norm
-            J = (torch.sin(phi_norm) / phi_norm) * torch.eye(3, 3, device=phi.device) + \
-                (1 - (torch.sin(phi_norm) / phi_norm)) * torch.mm(a, a.transpose(0, 1)) + \
-                ((1 - torch.cos(phi_norm)) / phi_norm) * TorchSE3.skew3(a)
-        else:
-            J = torch.eye(3, 3, device=phi.device) + 0.5 * TorchSE3.skew3(phi)
-        return J
-
-
 class IMUKalmanFilter(nn.Module):
     def __init__(self):
         super(IMUKalmanFilter, self).__init__()
@@ -130,13 +39,13 @@ class IMUKalmanFilter(nn.Module):
                          gyro_meas, accel_meas, imu_noise_covar):
         dt2 = dt * dt
         w = gyro_meas - bw_k
-        w_skewed = TorchSE3.skew3(w)
+        w_skewed = torch_se3.skew3(w)
         C_accum_transpose = C_accum.transpose(0, 1)
         a = accel_meas - ba_k
         v = torch.mm(C_accum_transpose, v_k - g_k * t_accum + v_accum)
-        v_skewed = TorchSE3.skew3(v)
+        v_skewed = torch_se3.skew3(v)
         I3 = torch.eye(3, 3, device=covar.device)
-        exp_int_w = TorchSE3.exp_SO3(dt * w)
+        exp_int_w = torch_se3.exp_SO3(dt * w)
 
         # propagate uncertainty, 2nd order
         F = torch.zeros(18, 18, device=covar.device)
@@ -145,7 +54,7 @@ class IMUKalmanFilter(nn.Module):
         F[6:9, 3:6] = -torch.mm(C_accum, v_skewed)
         F[6:9, 9:12] = C_accum
         F[9:12, 0:3] = -C_accum_transpose
-        F[9:12, 3:6] = -TorchSE3.skew3(torch.mm(C_accum_transpose, g_k))
+        F[9:12, 3:6] = -torch_se3.skew3(torch.mm(C_accum_transpose, g_k))
         F[9:12, 9:12] = -w_skewed
         F[9:12, 12:15] = -v_skewed
         F[9:12, 15:18] = -I3
@@ -205,7 +114,7 @@ class IMUKalmanFilter(nn.Module):
         r_cal = T_imu_cam[0:3, 3].view(3, 1)
 
         mm = torch.mm
-        se3 = TorchSE3
+        se3 = torch_se3
         vis_meas_rot = vis_meas[0:3, :]
         vis_meas_trans = vis_meas[3:6, :]
         residual_rot = se3.log_SO3(mm(mm(mm(se3.exp_SO3(vis_meas_rot), C_cal_transpose),
@@ -245,7 +154,7 @@ class IMUKalmanFilter(nn.Module):
         ba_err = est_error[15:18]
 
         est_state = IMUKalmanFilter.encode_state(g_pred + g_err,
-                                                 mm(C_pred, TorchSE3.exp_SO3(C_err)),
+                                                 mm(C_pred, torch_se3.exp_SO3(C_err)),
                                                  r_pred + r_err,
                                                  v_pred + v_err,
                                                  bw_pred + bw_err,
@@ -267,7 +176,7 @@ class IMUKalmanFilter(nn.Module):
                                                  v, bw, ba)
         U = torch.zeros(18, 18, device=prev_pose.device)
         U[0:3, 0:3] = C_transpose
-        U[0:3, 3:6] = TorchSE3.skew3(new_g)
+        U[0:3, 3:6] = torch_se3.skew3(new_g)
         U[9:18, 9:18] = torch.eye(9, 9, device=prev_pose.device)
         new_covar = torch.mm(torch.mm(U, est_covar), U.transpose(0, 1))
         new_covar = self.force_symmetrical(new_covar)

@@ -3,10 +3,10 @@ import torch as tr
 import scipy.linalg as slinalg
 import se3
 import numpy as np
-from model import TorchSE3 as trse3
+import torch_se3 as trse3
 
 
-class Test_TorchSE3(unittest.TestCase):
+class Test_torch_se3(unittest.TestCase):
     def test_skew_unskew(self):
         self.assertTrue(tr.allclose(trse3.unskew3(trse3.skew3(tr.tensor([1., 2., 3.]))),
                                     tr.tensor([1., 2., 3.]), atol=1e-8))
