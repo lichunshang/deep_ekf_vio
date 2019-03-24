@@ -2,7 +2,7 @@ from log import logger
 import numpy as np
 import os
 import transformations
-from se3_math import log_SO3, exp_SO3, interpolate_SE3, interpolate_SO3
+from se3 import log_SO3, exp_SO3, interpolate_SE3, interpolate_SO3
 from data_loader import SequenceData
 from utils import Plotter
 import matplotlib.pyplot as plt

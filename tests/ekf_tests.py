@@ -6,10 +6,9 @@ import torch
 import numpy as np
 from params import par
 from log import logger
-from se3_math import log_SO3
+from se3 import log_SO3
 import os
 import scipy.linalg
-import se3_math
 from utils import Plotter
 
 
@@ -457,7 +456,7 @@ class Test_EKF(unittest.TestCase):
         for i in range(0, len(imu_timestamps) - 1):
             T_rel = np.linalg.inv(gt_poses[i]).dot(gt_poses[i + 1])
             T_rel_vis = np.linalg.inv(T_imu_cam).dot(T_rel).dot(T_imu_cam)
-            vis_meas.append(torch.tensor(np.concatenate([se3_math.log_SO3(T_rel_vis[0:3, 0:3]), T_rel_vis[0:3, 3]]),
+            vis_meas.append(torch.tensor(np.concatenate([log_SO3(T_rel_vis[0:3, 0:3]), T_rel_vis[0:3, 3]]),
                                          dtype=torch.float32, requires_grad=req_grad).to(device))
         vis_meas = torch.stack(vis_meas)
         vis_meas_covars = vis_meas_covar.repeat(vis_meas.shape[0], 1, 1).to(device)

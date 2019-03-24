@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import torch
-import se3_math
+import se3
 from PIL import Image
 from torch.utils.data import Dataset
 from log import logger
@@ -160,7 +160,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
                     for subseq in sub_seqs_vanilla:
                         subseq_flipped = copy.deepcopy(subseq)
                         subseq_flipped.gt_poses = \
-                            np.array([se3_math.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())), H.dot(T[0:3, 3]))
+                            np.array([se3.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())), H.dot(T[0:3, 3]))
                                       for T in subseq.gt_poses])
                         subseq_flipped.type = subseq.type + "_flippedlr"
                         subseq_flipped_buffer.append(subseq_flipped)
@@ -250,9 +250,9 @@ class SubseqDataset(Dataset):
             # get relative poses
             T_i_vkm1 = subseq.gt_poses[i - 1]
             T_i_vk = subseq.gt_poses[i]
-            T_vkm1_vk = se3_math.reorthogonalize_SE3(np.linalg.inv(T_i_vkm1).dot(T_i_vk))
+            T_vkm1_vk = se3.reorthogonalize_SE3(np.linalg.inv(T_i_vkm1).dot(T_i_vk))
             r_vk_vkm1_vkm1 = T_vkm1_vk[0:3, 3]  # get the translation from T
-            phi_vkm1_vk = se3_math.log_SO3(T_vkm1_vk[0:3, 0:3])
+            phi_vkm1_vk = se3.log_SO3(T_vkm1_vk[0:3, 0:3])
             gt_rel_poses.append(np.concatenate([r_vk_vkm1_vkm1, phi_vkm1_vk, ]))
 
             imu_data.append(np.concatenate([np.expand_dims(subseq.imu_timestamps[i], 1),

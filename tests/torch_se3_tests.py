@@ -1,7 +1,7 @@
 import unittest
 import torch as tr
 import scipy.linalg as slinalg
-import se3_math as se3
+import se3
 import numpy as np
 from model import TorchSE3 as trse3
 

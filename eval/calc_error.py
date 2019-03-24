@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from log import Logger, logger
-from se3_math import log_SO3, r_from_T, C_from_T
+from se3 import log_SO3, r_from_T, C_from_T
 
 
 def calc_error(working_dir):

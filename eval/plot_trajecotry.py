@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import se3_math
+import se3
 from data_loader import SequenceData
 from log import logger, Logger
 import os
@@ -26,10 +26,10 @@ def plot_trajectory(working_dir):
         trajectory = np.load(os.path.join(pose_est_dir, "%s.npy" % sequence))
         trajectory_gt = SequenceData(sequence).get_poses()
 
-        trans_xyz = np.array([se3_math.r_from_T(T) for T in trajectory])
-        rot_xyz = np.array([se3_math.log_SO3(se3_math.C_from_T(T)) for T in trajectory])
-        trans_xyz_gt = np.array([se3_math.r_from_T(T) for T in trajectory_gt])
-        rot_xyz_gt = np.array([se3_math.log_SO3(se3_math.C_from_T(T)) for T in trajectory_gt])
+        trans_xyz = np.array([se3.r_from_T(T) for T in trajectory])
+        rot_xyz = np.array([se3.log_SO3(se3.C_from_T(T)) for T in trajectory])
+        trans_xyz_gt = np.array([se3.r_from_T(T) for T in trajectory_gt])
+        rot_xyz_gt = np.array([se3.log_SO3(se3.C_from_T(T)) for T in trajectory_gt])
 
         trans_x = trans_xyz[:, 0]
         trans_y = trans_xyz[:, 1]
