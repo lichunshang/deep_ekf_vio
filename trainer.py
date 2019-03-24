@@ -94,7 +94,7 @@ class _TrainAssistant(object):
                                prev_state.cuda(), T_imu_cam.cuda())
 
         if par.enable_ekf:
-            loss = self.ekf_loss(poses, gt_poses)
+            loss = self.ekf_loss(poses, gt_poses.cuda())
         else:
             loss = self.vis_meas_loss(vis_meas, gt_rel_poses.cuda())
 
@@ -139,18 +139,28 @@ class _TrainAssistant(object):
     def ekf_loss(self, est_poses, gt_poses):
         est_poses_inv = torch.inverse(est_poses)
         errors = torch.matmul(est_poses_inv, gt_poses)
-        angle_errors_sq = torch.tensor([TorchSE3.log_SO3(errors[i, 0:3, 0:3]) for i in range(0, len(errors))]) ** 2
+
+        angle_errors = []
+        for i in range(0, errors.size(0)):
+            angle_errors_over_timesteps = []
+            for j in range(0, errors.size(1)):
+                angle_errors_over_timesteps.append(TorchSE3.log_SO3(errors[i, j, 0:3, 0:3]))
+            angle_errors.append(torch.stack(angle_errors_over_timesteps))
+
+        angle_errors = torch.stack(angle_errors)
+        angle_errors_sq = angle_errors ** 2
+
         trans_errors_sq = errors[:, 0:3, 3] ** 2
         angle_loss = torch.mean(angle_errors_sq)
         trans_loss = torch.mean(trans_errors_sq)
         loss = (100 * angle_loss + trans_loss)
 
-        last_rot_x_loss = angle_errors_sq[-1, 0]
-        last_rot_y_loss = angle_errors_sq[-1, 1]
-        last_rot_z_loss = angle_errors_sq[-1, 2]
-        last_trans_x_loss = trans_errors_sq[-1, 0]
-        last_trans_y_loss = trans_errors_sq[-1, 1]
-        last_trans_z_loss = trans_errors_sq[-1, 2]
+        last_rot_x_loss = torch.mean(angle_errors_sq[:, -1, 0])
+        last_rot_y_loss = torch.mean(angle_errors_sq[:, -1, 1])
+        last_rot_z_loss = torch.mean(angle_errors_sq[:, -1, 2])
+        last_trans_x_loss = torch.mean(trans_errors_sq[:, -1, 0])
+        last_trans_y_loss = torch.mean(trans_errors_sq[:, -1, 1])
+        last_trans_z_loss = torch.mean(trans_errors_sq[:, -1, 2])
 
         loss_name = "train_loss" if self.model.training else "val_loss"
         iterations = self.num_train_iterations if self.model.training else self.num_val_iterations

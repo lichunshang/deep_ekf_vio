@@ -161,7 +161,7 @@ class IMUKalmanFilter(nn.Module):
         Phi = torch.eye(18, 18, device=covar.device) + F * dt + 0.5 * mm(F, F) * dt2
         Phi[6:9, 12:15] = torch.zeros(3, 3, device=covar.device)  # this blocks is exactly zero in 2nd order approx
         Phi[3:6, 3:6] = exp_int_w.transpose(0, 1)
-        Phi[9:12, 9:12] = Phi[3:6, 3:6]
+        Phi[9:12, 9:12] = exp_int_w.transpose(0, 1)
 
         Q = mm(mm(mm(mm(Phi, G), imu_noise_covar), G.transpose(0, 1)), Phi.transpose(0, 1)) * dt
         covar = mm(mm(Phi, covar), Phi.transpose(0, 1)) + Q
@@ -171,7 +171,7 @@ class IMUKalmanFilter(nn.Module):
         r_accum = r_accum + v_accum * dt + 0.5 * torch.mm(C_accum, (dt2 * a))
         v_accum = v_accum + torch.mm(C_accum, (dt * a))
         C_accum = torch.mm(C_accum, exp_int_w)
-        t_accum += dt
+        t_accum = t_accum + dt
 
         return t_accum, C_accum, r_accum, v_accum, covar, F, G, Phi, Q
 
