@@ -14,7 +14,9 @@ def over_batch(fn, param):
     for i in range(0, len(param)):
         batches.append(fn(param[i]))
 
-    return tr.stack(batches)
+    if tr.is_tensor(param):
+        return tr.stack(batches)
+    return np.stack(batches)
 
 
 class Test_torch_se3(unittest.TestCase):
@@ -267,35 +269,71 @@ class Test_batched_torch_se3(unittest.TestCase):
         self.assertTrue(tr.allclose(t1, t2, atol=atol, rtol=rtol))
 
     def test_skew_unskew(self):
-        dat = tr.rand([100, 3])
+        dat = tr.rand([1000, 3])
         ret = over_batch(torch_se3.skew3, dat)
         self.close(ret, torch_se3.skew3_b(dat), atol=0)
         self.close(over_batch(torch_se3.unskew3, ret), torch_se3.unskew3_b(ret), atol=0)
 
     def test_exp_SO3(self):
-        n = 100
-        dat = tr.cat([tr.rand([n, 3]), tr.rand([n, 3]) * 1e-10], dim=0)
-        dat = dat[tr.randperm(len(dat))]
-        ret = over_batch(torch_se3.exp_SO3, dat)
-        self.close(ret, torch_se3.exp_SO3_b(dat), atol=0)
+        n = 10000
+        dat0 = tr.cat([tr.zeros(n, 3), tr.rand([n, 3]), tr.rand([n, 3]) * 1e-10], dim=0)
+        dat0 = dat0[tr.randperm(len(dat0))]
+        self.close(over_batch(torch_se3.exp_SO3, dat0), torch_se3.exp_SO3_b(dat0), atol=1e-7)
+
+        # of one either near or far from zero
+        dat = tr.zeros(n, 3)
+        self.close(over_batch(torch_se3.exp_SO3, dat), torch_se3.exp_SO3_b(dat), atol=0)
+        dat = tr.rand([n, 3])
+        self.close(over_batch(torch_se3.exp_SO3, dat), torch_se3.exp_SO3_b(dat), atol=1e-7)
+
+        # one item
+        dat = tr.zeros(1, 3)
+        self.close(over_batch(torch_se3.exp_SO3, dat), torch_se3.exp_SO3_b(dat), atol=0)
+        dat = tr.rand([1, 3])
+        self.close(over_batch(torch_se3.exp_SO3, dat), torch_se3.exp_SO3_b(dat), atol=1e-7)
+
+        # grad and cuda
+        dat0.requires_grad = True
+        dat0 = dat0.cuda()
+        ret = torch_se3.exp_SO3_b(dat0)
+        self.assertTrue(ret.is_cuda)
+        self.assertTrue(ret.requires_grad)
 
     def test_log_SO3(self):
-        n = 100
-        dat = over_batch(torch_se3.exp_SO3, tr.cat([tr.rand([n, 3]),
-                                                    tr.rand([n, 3]) * 1e-10,
-                                                    tr.rand([n, 3]) * 1e-8], dim=0))
-        dat = dat[tr.randperm(len(dat))]
-        ret = over_batch(torch_se3.log_SO3, dat)
-        self.close(ret, torch_se3.log_SO3_b(dat), atol=0)
+        n = 10000
+        dat0 = over_batch(se3.exp_SO3, np.concatenate([np.zeros([n, 3]),
+                                                       np.random.rand(n, 3),
+                                                       np.random.rand(n, 3) * 1e-2,
+                                                       np.random.rand(n, 3) * 1e-3,
+                                                       np.random.rand(n, 3) * 1e-4,
+                                                       np.random.rand(n, 3) * 1e-5,
+                                                       np.random.rand(n, 3) * 1e-6], 0))
+        dat0 = tr.tensor(dat0, dtype=tr.float32)
+        dat0 = dat0[tr.randperm(len(dat0))]
+        ret = over_batch(torch_se3.log_SO3, dat0)
+        self.close(ret, torch_se3.log_SO3_b(dat0), atol=0)
 
-        dat.requires_grad = True
-        dat = dat.cuda()
-        ret = torch_se3.log_SO3_b(dat)
+        # of one either near or far from zero
+        dat = over_batch(torch_se3.exp_SO3, tr.rand([n, 3]))
+        self.close(over_batch(torch_se3.log_SO3, dat), torch_se3.log_SO3_b(dat), atol=0)
+        dat = tr.eye(3, 3).repeat(n, 1, 1)
+        self.close(tr.zeros(n, 3), torch_se3.log_SO3_b(dat), atol=0)
+
+        # one item
+        dat = over_batch(torch_se3.exp_SO3, tr.rand([1, 3]))
+        self.close(over_batch(torch_se3.log_SO3, dat), torch_se3.log_SO3_b(dat), atol=0)
+        dat = tr.eye(3, 3).repeat(1, 1, 1)
+        self.close(tr.zeros(n, 3), torch_se3.log_SO3_b(dat), atol=0)
+
+        # grad and cuda
+        dat0.requires_grad = True
+        dat0 = dat0.cuda()
+        ret = torch_se3.log_SO3_b(dat0)
         self.assertTrue(ret.is_cuda)
         self.assertTrue(ret.requires_grad)
 
     def test_exp_SO3_and_log_SO3_grad(self):
-        n = 5
+        n = 100
         dat = tr.cat([tr.rand([n, 3]), tr.rand([n, 3]) * 1e-10], dim=0)
         dat = dat[tr.randperm(len(dat))]
         dat.requires_grad = True
@@ -304,18 +342,66 @@ class Test_batched_torch_se3(unittest.TestCase):
         C = torch_se3.exp_SO3_b(dat)
         phi = torch_se3.log_SO3_b(C)
 
-        print("hello")
+        for i in range(0, phi.shape[0]):
+            for j in range(0, phi.shape[1]):
+                grad = tr.autograd.grad(phi[i, j], dat, retain_graph=True)[0]
+                cmp = tr.zeros_like(phi)
+                cmp[i, j] = 1
+                self.close(grad[i], cmp[i], atol=1e-6)
+                not_i = list(range(0, phi.shape[0]))
+                not_i.remove(i)
+                self.close(grad[not_i], cmp[not_i], atol=0)
 
     def test_J_left_SO3_inv(self):
-        pass
+        n = 10000
+        dat0 = tr.cat([tr.zeros(n, 3), tr.rand([n, 3]), tr.rand([n, 3]) * 1e-10], dim=0)
+        dat0 = dat0[tr.randperm(len(dat0))]
+        self.close(over_batch(torch_se3.J_left_SO3_inv, dat0), torch_se3.J_left_SO3_inv_b(dat0), atol=1e-7)
 
-    def test_cuda_and_grad(self):
-        pass
+        # of one either near or far from zero
+        dat = tr.zeros(n, 3)
+        self.close(over_batch(torch_se3.J_left_SO3_inv, dat), torch_se3.J_left_SO3_inv_b(dat), atol=0)
+        dat = tr.rand([n, 3])
+        self.close(over_batch(torch_se3.J_left_SO3_inv, dat), torch_se3.J_left_SO3_inv_b(dat), atol=1e-7)
 
-    def test_gradient(self):
-        pass
+        # one item
+        dat = tr.zeros(1, 3)
+        self.close(over_batch(torch_se3.J_left_SO3_inv, dat), torch_se3.J_left_SO3_inv_b(dat), atol=0)
+        dat = tr.rand([1, 3])
+        self.close(over_batch(torch_se3.J_left_SO3_inv, dat), torch_se3.J_left_SO3_inv_b(dat), atol=1e-7)
+
+        # grad and cuda
+        dat0.requires_grad = True
+        dat0 = dat0.cuda()
+        ret = torch_se3.J_left_SO3_inv_b(dat0)
+        self.assertTrue(ret.is_cuda)
+        self.assertTrue(ret.requires_grad)
+
+    def test_test_J_left_SO3_inv_grad(self):
+        n = 100
+        dat = tr.cat([tr.rand([n, 3]), tr.rand([n, 3]) * 1e-10], dim=0)
+        dat = dat[tr.randperm(len(dat))]
+        dat.requires_grad = True
+        dat = dat.cuda()
+
+        C = tr.eye(3,3, device=dat.device).repeat(dat.size(0), 1, 1) + \
+            tr.matmul(torch_se3.skew3_b(dat), torch_se3.J_left_SO3_inv_b(dat).inverse())
+        phi = torch_se3.log_SO3_b(C)
+
+        for i in range(0, phi.shape[0]):
+            for j in range(0, phi.shape[1]):
+                grad = tr.autograd.grad(phi[i, j], dat, retain_graph=True)[0]
+                cmp = tr.zeros_like(phi)
+                cmp[i, j] = 1
+                self.close(grad[i], cmp[i], atol=1e-6)
+                not_i = list(range(0, phi.shape[0]))
+                not_i.remove(i)
+                self.close(grad[not_i], cmp[not_i], atol=0)
 
 
 if __name__ == '__main__':
-    Test_batched_torch_se3().test_exp_SO3_and_log_SO3_grad()
-    # unittest.main()
+    # Test_batched_torch_se3().test_exp_SO3()
+    # Test_batched_torch_se3().test_log_SO3()
+    # Test_batched_torch_se3().test_J_left_SO3_inv()
+    # Test_batched_torch_se3().test_test_J_left_SO3_inv_grad()
+    unittest.main(verbosity=2)

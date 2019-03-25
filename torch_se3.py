@@ -112,28 +112,33 @@ def unskew3_b(m):
 
 
 def exp_SO3_b(phi):
+    eps = 1e-8
+    C = torch.zeros(phi.size(0), 3, 3, device=phi.device)
+
     phi_norm = torch.norm(phi, dim=1, keepdim=True)
+    sel = torch.squeeze(phi_norm > eps)
 
-    unit_phi = phi / phi_norm
-    phi_norm = torch.unsqueeze(phi_norm, -1)
-    unit_phi_skewed = skew3_b(unit_phi)
-    unit_phi_skewed2 = torch.matmul(unit_phi_skewed, unit_phi_skewed)
+    phi_norm_sel = phi_norm[sel]
+    phi_no_sel = phi[~sel]
 
-    C1 = torch.eye(3, 3, device=phi.device).repeat([phi.size(0), 1, 1]) + \
-         torch.sin(phi_norm) * unit_phi_skewed + \
-         (1 - torch.cos(phi_norm)) * unit_phi_skewed2
-    C2 = torch.eye(3, 3, device=phi.device) + unit_phi_skewed * phi_norm + 0.5 * unit_phi_skewed2 * phi_norm * phi_norm
+    if phi_norm_sel.size(0):
+        unit_phi_sel = phi[sel] / phi_norm_sel
+        unit_phi_skewed_sel = skew3_b(unit_phi_sel)
+        phi_norm_sel = torch.unsqueeze(phi_norm_sel, -1)
+        C[sel] = torch.eye(3, 3, device=phi.device).repeat([phi_norm_sel.size(0), 1, 1]) + \
+                 torch.sin(phi_norm_sel) * unit_phi_skewed_sel + \
+                 (1 - torch.cos(phi_norm_sel)) * torch.matmul(unit_phi_skewed_sel, unit_phi_skewed_sel)
 
-    mask = phi_norm > 1e-8
-
-    C = mask.float() * C1 + (1 - mask.float()) * C2
+    if phi_no_sel.size(0):
+        phi_skewed_no_sel = skew3_b(phi_no_sel)
+        C[~sel] = torch.eye(3, 3, device=phi.device).repeat([phi_no_sel.size(0), 1, 1]) + phi_skewed_no_sel
 
     return C
 
 
 # assumes small rotations
 def log_SO3_b(C):
-    eps = 1e-7
+    eps = 1e-8
 
     phi = torch.zeros(C.size(0), 3, device=C.device)
     trace = torch.sum(torch.diagonal(C, dim1=-2, dim2=-1), dim=1, keepdim=True)
@@ -152,39 +157,27 @@ def log_SO3_b(C):
     phi[sel] = phi_norm_sel * unskew3_b(C_sel - C_sel.transpose(-2, -1)) / (2 * torch.sin(phi_norm_sel))
     phi[~sel] = 0.5 * unskew3_b(C_not_sel - C_not_sel.transpose(-2, -1))
 
-    #
-    #
-    # eps = 1e-7
-    # trace = torch.sum(torch.diagonal(C, dim1=-2, dim2=-1), dim=1, keepdim=True)
-    #
-    # phi_norm = torch.acos(torch.clamp((trace - 1) / 2, -1.0 + eps, 1.0 - eps))
-    #
-    # phi = phi_norm * unskew3_b(C - C.transpose(-2, -1)) / (2 * torch.sin(phi_norm))
-    # phi2 = 0.5 * unskew3_b(C - C.transpose(-2, -1))
-    #
-    # # mask = torch.sin(phi_norm) > 1e-6
-    #
-    # # phi1[torch.isnan(phi1)] = 0
-    # # phi1[torch.isinf(phi1)] = 0
-    #
-    # # phi = mask.float() * phi1 + (1 - mask.float()) * phi2
-    #
-    # mask = (torch.sin(phi_norm) < 1e-6).repeat(1, 3)
-    #
-    # phi[mask] = phi2[mask]
-
     return phi
 
 
 def J_left_SO3_inv_b(phi):
-    phi = phi.view(3, 1)
-    phi_norm = torch.norm(phi)
-    if torch.abs(phi_norm) > 1e-6:
-        a = phi / phi_norm
-        cot_half_phi_norm = 1.0 / torch.tan(phi_norm / 2)
-        J_inv = (phi_norm / 2) * cot_half_phi_norm * torch.eye(3, 3, device=phi.device) + \
-                (1 - (phi_norm / 2) * cot_half_phi_norm) * \
-                torch.mm(a, a.transpose(0, 1)) - (phi_norm / 2) * skew3(a)
-    else:
-        J_inv = torch.eye(3, 3, device=phi.device) - 0.5 * skew3(phi)
+    eps = 1e-8
+    J_inv = torch.zeros(phi.size(0), 3, 3, device=phi.device)
+    phi_norm = torch.norm(phi, dim=1, keepdim=True)
+    sel = torch.squeeze(phi_norm > eps)
+
+    phi_norm_sel = torch.unsqueeze(phi_norm[sel], -1)
+    if phi_norm_sel.size(0):
+        unit_phi_sel = torch.unsqueeze(phi[sel], -1) / phi_norm_sel
+        cot_half_phi_norm_sel = 1.0 / torch.tan(phi_norm_sel / 2)
+        J_inv[sel] = (phi_norm_sel / 2) * cot_half_phi_norm_sel * \
+                     torch.eye(3, 3, device=phi.device).repeat(phi_norm_sel.size(0), 1, 1) + \
+                     (1 - (phi_norm_sel / 2) * cot_half_phi_norm_sel) * \
+                     torch.matmul(unit_phi_sel, unit_phi_sel.transpose(-2, -1)) - \
+                     (phi_norm_sel / 2) * skew3_b(unit_phi_sel[..., -1])
+
+    phi_no_sel = phi[~sel]
+    if phi_no_sel.size(0):
+        J_inv[~sel] = torch.eye(3, 3, device=phi.device).repeat(phi_no_sel.size(0), 1, 1) - 0.5 * skew3_b(phi_no_sel)
+
     return J_inv
