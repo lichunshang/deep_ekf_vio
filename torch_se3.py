@@ -1,4 +1,6 @@
 import torch
+import traceback
+from log import logger
 
 
 def exp_SO3(phi):
@@ -17,7 +19,6 @@ def exp_SO3(phi):
 
 
 # assumes small rotations
-
 def log_SO3(C):
     phi_norm = torch.acos(torch.clamp((torch.trace(C) - 1) / 2, -1.0, 1.0))
     if torch.sin(phi_norm) > 1e-6:
@@ -90,3 +91,100 @@ def J_left_SO3(phi):
     else:
         J = torch.eye(3, 3, device=phi.device) + 0.5 * skew3(phi)
     return J
+
+
+# ============================= Batched Methods =============================
+def skew3_b(v):
+    m = torch.zeros([v.size(0), 3, 3], device=v.device)
+    m[..., 0, 1] = -v[..., 2]
+    m[..., 0, 2] = v[..., 1]
+    m[..., 1, 0] = v[..., 2]
+
+    m[..., 1, 2] = -v[..., 0]
+    m[..., 2, 0] = -v[..., 1]
+    m[..., 2, 1] = v[..., 0]
+
+    return m
+
+
+def unskew3_b(m):
+    return torch.stack([m[..., 2, 1], m[..., 0, 2], m[..., 1, 0]], -1)
+
+
+def exp_SO3_b(phi):
+    phi_norm = torch.norm(phi, dim=1, keepdim=True)
+
+    unit_phi = phi / phi_norm
+    phi_norm = torch.unsqueeze(phi_norm, -1)
+    unit_phi_skewed = skew3_b(unit_phi)
+    unit_phi_skewed2 = torch.matmul(unit_phi_skewed, unit_phi_skewed)
+
+    C1 = torch.eye(3, 3, device=phi.device).repeat([phi.size(0), 1, 1]) + \
+         torch.sin(phi_norm) * unit_phi_skewed + \
+         (1 - torch.cos(phi_norm)) * unit_phi_skewed2
+    C2 = torch.eye(3, 3, device=phi.device) + unit_phi_skewed * phi_norm + 0.5 * unit_phi_skewed2 * phi_norm * phi_norm
+
+    mask = phi_norm > 1e-8
+
+    C = mask.float() * C1 + (1 - mask.float()) * C2
+
+    return C
+
+
+# assumes small rotations
+def log_SO3_b(C):
+    eps = 1e-7
+
+    phi = torch.zeros(C.size(0), 3, device=C.device)
+    trace = torch.sum(torch.diagonal(C, dim1=-2, dim2=-1), dim=1, keepdim=True)
+    acos_ratio = (trace - 1) / 2
+
+    if torch.sum(torch.abs(acos_ratio + 1.0) < eps) > 0:
+        logger.print(C)
+        logger.print("Error: log_SO3_b acos_ratio close to -1")
+        raise ValueError("Error: log_SO3_b acos_ratio close to -1")
+
+    sel = torch.squeeze(torch.abs(acos_ratio - 1.0) > eps)
+    phi_norm_sel = torch.acos(acos_ratio[sel])
+    C_sel = C[sel]
+    C_not_sel = C[~sel]
+
+    phi[sel] = phi_norm_sel * unskew3_b(C_sel - C_sel.transpose(-2, -1)) / (2 * torch.sin(phi_norm_sel))
+    phi[~sel] = 0.5 * unskew3_b(C_not_sel - C_not_sel.transpose(-2, -1))
+
+    #
+    #
+    # eps = 1e-7
+    # trace = torch.sum(torch.diagonal(C, dim1=-2, dim2=-1), dim=1, keepdim=True)
+    #
+    # phi_norm = torch.acos(torch.clamp((trace - 1) / 2, -1.0 + eps, 1.0 - eps))
+    #
+    # phi = phi_norm * unskew3_b(C - C.transpose(-2, -1)) / (2 * torch.sin(phi_norm))
+    # phi2 = 0.5 * unskew3_b(C - C.transpose(-2, -1))
+    #
+    # # mask = torch.sin(phi_norm) > 1e-6
+    #
+    # # phi1[torch.isnan(phi1)] = 0
+    # # phi1[torch.isinf(phi1)] = 0
+    #
+    # # phi = mask.float() * phi1 + (1 - mask.float()) * phi2
+    #
+    # mask = (torch.sin(phi_norm) < 1e-6).repeat(1, 3)
+    #
+    # phi[mask] = phi2[mask]
+
+    return phi
+
+
+def J_left_SO3_inv_b(phi):
+    phi = phi.view(3, 1)
+    phi_norm = torch.norm(phi)
+    if torch.abs(phi_norm) > 1e-6:
+        a = phi / phi_norm
+        cot_half_phi_norm = 1.0 / torch.tan(phi_norm / 2)
+        J_inv = (phi_norm / 2) * cot_half_phi_norm * torch.eye(3, 3, device=phi.device) + \
+                (1 - (phi_norm / 2) * cot_half_phi_norm) * \
+                torch.mm(a, a.transpose(0, 1)) - (phi_norm / 2) * skew3(a)
+    else:
+        J_inv = torch.eye(3, 3, device=phi.device) - 0.5 * skew3(phi)
+    return J_inv
