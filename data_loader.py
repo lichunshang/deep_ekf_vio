@@ -298,7 +298,7 @@ class SubseqDataset(Dataset):
                                                         torch.zeros(3),  # bw
                                                         torch.zeros(3))  # ba
         return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
-               images, None, imu_data, init_state, T_imu_cam, gt_poses, gt_rel_poses
+               images, imu_data, init_state, T_imu_cam, gt_poses, gt_rel_poses
 
     @staticmethod
     def decode_batch_meta_info(batch_meta_info):

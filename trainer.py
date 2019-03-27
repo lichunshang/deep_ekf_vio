@@ -79,7 +79,7 @@ class _TrainAssistant(object):
         return torch.stack(lstm_states, dim=0)
 
     def get_loss(self, data):
-        meta_data, images, imu_data_idxs, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
+        meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
 
         prev_lstm_states = None
         if par.stateful_training:
@@ -88,7 +88,6 @@ class _TrainAssistant(object):
 
         vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars = \
             self.model.forward(images.cuda(),
-                               imu_data_idxs.cuda(),
                                imu_data.cuda(),
                                prev_lstm_states,
                                gt_poses[0].cuda(),

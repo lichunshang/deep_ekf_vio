@@ -18,7 +18,7 @@ def gen_trajectory_rel_iter(model, dataloader, prop_lstm_states, initial_pose=np
         images = data[1].cuda()
 
         lstm_states = lstm_states if prop_lstm_states else None
-        predicted_rel_poses, _, lstm_states, _, _, _ = model.forward(images, None, None, lstm_states, None, None, None)
+        predicted_rel_poses, _, lstm_states, _, _, _ = model.forward(images, None, lstm_states, None, None, None)
 
         lstm_states = lstm_states.detach()
         predicted_rel_poses = predicted_rel_poses.detach().cpu().numpy()

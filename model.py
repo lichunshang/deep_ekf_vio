@@ -371,7 +371,7 @@ class E2EVIO(nn.Module):
 
         self.ekf_module = IMUKalmanFilter()
 
-    def forward(self, images, imu_data_idxs, imu_data, prev_lstm_states, prev_pose, prev_state, T_imu_cam):
+    def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, T_imu_cam):
         vis_meas, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
 
         if par.vis_meas_covar_use_fixed:
@@ -389,7 +389,7 @@ class E2EVIO(nn.Module):
 
         # vis model outputs positions first
         vis_meas_swapped = torch.cat(vis_meas[:, :, 3:6], vis_meas[:, :, 0:3])  #
-        poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data_idxs, imu_data, imu_noise_covar,
+        poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data, imu_noise_covar,
                                                                 prev_pose, prev_state, init_covar,
                                                                 vis_meas_swapped, vis_meas_covar, T_imu_cam)
 
