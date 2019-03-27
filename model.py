@@ -96,7 +96,6 @@ class IMUKalmanFilter(nn.Module):
         r_accum = torch.zeros(num_batches, 3, 1, device=imu_meas.device)
         v_accum = torch.zeros(num_batches, 3, 1, device=imu_meas.device)
         t_accum = torch.zeros(num_batches, 1, 1, device=imu_meas.device)
-        # pred_covar = prev_covar.clone()
         pred_covar = prev_covar
 
         g_k, C_k, r_k, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state_b(prev_state)
@@ -107,15 +106,15 @@ class IMUKalmanFilter(nn.Module):
             sel = ~torch.isnan(dt).view(num_batches)
 
             # only update the selected batches
-            if torch.sum(sel) > 0:
-                t_accum[sel], C_accum[sel], r_accum[sel], v_accum[sel], pred_covar[sel], _, _, _, _ = \
-                    self.predict_one_step(t_accum[sel], C_accum[sel], r_accum[sel], v_accum[sel], dt[sel], g_k[sel],
-                                          v_k[sel], bw_k[sel], ba_k[sel], pred_covar[sel],
-                                          gyro_meas[sel], accel_meas[sel], imu_noise_covar)
-            # t_accum, C_accum, r_accum, v_accum, pred_covar, _, _, _, _ = \
-            #     self.predict_one_step(t_accum, C_accum, r_accum, v_accum, dt, g_k,
-            #                           v_k, bw_k, ba_k, pred_covar,
-            #                           gyro_meas, accel_meas, imu_noise_covar)
+            # if torch.sum(sel) > 0:
+            #     t_accum[sel], C_accum[sel], r_accum[sel], v_accum[sel], pred_covar[sel], _, _, _, _ = \
+            #         self.predict_one_step(t_accum[sel], C_accum[sel], r_accum[sel], v_accum[sel], dt[sel], g_k[sel],
+            #                               v_k[sel], bw_k[sel], ba_k[sel], pred_covar[sel],
+            #                               gyro_meas[sel], accel_meas[sel], imu_noise_covar)
+            t_accum, C_accum, r_accum, v_accum, pred_covar, _, _, _, _ = \
+                self.predict_one_step(t_accum, C_accum, r_accum, v_accum, dt, g_k,
+                                      v_k, bw_k, ba_k, pred_covar,
+                                      gyro_meas, accel_meas, imu_noise_covar)
 
         pred_state = IMUKalmanFilter.encode_state_b(g_k,
                                                     torch.matmul(C_k, C_accum),
@@ -209,7 +208,7 @@ class IMUKalmanFilter(nn.Module):
 
         poses_over_timesteps = [prev_pose]
         states_over_timesteps = [prev_state]
-        covars_over_timesteps = [prev_covar.clone()]
+        covars_over_timesteps = [prev_covar]
         for k in range(0, num_timesteps):
             pred_state, pred_covar = self.predict(imu_data[:, k], imu_noise_covar,
                                                   states_over_timesteps[-1], covars_over_timesteps[-1])

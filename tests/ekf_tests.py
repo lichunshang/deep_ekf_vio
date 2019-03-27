@@ -270,8 +270,6 @@ class Test_EKF(unittest.TestCase):
         covars[0].requires_grad = req_grad
         poses[0].requires_grad = req_grad
 
-        covars[0] = covars[0].clone()  # need this to avoid leaf node error, need more investigation
-
         imu_max_length = 12
         for i in range(0, timestamps.shape[1] - 1):
             imu_data = self.concat_imu_data_at_time_k(imu_max_length, imu_timestamps[:, i],
@@ -344,10 +342,8 @@ class Test_EKF(unittest.TestCase):
                                                   1e0, 1e0, 1e0])).to("cuda")
         init_covar = np.tile(np.eye(18, 18), [len(seqs), 1, 1])
 
-        start_time = time.time()
         _, _, _, poses, states, covars = \
             self.ekf_test_case(seqs, [0, 150, ], init_covar, imu_covar, vis_meas_covar, "cuda", req_grad=True)
-        print("test_ekf_cuda_graph elapsed %.5f" % (time.time() - start_time))
 
         self.assertTrue(states.requires_grad)
         self.assertTrue(states.is_cuda)
@@ -365,7 +361,6 @@ class Test_EKF(unittest.TestCase):
         logger.initialize(output_dir, use_tensorboard=False)
 
         seqs = ["K01", "K06", "K07", "K10"]
-        # seqs = ["K01", "K04", "K06", "K07", "K08", "K09", "K10"]
 
         device = "cpu"
         req_grad = False
@@ -389,6 +384,8 @@ class Test_EKF(unittest.TestCase):
         for i in range(0, len(seqs)):
             self.plot_ekf_data(os.path.join(output_dir, seqs[i]),
                                timestamps[i], gt_poses[i], gt_vels[i], poses[i], states[i])
+
+        # seqs = ["K01", "K04", "K06", "K07", "K08", "K09", "K10"]
 
     def test_ekf_K06_with_artificial_biases_plotted(self):
         output_dir = os.path.join(par.results_coll_dir, "test_ekf_K06_with_artificial_biases_plotted")
@@ -459,10 +456,14 @@ class Test_EKF(unittest.TestCase):
         for i in range(0, n_batches):
             n_to_pad = max_length - len(imu_timestamps[i])
             assert (n_to_pad >= 0)
-            imu_timestamps[i] = np.concatenate([imu_timestamps[i], np.full(n_to_pad, float("NaN"))])
-            gyro_measurements[i] = np.concatenate([gyro_measurements[i], np.full([n_to_pad, 3], float("NaN"))]) + \
+            if len(imu_timestamps[i]) > 0:
+                time_pad = imu_timestamps[i][-1]
+            else:
+                time_pad = 0
+            imu_timestamps[i] = np.concatenate([imu_timestamps[i], np.full(n_to_pad, time_pad)])
+            gyro_measurements[i] = np.concatenate([gyro_measurements[i], np.full([n_to_pad, 3], 0)]) + \
                                    gyro_bias_inject[i:i + 1]
-            accel_measurements[i] = np.concatenate([accel_measurements[i], np.full([n_to_pad, 3], float("NaN"))]) + \
+            accel_measurements[i] = np.concatenate([accel_measurements[i], np.full([n_to_pad, 3], 0)]) + \
                                     accel_bias_inject[i:i + 1]
 
         imu_timestamps = np.array(imu_timestamps)
@@ -542,6 +543,7 @@ class Test_EKF(unittest.TestCase):
         init_state.requires_grad = req_grad
         init_pose.requires_grad = req_grad
 
+        start_time = time.time()
         poses, states, covars = ekf.forward(imu_data,
                                             imu_covar,
                                             init_pose,
@@ -550,7 +552,7 @@ class Test_EKF(unittest.TestCase):
                                             vis_meas,
                                             vis_meas_covars,
                                             torch.tensor(T_imu_cam, dtype=torch.float32).to(device))
-
+        print("ekf.forward elapsed %.5f" % (time.time() - start_time))
         return timestamps, gt_poses, gt_vels, poses, states, covars
 
 
