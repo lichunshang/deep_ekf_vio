@@ -237,7 +237,7 @@ class SubseqDataset(Dataset):
         # the rest with zeros
         imu_data_lengths = []
         for s in self.subseqs:
-            imu_data_lengths.append(sum([len(t) for t in s.imu_timestamps]))
+            imu_data_lengths += [len(t) for t in s.imu_timestamps]
         self.max_imu_data_length = max(imu_data_lengths)
 
     def __getitem__(self, index):
@@ -245,7 +245,6 @@ class SubseqDataset(Dataset):
 
         gt_rel_poses = []
         imu_data = []
-        imu_data_idxs = [0]  # this is needed to have varying imu data length
         for i in range(1, len(subseq.gt_poses)):
             # get relative poses
             T_i_vkm1 = subseq.gt_poses[i - 1]
@@ -255,15 +254,17 @@ class SubseqDataset(Dataset):
             phi_vkm1_vk = se3.log_SO3(T_vkm1_vk[0:3, 0:3])
             gt_rel_poses.append(np.concatenate([r_vk_vkm1_vkm1, phi_vkm1_vk, ]))
 
-            imu_data.append(np.concatenate([np.expand_dims(subseq.imu_timestamps[i], 1),
-                                            subseq.gyro_measurements[i], subseq.accel_measurements[i]], axis=1))
-            imu_data_idxs.append(imu_data_idxs[-1] + len(subseq.imu_timestamps[i]))
+            imu_dat_concat = np.concatenate([np.expand_dims(subseq.imu_timestamps[i], 1),
+                                             subseq.gyro_measurements[i], subseq.accel_measurements[i]], axis=1)
+            imu_dat_nan_padded = np.full([self.max_imu_data_length, 7], float("NaN"))
+            imu_dat_nan_padded[0:len(imu_dat_concat), :] = imu_dat_concat
+
+            imu_data.append(imu_dat_nan_padded)
 
         gt_rel_poses = torch.tensor(gt_rel_poses, dtype=torch.float32)
         gt_poses = torch.tensor(subseq.gt_poses, dtype=torch.float32)
         gt_velocities = torch.tensor(subseq.gt_velocities, dtype=torch.float32)
-        imu_data = torch.tensor(np.concatenate(imu_data))
-        imu_data_idxs = torch.tensor(imu_data_idxs, dtype=torch.int16)
+        imu_data = torch.tensor(imu_data, dtype=torch.float32)
 
         # process images
         images = []
@@ -296,12 +297,8 @@ class SubseqDataset(Dataset):
                                                         gt_velocities[0],  # v
                                                         torch.zeros(3),  # bw
                                                         torch.zeros(3))  # ba
-
-        imu_data_padded = torch.zeros(self.max_imu_data_length, imu_data.shape[1])
-        imu_data_padded[0:len(imu_data), :] = imu_data
-
         return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
-               images, imu_data_idxs, imu_data_padded, init_state, T_imu_cam, gt_poses, gt_rel_poses
+               images, None, imu_data, init_state, T_imu_cam, gt_poses, gt_rel_poses
 
     @staticmethod
     def decode_batch_meta_info(batch_meta_info):
@@ -320,10 +317,10 @@ class SubseqDataset(Dataset):
         return seq_len_list, seq_list, type_list, id_list, id_next_list
 
     @staticmethod
-    def decode_imu_data(imu_data):
-        t = imu_data[0]
-        gyro = imu_data[1:4].view(3, 1)
-        accel = imu_data[4:7].view(3, 1)
+    def decode_imu_data_b(imu_data):
+        t = imu_data[..., 0].view(-1, 1, 1)
+        gyro = imu_data[..., 1:4].view(-1, 3, 1)
+        accel = imu_data[..., 4:7].view(-1, 3, 1)
 
         return t, gyro, accel
 
