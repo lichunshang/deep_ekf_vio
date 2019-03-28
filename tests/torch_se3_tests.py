@@ -334,6 +334,10 @@ class Test_batched_torch_se3(unittest.TestCase):
         self.assertTrue(ret.is_cuda)
         self.assertTrue(ret.requires_grad)
 
+    def test_log_SO3_close_to_pi(self):
+        dat = over_batch(torch_se3.exp_SO3, tr.tensor([0.1, -0.2, 3.13]).view(1, 3, 1))
+        self.assertRaises(ValueError, torch_se3.log_SO3_b, dat)
+
     def test_log_SO3_double_batch_dims(self):
         n1 = 100
         n2 = 500
@@ -443,4 +447,5 @@ if __name__ == '__main__':
     # Test_batched_torch_se3().test_J_left_SO3_inv()
     # Test_batched_torch_se3().test_test_J_left_SO3_inv_grad()
     # Test_batched_torch_se3().test_skew_unskew()
+    # Test_batched_torch_se3().test_log_SO3_close_to_pi()
     unittest.main(verbosity=10)

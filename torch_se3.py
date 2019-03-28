@@ -138,13 +138,14 @@ def exp_SO3_b(phi):
 # supports more than one batch dimensions
 def log_SO3_b(C):
     eps = 1e-6
+    eps_pi = 1e-3  # strict eps_pi
 
     ret_sz = list(C.shape[:-2]) + [3, 1]
     phi = torch.zeros(*ret_sz, device=C.device)
     trace = torch.sum(torch.diagonal(C, dim1=-2, dim2=-1), dim=-1, keepdim=True)
     acos_ratio = torch.unsqueeze((trace - 1) / 2, -1)
 
-    if torch.any(acos_ratio + 1.0 < -eps):
+    if torch.any(acos_ratio + 1.0 < eps_pi):
         logger.print(C)
         logger.print("Error: log_SO3_b acos_ratio close to -1")
         raise ValueError("Error: log_SO3_b acos_ratio close to -1")
