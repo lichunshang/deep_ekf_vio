@@ -90,7 +90,7 @@ class _TrainAssistant(object):
             self.model.forward(images.cuda(),
                                imu_data.cuda(),
                                prev_lstm_states,
-                               gt_poses[0].cuda(),
+                               gt_poses[:, 0].cuda(),
                                prev_state.cuda(), T_imu_cam.cuda())
 
         if par.enable_ekf:

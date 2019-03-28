@@ -136,7 +136,7 @@ def exp_SO3_b(phi):
 
 # assumes small rotations
 def log_SO3_b(C):
-    eps = 1e-8
+    eps = 1e-6
 
     phi = torch.zeros(C.size(0), 3, 1, device=C.device)
     trace = torch.sum(torch.diagonal(C, dim1=-2, dim2=-1), dim=1, keepdim=True)

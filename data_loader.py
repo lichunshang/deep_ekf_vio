@@ -256,10 +256,11 @@ class SubseqDataset(Dataset):
 
             imu_dat_concat = np.concatenate([np.expand_dims(subseq.imu_timestamps[i], 1),
                                              subseq.gyro_measurements[i], subseq.accel_measurements[i]], axis=1)
-            imu_dat_nan_padded = np.full([self.max_imu_data_length, 7], float("NaN"))
-            imu_dat_nan_padded[0:len(imu_dat_concat), :] = imu_dat_concat
+            imu_dat_padded = np.full([self.max_imu_data_length, 7], 0.0)
+            imu_dat_padded[0:len(imu_dat_concat), :] = imu_dat_concat
+            imu_dat_padded[len(imu_dat_concat):, 0] = imu_dat_concat[-1, 0]
 
-            imu_data.append(imu_dat_nan_padded)
+            imu_data.append(imu_dat_padded)
 
         gt_rel_poses = torch.tensor(gt_rel_poses, dtype=torch.float32)
         gt_poses = torch.tensor(subseq.gt_poses, dtype=torch.float32)
