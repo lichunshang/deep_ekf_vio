@@ -109,22 +109,22 @@ if __name__ == '__main__':
     # start_t = time.time()
     # C = exp_SO3_over_batch2(torch.ones([1000000, 3]).cuda())
     # print("Took %.2f" % (time.time() - start_t))
-    n = 4
+    n = 100000
     v = torch.cat([torch.zeros(n, 3), torch.rand([n, 3]), torch.rand([n, 3]) * 1e-10, torch.rand([n, 3])], dim=0).cuda()
     # v = torch.rand([100000, 3], requires_grad=True).cuda()
 
+    # start_t = time.time()
+    # for i in range(0, 10):
+    #     C = over_batch(torch_se3.exp_SO3, v)
+    # print("Took %.5f" % (time.time() - start_t))
+
     start_t = time.time()
-    for i in range(0, 2000):
-        C = over_batch(torch_se3.exp_SO3, v)
+    for i in range(0, 1):
+        C = torch_se3.exp_SO3_b(torch.unsqueeze(v, -1))
     print("Took %.5f" % (time.time() - start_t))
 
     start_t = time.time()
-    for i in range(0, 2000):
-        C = torch_se3.exp_SO3_b(v)
-    print("Took %.5f" % (time.time() - start_t))
-
-    start_t = time.time()
-    for i in range(0, 2000):
+    for i in range(0, 1):
         C = exp_SO3_batched(v)
     print("Took %.5f" % (time.time() - start_t))
 

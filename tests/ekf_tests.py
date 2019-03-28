@@ -562,6 +562,6 @@ if __name__ == '__main__':
     # Test_EKF().test_meas_jacobian_numerically()
     # Test_EKF().test_ekf_all_plotted()
     # Test_EKF().test_ekf_predict_cuda_graph()
-    Test_EKF().test_ekf_cuda_graph()
+    # Test_EKF().test_ekf_cuda_graph()
     # Test_EKF().test_ekf_K06_with_artificial_biases_plotted()
-    # unittest.main()
+    unittest.main()

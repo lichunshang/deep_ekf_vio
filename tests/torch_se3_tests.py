@@ -4,6 +4,7 @@ import scipy.linalg as slinalg
 import se3
 import numpy as np
 import torch_se3
+import time
 
 tr.manual_seed(0)
 
@@ -266,6 +267,7 @@ class Test_torch_se3(unittest.TestCase):
 
 class Test_batched_torch_se3(unittest.TestCase):
     def close(self, t1, t2, rtol=1e-05, atol=1e-08):
+        self.assertEqual(t1.shape, t2.shape)
         self.assertTrue(tr.allclose(t1, t2, atol=atol, rtol=rtol))
 
     def test_skew_unskew(self):
@@ -323,7 +325,7 @@ class Test_batched_torch_se3(unittest.TestCase):
         dat = over_batch(torch_se3.exp_SO3, tr.rand([1, 3]))
         self.close(tr.unsqueeze(over_batch(torch_se3.log_SO3, dat), -1), torch_se3.log_SO3_b(dat), atol=0)
         dat = tr.eye(3, 3).repeat(1, 1, 1)
-        self.close(tr.zeros(n, 3, 1), torch_se3.log_SO3_b(dat), atol=0)
+        self.close(tr.zeros(1, 3, 1), torch_se3.log_SO3_b(dat), atol=0)
 
         # grad and cuda
         dat0.requires_grad = True
@@ -331,6 +333,40 @@ class Test_batched_torch_se3(unittest.TestCase):
         ret = torch_se3.log_SO3_b(dat0)
         self.assertTrue(ret.is_cuda)
         self.assertTrue(ret.requires_grad)
+
+    def test_log_SO3_double_batch_dims(self):
+        n1 = 100
+        n2 = 500
+        dat0 = []
+        for i in range(0, n2):
+            d = over_batch(se3.exp_SO3, np.concatenate([np.zeros([n1, 3]),
+                                                        np.random.rand(n1, 3),
+                                                        np.random.rand(n1, 3) * 1e-2,
+                                                        np.random.rand(n1, 3) * 1e-3,
+                                                        np.random.rand(n1, 3) * 1e-4,
+                                                        np.random.rand(n1, 3) * 1e-5,
+                                                        np.random.rand(n1, 3) * 1e-6], 0))
+            np.random.shuffle(d)
+            dat0.append(d)
+        dat0 = np.stack(dat0)
+        np.random.shuffle(dat0)
+        dat0 = tr.tensor(dat0, dtype=tr.float32)
+        print("test_log_SO3_double_batch_dims Finished computing dat0")
+
+        ret = []
+        for i in range(0, dat0.shape[0]):
+            ret.append(over_batch(torch_se3.log_SO3, dat0[i]))
+        ret = tr.unsqueeze(tr.stack(ret), -1)
+        print("test_log_SO3_double_batch_dims Finished computing ret")
+
+        start_time = time.time()
+        self.close(ret, torch_se3.log_SO3_b(dat0), atol=0)
+        print("test_log_SO3_double_batch_dims elapsed time %.5f" % (time.time() - start_time))
+
+        dat = over_batch(torch_se3.exp_SO3, tr.rand([1, 3])).view(1, 1, 3, 3)
+        self.close(torch_se3.log_SO3(dat[0, 0]).view(1, 1, 3, 1), torch_se3.log_SO3_b(dat), atol=0)
+        dat = tr.eye(3, 3).view(1, 1, 3, 3)
+        self.close(tr.zeros(1, 1, 3, 1), torch_se3.log_SO3_b(dat), atol=0)
 
     def test_exp_SO3_and_log_SO3_grad(self):
         n = 100
@@ -402,6 +438,7 @@ class Test_batched_torch_se3(unittest.TestCase):
 if __name__ == '__main__':
     # Test_batched_torch_se3().test_exp_SO3()
     # Test_batched_torch_se3().test_log_SO3()
+    # Test_batched_torch_se3().test_log_SO3_double_batch_dims()
     # Test_batched_torch_se3().test_exp_SO3_and_log_SO3_grad()
     # Test_batched_torch_se3().test_J_left_SO3_inv()
     # Test_batched_torch_se3().test_test_J_left_SO3_inv_grad()
