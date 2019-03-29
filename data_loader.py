@@ -254,11 +254,12 @@ class SubseqDataset(Dataset):
             phi_vkm1_vk = se3.log_SO3(T_vkm1_vk[0:3, 0:3])
             gt_rel_poses.append(np.concatenate([r_vk_vkm1_vkm1, phi_vkm1_vk, ]))
 
+        for i in range(0, len(subseq.gt_poses)):
             imu_dat_concat = np.concatenate([np.expand_dims(subseq.imu_timestamps[i], 1),
                                              subseq.gyro_measurements[i], subseq.accel_measurements[i]], axis=1)
             imu_dat_padded = np.full([self.max_imu_data_length, 7], 0.0)
             imu_dat_padded[0:len(imu_dat_concat), :] = imu_dat_concat
-            imu_dat_padded[len(imu_dat_concat):, 0] = imu_dat_concat[-1, 0]
+            imu_dat_padded[len(imu_dat_concat):, 0] = imu_dat_concat[-1, 0] if len(imu_dat_concat) > 0 else 0
 
             imu_data.append(imu_dat_padded)
 

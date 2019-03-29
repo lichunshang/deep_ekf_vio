@@ -3,7 +3,7 @@ import torch.nn.functional
 import numpy as np
 import os
 import time
-import torch_se3
+import se3
 from params import par
 from model import E2EVIO
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
@@ -139,28 +139,35 @@ class _TrainAssistant(object):
     def ekf_loss(self, est_poses, gt_poses):
         est_poses_inv = torch.inverse(est_poses)
         errors = torch.matmul(est_poses_inv, gt_poses)
+        # calculate the F norm squared from identity
+        I_minus_angle_errors = torch.eye(3, 3, device=errors.device) - errors[:, :, 0:3, 0:3]
+        I_minus_angle_errors_sq = torch.matmul(I_minus_angle_errors, I_minus_angle_errors.transpose(-2, -1))
+        angle_errors_F_norm_sq = torch.sum(torch.diagonal(I_minus_angle_errors_sq, dim1=-2, dim2=-1), dim=-1)
 
-        angle_errors = []
-        for i in range(0, errors.size(0)):
-            angle_errors_over_timesteps = []
-            for j in range(0, errors.size(1)):
-                angle_errors_over_timesteps.append(torch_se3.log_SO3(errors[i, j, 0:3, 0:3]))
-            angle_errors.append(torch.stack(angle_errors_over_timesteps))
-
-        angle_errors = torch.stack(angle_errors)
-        angle_errors_sq = angle_errors ** 2
-
-        trans_errors_sq = errors[:, 0:3, 3] ** 2
-        angle_loss = torch.mean(angle_errors_sq)
+        trans_errors_sq = torch.sum(errors[:, :, 0:3, 3] ** 2, dim=-1)
+        angle_loss = torch.mean(angle_errors_F_norm_sq)
         trans_loss = torch.mean(trans_errors_sq)
         loss = (100 * angle_loss + trans_loss)
 
-        last_rot_x_loss = torch.mean(angle_errors_sq[:, -1, 0])
-        last_rot_y_loss = torch.mean(angle_errors_sq[:, -1, 1])
-        last_rot_z_loss = torch.mean(angle_errors_sq[:, -1, 2])
-        last_trans_x_loss = torch.mean(trans_errors_sq[:, -1, 0])
-        last_trans_y_loss = torch.mean(trans_errors_sq[:, -1, 1])
-        last_trans_z_loss = torch.mean(trans_errors_sq[:, -1, 2])
+        assert not torch.any(torch.isnan(loss))
+
+        # add to tensorboard
+        trans_errors = errors[:, :, 0:3, 3].detach().cpu().numpy()
+        angle_errors_np = []
+        errors_np = errors.detach().cpu().numpy()
+        for i in range(0, errors.size(0)):
+            angle_errors_over_ts = []
+            for j in range(0, errors.size(1)):
+                angle_errors_over_ts.append(se3.log_SO3(errors_np[i, j, 0:3, 0:3]))
+            angle_errors_np.append(np.stack(angle_errors_over_ts))
+        angle_errors_np = np.stack(angle_errors_np)
+
+        last_rot_x_loss = np.mean(np.abs(angle_errors_np[:, -1, 0]))
+        last_rot_y_loss = np.mean(np.abs(angle_errors_np[:, -1, 1]))
+        last_rot_z_loss = np.mean(np.abs(angle_errors_np[:, -1, 2]))
+        last_trans_x_loss = np.mean(np.abs(trans_errors[:, -1, 0]))
+        last_trans_y_loss = np.mean(np.abs(trans_errors[:, -1, 1]))
+        last_trans_z_loss = np.mean(np.abs(trans_errors[:, -1, 2]))
 
         loss_name = "train_loss" if self.model.training else "val_loss"
         iterations = self.num_train_iterations if self.model.training else self.num_val_iterations

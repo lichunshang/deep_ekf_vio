@@ -1,5 +1,7 @@
 import torch
 from log import logger
+import sys
+import traceback
 
 
 def exp_SO3(phi):
@@ -136,9 +138,9 @@ def exp_SO3_b(phi):
 
 # assumes small rotations, does not handle case when phi is close to pi
 # supports more than one batch dimensions
-def log_SO3_b(C):
+def log_SO3_b(C, raise_exeption=True):
     eps = 1e-6
-    eps_pi = 1e-3  # strict eps_pi
+    eps_pi = 1e-4  # strict eps_pi
 
     ret_sz = list(C.shape[:-2]) + [3, 1]
     phi = torch.zeros(*ret_sz, device=C.device)
@@ -146,17 +148,21 @@ def log_SO3_b(C):
     acos_ratio = torch.unsqueeze((trace - 1) / 2, -1)
 
     if torch.any(acos_ratio + 1.0 < eps_pi):
-        logger.print(C)
-        logger.print("Error: log_SO3_b acos_ratio close to -1")
-        raise ValueError("Error: log_SO3_b acos_ratio close to -1")
+        sel_invalid = torch.sum(acos_ratio + 1.0 < eps_pi, (-2, -1)) > 0
+        logger.print(sel_invalid)
+        logger.print(C[sel_invalid])
+        logger.print("Warn: log_SO3_b acos_ratio close to -1")
+        if raise_exeption:
+            raise ValueError("Warn: log_SO3_b acos_ratio close to -1")
 
-    sel = torch.squeeze(acos_ratio - 1.0 < -eps)
+    sel = ((acos_ratio - 1.0 < -eps) & ~(acos_ratio + 1.0 < eps_pi)).view(ret_sz[:-2])
+    not_sel = (~(acos_ratio - 1.0 < -eps) & ~(acos_ratio + 1.0 < eps_pi)).view(ret_sz[:-2])
     phi_norm_sel = torch.acos(acos_ratio[sel])
     C_sel = C[sel]
-    C_not_sel = C[~sel]
+    C_not_sel = C[not_sel]
 
     phi[sel] = phi_norm_sel * unskew3_b(C_sel - C_sel.transpose(-2, -1)) / (2 * torch.sin(phi_norm_sel))
-    phi[~sel] = 0.5 * unskew3_b(C_not_sel - C_not_sel.transpose(-2, -1))
+    phi[not_sel] = 0.5 * unskew3_b(C_not_sel - C_not_sel.transpose(-2, -1))
 
     return phi
 

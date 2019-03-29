@@ -5,7 +5,7 @@ import fnmatch
 import re
 import numpy as np
 
-torch.set_printoptions(linewidth=1024)
+torch.set_printoptions(linewidth=1024, precision=10)
 np.set_printoptions(linewidth=1024)
 
 class AttrDict(dict):
