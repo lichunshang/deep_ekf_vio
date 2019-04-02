@@ -298,7 +298,8 @@ def train(resume_model_path, resume_optimizer_path):
         logger.print('Epoch {}\ntrain loss mean: {}, std: {}\nvalid loss mean: {}, std: {}\n'.
                      format(epoch + 1, loss_mean, np.std(t_loss_list), loss_mean_valid, np.std(v_loss_list)))
 
-        err_eval = online_evaluator.evaluate_rel()
+        # err_eval = online_evaluator.evaluate_rel()
+        err_eval = min_err_eval
         logger.tensorboard.add_scalar("eval_loss/epochs", err_eval, epoch)
 
         # Save model

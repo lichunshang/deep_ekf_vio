@@ -364,11 +364,15 @@ class E2EVIO(nn.Module):
 
         self.imu_noise_covar_diag_sqrt = nn.Parameter(torch.tensor(par.imu_noise_covar_diag_sqrt, dtype=torch.float32))
         if not par.train_imu_noise_covar:
-            self.imu_noise_covar_diag_sqrt.require_grad = False
+            self.imu_noise_covar_diag_sqrt.requires_grad = False
 
         self.init_covar_diag_sqrt = nn.Parameter(torch.tensor(par.init_covar_diag_sqrt, dtype=torch.float32))
         if not par.train_init_covar:
-            self.init_covar_diag_sqrt.require_grad = False
+            self.init_covar_diag_sqrt.requires_grad = False
+
+        if par.fix_vo_weights:
+            for param in self.vo_module.parameters():
+                param.requires_grad = False
 
         self.ekf_module = IMUKalmanFilter()
 
