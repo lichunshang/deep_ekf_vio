@@ -252,7 +252,7 @@ class SubseqDataset(Dataset):
             T_vkm1_vk = se3.reorthogonalize_SE3(np.linalg.inv(T_i_vkm1).dot(T_i_vk))
             r_vk_vkm1_vkm1 = T_vkm1_vk[0:3, 3]  # get the translation from T
             phi_vkm1_vk = se3.log_SO3(T_vkm1_vk[0:3, 0:3])
-            gt_rel_poses.append(np.concatenate([r_vk_vkm1_vkm1, phi_vkm1_vk, ]))
+            gt_rel_poses.append(np.concatenate([phi_vkm1_vk, r_vk_vkm1_vkm1, ]))
 
         for i in range(0, len(subseq.gt_poses)):
             imu_dat_concat = np.concatenate([np.expand_dims(subseq.imu_timestamps[i], 1),

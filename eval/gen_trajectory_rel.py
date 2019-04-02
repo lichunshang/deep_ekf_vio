@@ -24,7 +24,7 @@ def gen_trajectory_rel_iter(model, dataloader, prop_lstm_states, initial_pose=np
         predicted_rel_poses = predicted_rel_poses.detach().cpu().numpy()
 
         for rel_pose in predicted_rel_poses[-1]:  # select the only batch
-            T_vkm1_vk = se3.T_from_Ct(se3.exp_SO3(rel_pose[3:6]), rel_pose[0:3])
+            T_vkm1_vk = se3.T_from_Ct(se3.exp_SO3(rel_pose[0:3]), rel_pose[3:6])
             T_i_vk = predicted_abs_poses[-1].dot(T_vkm1_vk)
             se3.log_SO3(T_i_vk[0:3, 0:3])  # just here to check for warnings
             predicted_abs_poses.append(T_i_vk)

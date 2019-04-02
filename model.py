@@ -393,9 +393,8 @@ class E2EVIO(nn.Module):
                                 par.init_covar_diag_eps).repeat(vis_meas.shape[0], 1, 1)
 
         # vis model outputs positions first
-        vis_meas_swapped = torch.unsqueeze(torch.cat([vis_meas[:, :, 3:6], vis_meas[:, :, 0:3]], -1), -1)
         poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data, imu_noise_covar,
                                                                 prev_pose, prev_state, init_covar,
-                                                                vis_meas_swapped, vis_meas_covar, T_imu_cam)
+                                                                vis_meas, vis_meas_covar, T_imu_cam)
 
         return vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars
