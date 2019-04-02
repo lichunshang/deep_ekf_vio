@@ -5,3 +5,4 @@ from eval.kitt_eval import kitti_eval
 from eval.kitti_eval_pyimpl import KittiErrorCalc
 from eval.calc_error import calc_error
 from eval.plot_error import plot_errors
+from eval.plot_ekf import plot_ekf_data
