@@ -36,10 +36,10 @@ class Parameters(object):
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        # self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
-        # self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
-        self.train_seqs = ['K06']
-        self.valid_seqs = ['K07']
+        self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
+        self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
+        # self.train_seqs = ['K06']
+        # self.valid_seqs = ['K07']
 
         self.seq_len = 32
         self.sample_times = 3
@@ -64,7 +64,7 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = True
+        self.enable_ekf = False
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
         #
@@ -92,9 +92,9 @@ class Parameters(object):
         self.epochs = 200
         self.batch_size = 32
         self.pin_mem = True
-        self.cache_image = False
+        self.cache_image = True
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 0.1}
+        self.optimizer_args = {'lr': 0.001}
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({
@@ -107,7 +107,7 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
-            "enable": False,
+            "enable": True,
             "lr_flip": True,
             "reverse": True,
         })

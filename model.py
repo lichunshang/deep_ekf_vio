@@ -279,7 +279,7 @@ class DeepVO(nn.Module):
                 dropout=par.rnn_dropout_between,
                 batch_first=True)
         self.rnn_drop_out = nn.Dropout(par.rnn_dropout_out)
-        self.linear = nn.Linear(in_features=par.rnn_hidden_size, out_features=6)
+        self.linear = nn.Linear(in_features=par.rnn_hidden_size, out_features=12)
 
         # Initilization
         for m in self.modules():
