@@ -41,8 +41,10 @@ class Parameters(object):
         self.train_seqs = ['K06']
         self.valid_seqs = ['K07']
 
-        self.seq_len = 16
+        self.seq_len = 32
         self.sample_times = 3
+
+        self.exclude_resume_weights = ["imu_noise_covar_diag_sqrt", "init_covar_diag_sqrt"]
 
         # VO Model parameters
         self.fix_vo_weights = True

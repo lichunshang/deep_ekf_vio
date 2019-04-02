@@ -133,9 +133,9 @@ class IMUKalmanFilter(nn.Module):
         mm = torch.matmul
         vis_meas_rot = vis_meas[:, 0:3, :]
         vis_meas_trans = vis_meas[:, 3:6, :]
-        # residual_rot = torch_se3.log_SO3_b(mm(mm(mm(torch_se3.exp_SO3_b(vis_meas_rot), C_cal_transpose),
-        #                                          C_pred.transpose(-2, -1)), C_cal))
-        residual_rot = vis_meas_rot - torch_se3.log_SO3_b(mm(mm(C_cal_transpose, C_pred), C_cal))
+        residual_rot = torch_se3.log_SO3_b(mm(mm(mm(torch_se3.exp_SO3_b(vis_meas_rot), C_cal_transpose),
+                                                 C_pred.transpose(-2, -1)), C_cal))
+        # residual_rot = vis_meas_rot - torch_se3.log_SO3_b(mm(mm(C_cal_transpose, C_pred), C_cal))
         residual_trans = vis_meas_trans - mm(mm(C_cal_transpose, C_pred), r_cal) - \
                          mm(C_cal_transpose, r_pred - r_cal)
         residual = torch.cat([residual_rot, residual_trans], dim=1)

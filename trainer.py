@@ -4,6 +4,7 @@ import numpy as np
 import os
 import time
 import se3
+import torch_se3
 from params import par
 from model import E2EVIO
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
@@ -94,7 +95,7 @@ class _TrainAssistant(object):
                                prev_state.cuda(), T_imu_cam.cuda())
 
         if par.enable_ekf:
-            loss = self.ekf_loss(poses, gt_poses.cuda())
+            loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda())
         else:
             loss = self.vis_meas_loss(vis_meas, gt_rel_poses.cuda())
 
@@ -136,18 +137,20 @@ class _TrainAssistant(object):
 
         return loss
 
-    def ekf_loss(self, est_poses, gt_poses):
+    def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses):
         est_poses_inv = torch.inverse(est_poses)
         errors = torch.matmul(est_poses_inv, gt_poses)
         # calculate the F norm squared from identity
-        I_minus_angle_errors = torch.eye(3, 3, device=errors.device) - errors[:, :, 0:3, 0:3]
-        I_minus_angle_errors_sq = torch.matmul(I_minus_angle_errors, I_minus_angle_errors.transpose(-2, -1))
-        angle_errors_F_norm_sq = torch.sum(torch.diagonal(I_minus_angle_errors_sq, dim1=-2, dim2=-1), dim=-1)
+        # I_minus_angle_errors = torch.eye(3, 3, device=errors.device) - errors[:, :, 0:3, 0:3]
+        # I_minus_angle_errors_sq = torch.matmul(I_minus_angle_errors, I_minus_angle_errors.transpose(-2, -1))
+        # angle_errors_F_norm_sq = torch.sum(torch.diagonal(I_minus_angle_errors_sq, dim1=-2, dim2=-1), dim=-1)
+        angle_errors = torch.squeeze(torch_se3.log_SO3_b(errors[:, :, 0:3, 0:3]), -1)
+        angle_errors_sq = torch.sum(angle_errors ** 2, dim=-1)
 
         trans_errors_sq = torch.sum(errors[:, :, 0:3, 3] ** 2, dim=-1)
-        angle_loss = torch.mean(angle_errors_F_norm_sq)
+        angle_loss = torch.mean(angle_errors_sq)
         trans_loss = torch.mean(trans_errors_sq)
-        loss = (100 * angle_loss + trans_loss)
+        loss = (500 * angle_loss + trans_loss)
 
         assert not torch.any(torch.isnan(loss))
 
@@ -180,6 +183,22 @@ class _TrainAssistant(object):
         logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/x", last_trans_x_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/y", last_trans_y_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/z", last_trans_z_loss, iterations)
+
+        if self.model.training:
+            model = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
+            imu_noise_covar_diag = model.imu_noise_covar_diag_sqrt.detach().cpu() ** 2 + par.imu_noise_covar_diag_eps
+            logger.tensorboard.add_scalar("imu_noise_diag/w_x", imu_noise_covar_diag[0], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/w_y", imu_noise_covar_diag[1], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/w_z", imu_noise_covar_diag[2], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/bw_x", imu_noise_covar_diag[3], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/bw_y", imu_noise_covar_diag[4], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/bw_z", imu_noise_covar_diag[5], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/a_x", imu_noise_covar_diag[6], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/a_y", imu_noise_covar_diag[7], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/a_z", imu_noise_covar_diag[8], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/ba_x", imu_noise_covar_diag[9], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/ba_y", imu_noise_covar_diag[10], iterations)
+            logger.tensorboard.add_scalar("imu_noise_diag/ba_z", imu_noise_covar_diag[11], iterations)
 
         return loss
 
@@ -246,7 +265,12 @@ def train(resume_model_path, resume_optimizer_path):
 
     # Load trained DeepVO model and optimizer
     if resume_model_path:
-        e2e_vio_model.load_state_dict(logger.clean_state_dict_key(torch.load(resume_model_path)))
+        state_dict_update = logger.clean_state_dict_key(torch.load(resume_model_path))
+        state_dict_update = {key: state_dict_update[key] for key in state_dict_update
+                             if key not in par.exclude_resume_weights}
+        state_dict = e2e_vio_model.state_dict()
+        state_dict.update(state_dict_update)
+        e2e_vio_model.load_state_dict(state_dict)
         logger.print('Load model from: %s' % resume_model_path)
         if resume_optimizer_path:
             optimizer.load_state_dict(torch.load(resume_optimizer_path))

@@ -6,7 +6,7 @@ from log import logger
 from eval import plot_ekf_data
 import torch
 
-train_subseqs = get_subseqs(["K06"], 256, overlap=1, sample_times=par.sample_times, training=True)
+train_subseqs = get_subseqs(["K06"], 1090, overlap=1, sample_times=par.sample_times, training=True)
 train_dataset = SubseqDataset(train_subseqs, (par.img_h, par.img_w), par.img_means,
                               par.img_stds, par.minus_point_5)
 train_dl = DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=0, pin_memory=True, drop_last=False)
