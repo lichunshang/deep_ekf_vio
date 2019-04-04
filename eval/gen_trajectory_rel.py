@@ -3,6 +3,7 @@ import torch
 import os
 import time
 import se3
+import collections
 from data_loader import get_subseqs, SubseqDataset, SequenceData
 from params import par
 from model import E2EVIO
@@ -30,6 +31,54 @@ def gen_trajectory_rel_iter(model, dataloader, prop_lstm_states, initial_pose=np
             predicted_abs_poses.append(T_i_vk)
 
     return predicted_abs_poses
+
+
+def gen_trajectory_abs_iter(model, dataloaders):
+    est_poses_dict = dict.fromkeys(dataloaders.keys(), [])
+    est_states_dict = dict.fromkeys(dataloaders.keys(), [])
+    est_covars_dict = dict.fromkeys(dataloaders.keys(), [])
+    est_vis_meas_dict = dict.fromkeys(dataloaders.keys(), [])
+    vis_meas_covar_dict = dict.fromkeys(dataloaders.keys(), [])
+    lstm_states_dict = dict.fromkeys(dataloaders.keys())
+
+    max_length = max([len(dataloaders[k]) for k in dataloaders])
+    data_loader_iter = {k: iter(v) for k, v in dataloaders}
+
+    for i in range(0, max_length):
+        print('%d/%d (%.2f%%)' % (i, max_length, i * 100 / max_length), end="\r")
+
+        # use Ordered Dict guarantee deterministic order
+        data = collections.OrderedDict({k: next(data_loader_iter[k]) for k, v in dataloaders if i < len(v)})
+        data_coll = torch.utils.data.dataloader.default_collate(list(data.values()))
+        data_keys = list(data.keys())
+        _, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data_coll
+
+        # use returned states for all iterations after the first
+        if i > 0:
+            prev_state = torch.tensor([prev_state[k] for k in data_keys])
+            prev_pose = torch.tensor([prev_pose[k] for k in data_keys])
+        else:
+            prev_pose = torch.tensor([gt_poses[k, 0] for k in data_keys])
+
+        lstm_states = torch.tensor([lstm_states_dict[k] for k in data_keys])
+
+        vis_meas, vis_meas_covar, lstm_states, est_poses, est_ekf_states, est_ekf_covars = \
+            model.forward(images.cuda(),
+                          imu_data.cuda(),
+                          lstm_states,
+                          prev_pose.cuda(),
+                          prev_state.cuda(), T_imu_cam.cuda())
+
+        for k in data:
+            i = data_keys.index(k)
+            est_poses_dict[k] += list(est_poses[i].detach().cpu().numpy())
+            est_states_dict[k] += list(est_ekf_states[i].detach().cpu().numpy())
+            est_covars_dict[k] += list(est_ekf_covars[i].detach().cpu().numpy())
+            est_vis_meas_dict[k] += list(vis_meas[i].detach().cpu().numpy())
+            vis_meas_covar_dict[k] += list(vis_meas_covar[i].detach().cpu().numpy())
+            lstm_states_dict[k] = lstm_states[i].detach()
+
+    return vis_meas_covar_dict, vis_meas_covar_dict, est_poses_dict, est_states_dict, est_covars_dict
 
 
 def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
