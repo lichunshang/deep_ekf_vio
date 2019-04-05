@@ -2,6 +2,7 @@ import os
 import subprocess
 from log import logger, Logger
 from params import par
+from eval import kitti_eval_pyimpl
 import glob
 import numpy as np
 import prettytable
@@ -48,6 +49,39 @@ def print_error_table(errors, ave_errors):
                  ",".join([str(errors[k][0]) + "," + str(errors[k][1] * 180 / np.pi) for k in
                            sorted(list(errors.keys()))]) +
                  "," + str(ave_errors[0]) + "," + str(ave_errors[1] * 180 / np.pi))
+
+
+def kitti_eval_simple(working_dir, seqs):
+    logger.initialize(working_dir=working_dir, use_tensorboard=False)
+    logger.print("================ Evaluate KITTI SIMPLE ================")
+    logger.print("Working on directory:", working_dir)
+
+    pose_est_dir = os.path.join(working_dir, "est_poses")
+    pose_gt_dir = os.path.join(working_dir, "gt_poses")
+    assert sorted(os.listdir(pose_est_dir)) == sorted(os.listdir(pose_gt_dir))
+    pose_est_files = sorted(os.listdir(pose_est_dir))
+
+    if seqs is None:
+        seqs = [os.path.splitext(f)[0] for f in pose_est_files]
+
+    errs = []
+
+    for i, seq in enumerate(seqs):
+        est_poses = np.load(os.path.join(pose_est_dir, "%s.npy" % seq))
+        gt_poses = np.load(os.path.join(pose_gt_dir, "%s.npy" % seq))
+        err = kitti_eval_pyimpl.calc_kitti_seq_errors(gt_poses, est_poses)
+        errs += err
+        err = np.array(err)
+
+        if err.any():
+            logger.print("Seq %s trans & rot error:" % seq)
+            logger.print("%.6f   %.6f\n" % (np.average(err[:, 0]), np.average(err[:, 1]) * 180 / np.pi))
+        else:
+            logger.print("Error cannot be computed for seq %s\n" % seq)
+
+    errs = np.array(errs)
+    logger.print("Ave trans & rot error:")
+    logger.print("%.6f   %.6f\n" % (np.average(errs[:, 0]), np.average(errs[:, 1]) * 180 / np.pi))
 
 
 def kitti_eval(working_dir, train_sequences, val_sequences, min_num_frames=200):

@@ -2,7 +2,13 @@ import numpy as np
 from model import IMUKalmanFilter
 from se3 import log_SO3
 from utils import Plotter
+import matplotlib.pyplot as plt
 import torch
+import os
+from log import Logger, logger
+
+if "DISPLAY" not in os.environ:
+    plt.switch_backend("Agg")
 
 
 def plot_ekf_data(output_dir, timestamps, gt_poses, gt_vels, est_poses, est_states, g_const=9.80665):
@@ -51,13 +57,13 @@ def plot_ekf_data(output_dir, timestamps, gt_poses, gt_vels, est_poses, est_stat
     plotter = Plotter(output_dir)
     plotter.plot(([gt_poses[:, 0, 3], gt_poses[:, 1, 3]],
                   [est_positions[:, 0], est_positions[:, 1]],),
-                 "x [m]", "y [m]", "XY Plot", labels=["gt_poses", "imu_int_pose"], equal_axes=True)
+                 "x [m]", "y [m]", "XY Plot", labels=["gt_poses", "est_pose"], equal_axes=True)
     plotter.plot(([gt_poses[:, 0, 3], gt_poses[:, 2, 3]],
                   [est_positions[:, 0], est_positions[:, 2]],),
-                 "x [m]", "z [m]", "XZ Plot", labels=["gt_poses", "imu_int_pose"], equal_axes=True)
+                 "x [m]", "z [m]", "XZ Plot", labels=["gt_poses", "est_pose"], equal_axes=True)
     plotter.plot(([gt_poses[:, 1, 3], gt_poses[:, 2, 3]],
                   [est_positions[:, 1], est_positions[:, 2]],),
-                 "y [m]", "z [m]", "YZ Plot", labels=["gt_poses", "imu_int_pose"], equal_axes=True)
+                 "y [m]", "z [m]", "YZ Plot", labels=["gt_poses", "est_pose"], equal_axes=True)
 
     plotter.plot(([timestamps, gt_poses[:, 0, 3]], [timestamps, est_positions[:, 0]],),
                  "t [s]", "p [m]", "Pos X", labels=["gt", "est"])
@@ -94,3 +100,33 @@ def plot_ekf_data(output_dir, timestamps, gt_poses, gt_vels, est_poses, est_stat
     plotter.plot(([timestamps, est_ba[:, 0]],), "t [s]", "a [m/s^2]", "Accel Bias X")
     plotter.plot(([timestamps, est_ba[:, 1]],), "t [s]", "a [m/s^2]", "Accel Bias Y")
     plotter.plot(([timestamps, est_ba[:, 2]],), "t [s]", "a [m/s^2]", "Accel Bias Z")
+
+
+def plot_ekf_states(working_dir):
+    output_dir = os.path.join(working_dir, "figures")
+
+    timestamps_dir = os.path.join(working_dir, "timestamps")
+    poses_dir = os.path.join(working_dir, "ekf_states", "poses")
+    states_dir = os.path.join(working_dir, "ekf_states", "states")
+    gt_velocities_dir = os.path.join(working_dir, "ekf_states", "gt_velocities")
+    gt_poses_dir = os.path.join(working_dir, "gt_poses")
+
+    pose_files = sorted(os.listdir(poses_dir))
+    assert sorted(os.listdir(poses_dir)) == sorted(os.listdir(states_dir)) == sorted(os.listdir(gt_velocities_dir)) == \
+           sorted(os.listdir(timestamps_dir))
+
+    Logger.make_dir_if_not_exist(output_dir)
+    logger.initialize(working_dir=working_dir, use_tensorboard=False)
+    logger.print("================ PLOT EKF States ================")
+    logger.print("Working on directory:", working_dir)
+    logger.print("Found pose estimate files: \n" + "\n".join(pose_files))
+
+    for i, pose_est_file in enumerate(pose_files):
+        seq = os.path.splitext(pose_est_file)[0]
+        plot_ekf_data(os.path.join(working_dir, "ekf_states", "figures", seq),
+                      np.load(os.path.join(timestamps_dir, seq + ".npy")),
+                      np.load(os.path.join(gt_poses_dir, seq + ".npy")),
+                      np.load(os.path.join(gt_velocities_dir, seq + ".npy")),
+                      np.load(os.path.join(poses_dir, seq + ".npy")),
+                      np.load(os.path.join(states_dir, seq + ".npy")))
+        logger.print("Plot saved for sequence %s" % seq)

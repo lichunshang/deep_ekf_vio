@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import se3
-from data_loader import SequenceData
 from log import logger, Logger
 import os
 
@@ -12,6 +11,8 @@ if "DISPLAY" not in os.environ:
 def plot_trajectory(working_dir):
     output_dir = os.path.join(working_dir, "figures")
     pose_est_dir = os.path.join(working_dir, "est_poses")
+    pose_gt_dir = os.path.join(working_dir, "gt_poses")
+    assert sorted(os.listdir(pose_est_dir)) == sorted(os.listdir(pose_gt_dir))
     pose_est_files = sorted(os.listdir(pose_est_dir))
 
     Logger.make_dir_if_not_exist(output_dir)
@@ -24,7 +25,7 @@ def plot_trajectory(working_dir):
         sequence = os.path.splitext(pose_est_file)[0]
 
         trajectory = np.load(os.path.join(pose_est_dir, "%s.npy" % sequence))
-        trajectory_gt = SequenceData(sequence).get_poses()
+        trajectory_gt = np.load(os.path.join(pose_gt_dir, "%s.npy" % sequence))
 
         trans_xyz = np.array([se3.r_from_T(T) for T in trajectory])
         rot_xyz = np.array([se3.log_SO3(se3.C_from_T(T)) for T in trajectory])

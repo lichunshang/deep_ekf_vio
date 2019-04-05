@@ -4,14 +4,15 @@ import os
 from params import par
 import preprocess
 
-choices = ["gen_trajectory_rel", "plot_trajectory", "np_traj_to_kitti", "kitti_eval", "calc_error", "plot_error",
+choices = ["gen_trajectory", "plot_trajectory", "plot_ekf_states", "np_traj_to_kitti", "kitti_eval", "calc_error",
+           "plot_error",
            "preprocess_kitti_raw", "check_time_discontinuities", "calc_image_mean_std"]
 
 top_level_arg_parser = argparse.ArgumentParser(description='Execute scripts')
 top_level_arg_parser.add_argument('script', type=str, help='The program to run', choices=choices)
 top_level_arg_parsed, args = top_level_arg_parser.parse_known_args()
 
-if top_level_arg_parsed.script == "gen_trajectory_rel":
+if top_level_arg_parsed.script == "gen_trajectory":
     default_sequences = par.train_seqs + par.valid_seqs
     default_seq_len = 2
     arg_parser = argparse.ArgumentParser(description='Generate trajectory')
@@ -22,13 +23,19 @@ if top_level_arg_parsed.script == "gen_trajectory_rel":
                             action='store_true')
     arg_parsed = arg_parser.parse_args(args=args)
 
-    eval.gen_trajectory_rel(os.path.abspath(arg_parsed.model_file_path), arg_parsed.sequences, arg_parsed.seq_len,
-                            not arg_parsed.no_prop_lstm_states)
+    eval.gen_trajectory(os.path.abspath(arg_parsed.model_file_path), arg_parsed.sequences, arg_parsed.seq_len,
+                        not arg_parsed.no_prop_lstm_states)
 
 elif top_level_arg_parsed.script == "plot_trajectory":
     arg_parser = argparse.ArgumentParser(description='Plot trajectory')
     arg_parser.add_argument("working_dir", type=str, help="working directory of generated results")
     eval.plot_trajectory(arg_parser.parse_args(args=args).working_dir)
+
+elif top_level_arg_parsed.script == "plot_ekf_states":
+    arg_parser = argparse.ArgumentParser(description='Plot EKF States')
+    arg_parser.add_argument("working_dir", type=str, help="working directory of generated results")
+    eval.plot_ekf_states(arg_parser.parse_args(args=args).working_dir)
+
 
 elif top_level_arg_parsed.script == "plot_error":
     arg_parser = argparse.ArgumentParser(description='Plot error')
@@ -52,8 +59,16 @@ elif top_level_arg_parsed.script == "kitti_eval":
                             default=par.train_seqs)
     arg_parser.add_argument('--val_seqs', type=str, nargs="+", help="Select validation sequences",
                             default=par.valid_seqs)
+    arg_parser.add_argument('--simple', default=False, action='store_true',
+                            help="Compute with kitti python implementation, only computes error, looks at --seqs only")
+    arg_parser.add_argument('--seqs', type=str, nargs="*", help="select sequences, only with --simple")
     arg_parsed = arg_parser.parse_args(args=args)
-    eval.kitti_eval(arg_parsed.working_dir, arg_parsed.train_seqs, arg_parsed.val_seqs)
+
+    if arg_parsed.simple:
+        eval.kitti_eval_simple(arg_parsed.working_dir, arg_parsed.seqs)
+    else:
+        eval.kitti_eval(arg_parsed.working_dir, arg_parsed.train_seqs, arg_parsed.val_seqs)
+
 
 elif top_level_arg_parsed.script == "preprocess_kitti_raw":
     arg_parser = argparse.ArgumentParser(description='Preprocess RAW Kitti Data')

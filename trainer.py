@@ -11,7 +11,7 @@ from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_pand
 from log import logger
 from torch.utils.data import DataLoader
 from eval.kitti_eval_pyimpl import KittiErrorCalc
-from eval.gen_trajectory_rel import gen_trajectory_rel_iter, gen_trajectory_abs_iter
+from eval.gen_trajectory import gen_trajectory_rel_iter, gen_trajectory_abs_iter
 
 
 class _OnlineDatasetEvaluator(object):

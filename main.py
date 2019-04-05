@@ -4,7 +4,7 @@ import trainer
 import time
 from params import par
 from log import logger
-from eval import gen_trajectory_rel, plot_trajectory, kitti_eval, np_traj_to_kitti, calc_error, plot_errors
+from eval import gen_trajectory, plot_trajectory, kitti_eval, np_traj_to_kitti, calc_error, plot_errors
 
 logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
 
@@ -27,8 +27,8 @@ trainer.train(resume_model_path, resume_optimizer_path)
 logger.print("Training took %.2fs" % (time.time() - start_t))
 
 for tag in ["valid", "train", "checkpoint", "eval"]:
-    seq_results_dir = gen_trajectory_rel(os.path.join(par.results_dir, "saved_model.%s" % tag),
-                                         par.valid_seqs + par.train_seqs, 2, True)
+    seq_results_dir = gen_trajectory(os.path.join(par.results_dir, "saved_model.%s" % tag),
+                                     par.valid_seqs + par.train_seqs, 2, True)
     plot_trajectory(seq_results_dir)
     calc_error(seq_results_dir)
     plot_errors(seq_results_dir)

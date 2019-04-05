@@ -86,7 +86,7 @@ def gen_trajectory_abs_iter(model, dataloaders):
     return est_vis_meas_dict, vis_meas_covar_dict, est_poses_dict, est_states_dict, est_covars_dict
 
 
-def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
+def gen_trajectory(model_file_path, sequences, seq_len, prop_lstm_states):
     # Path
     model_file_path = os.path.abspath(model_file_path)
     assert (os.path.exists(model_file_path))
@@ -115,15 +115,43 @@ def gen_trajectory_rel(model_file_path, sequences, seq_len, prop_lstm_states):
         dataset = SubseqDataset(subseqs, (par.img_h, par.img_w), par.img_means, par.img_stds, par.minus_point_5,
                                 training=False)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
-        gt_abs_poses = SequenceData(seq).get_poses()
+        seq_data = SequenceData(seq)
+        gt_abs_poses = seq_data.get_poses()
+        timestamps = seq_data.get_timestamps()
 
-        predicted_abs_poses = gen_trajectory_rel_iter(model, dataloader, prop_lstm_states,
-                                                      initial_pose=gt_abs_poses[0, :, :])
+        if par.enable_ekf:
+            logger.print("With EKF enabled ...")
+            est_vis_meas_dict, vis_meas_covar_dict, est_poses_dict, est_states_dict, est_covars_dict = \
+                gen_trajectory_abs_iter(model, {seq: dataloader})
+            est_vis_meas = est_vis_meas_dict[seq]
+            vis_meas_covar = vis_meas_covar_dict[seq]
+            est_states = est_states_dict[seq]
+            est_covars = est_covars_dict[seq]
+            est_poses = est_poses_dict[seq]
+            np.save(logger.ensure_file_dir_exists(
+                    os.path.join(working_dir, "ekf_states", "vis_meas", seq + ".npy")), est_vis_meas)
+            np.save(logger.ensure_file_dir_exists(
+                    os.path.join(working_dir, "ekf_states", "vis_meas_covar", seq + ".npy")), vis_meas_covar)
+            np.save(logger.ensure_file_dir_exists(
+                    os.path.join(working_dir, "ekf_states", "poses", seq + ".npy")), est_poses)
+            np.save(logger.ensure_file_dir_exists(
+                    os.path.join(working_dir, "ekf_states", "states", seq + ".npy")), est_states)
+            np.save(logger.ensure_file_dir_exists(
+                    os.path.join(working_dir, "ekf_states", "covars", seq + ".npy")), est_covars)
+            np.save(logger.ensure_file_dir_exists(
+                    os.path.join(working_dir, "ekf_states", "gt_velocities", seq + ".npy")), seq_data.get_velocities())
 
-        np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "est_poses", seq + ".npy")),
-                predicted_abs_poses)
+            est_poses = np.linalg.inv(np.array(est_poses_dict[seq]).astype(np.float64))
+        else:
+            logger.print("Without EKF enabled ...")
+            est_poses = gen_trajectory_rel_iter(model, dataloader, prop_lstm_states,
+                                                initial_pose=gt_abs_poses[0, :, :])
+
+        np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "est_poses", seq + ".npy")), est_poses)
         np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "gt_poses", seq + ".npy")),
-                gt_abs_poses[:len(predicted_abs_poses)])  # ensure same length as est poses
+                gt_abs_poses[:len(est_poses)])  # ensure same length as est poses
+        np.save(logger.ensure_file_dir_exists(os.path.join(working_dir, "timestamps", seq + ".npy")),
+                timestamps[:len(est_poses)])
         logger.print("Done, took %.2f seconds" % (time.time() - start_time))
 
     return working_dir

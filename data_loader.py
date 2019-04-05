@@ -66,6 +66,12 @@ class SequenceData(object):
     def get_poses(self):
         return np.array(list(self.df.loc[:, "T_i_vk"].values))
 
+    def get_velocities(self):
+        return np.array(list(self.df.loc[:, "v_vk_i_vk"]))
+
+    def get_timestamps(self):
+        return np.array(list(self.df.loc[:, "timestamp"]))
+
     def get_images_paths(self):
         return list(self.df.loc[:, "image_path"].values)
 
