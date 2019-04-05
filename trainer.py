@@ -11,7 +11,7 @@ from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_pand
 from log import logger
 from torch.utils.data import DataLoader
 from eval.kitti_eval_pyimpl import KittiErrorCalc
-from eval.gen_trajectory_rel import gen_trajectory_rel_iter
+from eval.gen_trajectory_rel import gen_trajectory_rel_iter, gen_trajectory_abs_iter
 
 
 class _OnlineDatasetEvaluator(object):
@@ -27,6 +27,12 @@ class _OnlineDatasetEvaluator(object):
             dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4)
             self.dataloaders[seq] = dataloader
 
+    def evaluate(self):
+        if par.enable_ekf:
+            return self.evaluate_abs()
+        else:
+            return self.evaluate_rel()
+
     def evaluate_rel(self):
         start_time = time.time()
         seqs = sorted(list(self.dataloaders.keys()))
@@ -36,6 +42,17 @@ class _OnlineDatasetEvaluator(object):
         ave_err = self.error_calc.get_average_error()
         self.error_calc.clear()
         logger.print("Online evaluation took %.2fs, err %.6f" % (time.time() - start_time, ave_err))
+
+        return ave_err
+
+    def evaluate_abs(self):
+        start_time = time.time()
+        _, _, est_poses_dict, _, _ = gen_trajectory_abs_iter(self.model, self.dataloaders)
+        for k, v in est_poses_dict.items():
+            self.error_calc.accumulate_error(k, np.linalg.inv(np.array(v, dtype=np.float64)))
+        ave_err = self.error_calc.get_average_error()
+        self.error_calc.clear()
+        logger.print("Online evaluation abs took %.2fs, err %.6f" % (time.time() - start_time, ave_err))
 
         return ave_err
 
@@ -92,7 +109,8 @@ class _TrainAssistant(object):
                                imu_data.cuda(),
                                prev_lstm_states,
                                gt_poses[:, 0].cuda(),
-                               prev_state.cuda(), T_imu_cam.cuda())
+                               prev_state.cuda(), None,
+                               T_imu_cam.cuda())
 
         if par.enable_ekf:
             loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda())
@@ -322,8 +340,7 @@ def train(resume_model_path, resume_optimizer_path):
         logger.print('Epoch {}\ntrain loss mean: {}, std: {}\nvalid loss mean: {}, std: {}\n'.
                      format(epoch + 1, loss_mean, np.std(t_loss_list), loss_mean_valid, np.std(v_loss_list)))
 
-        # err_eval = online_evaluator.evaluate_rel()
-        err_eval = min_err_eval
+        err_eval = online_evaluator.evaluate()
         logger.tensorboard.add_scalar("eval_loss/epochs", err_eval, epoch)
 
         # Save model

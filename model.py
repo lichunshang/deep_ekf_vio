@@ -376,7 +376,7 @@ class E2EVIO(nn.Module):
 
         self.ekf_module = IMUKalmanFilter()
 
-    def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, T_imu_cam):
+    def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam):
         vis_meas, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
 
         if par.vis_meas_covar_use_fixed:
@@ -389,12 +389,17 @@ class E2EVIO(nn.Module):
 
         imu_noise_covar = torch.diag(self.imu_noise_covar_diag_sqrt * self.imu_noise_covar_diag_sqrt +
                                      par.imu_noise_covar_diag_eps)
-        init_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
-                                par.init_covar_diag_eps).repeat(vis_meas.shape[0], 1, 1)
+
+        if prev_covar is None:
+            init_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
+                                    par.init_covar_diag_eps).repeat(vis_meas.shape[0], 1, 1)
+        else:
+            init_covar = prev_covar
 
         # vis model outputs positions first
         poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data, imu_noise_covar,
                                                                 prev_pose, prev_state, init_covar,
-                                                                vis_meas, vis_meas_covar, T_imu_cam)
+                                                                torch.unsqueeze(vis_meas, -1),
+                                                                vis_meas_covar, T_imu_cam)
 
         return vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars
