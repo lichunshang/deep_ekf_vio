@@ -65,7 +65,7 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = False
+        self.enable_ekf = True
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
         #
@@ -77,12 +77,12 @@ class Parameters(object):
         self.train_init_covar = False
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag_sqrt = np.array([1e-2, 1e-2, 1e-2,
-                                                   1e-4, 1e-4, 1e-4,
-                                                   1e-1, 1e-1, 1e-1,
-                                                   1e-3, 1e-3, 1e-3])
+        self.imu_noise_covar_diag_sqrt = np.array([1e0, 1e0, 1e0,
+                                                   1e0, 1e0, 1e0,
+                                                   1e0, 1e0, 1e0,
+                                                   1e0, 1e0, 1e0])
         self.train_imu_noise_covar = True
-        self.imu_noise_covar_diag_eps = 1e-12
+        self.imu_noise_covar_diag_eps = 1e-6
         #
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
@@ -93,9 +93,9 @@ class Parameters(object):
         self.epochs = 200
         self.batch_size = 32
         self.pin_mem = True
-        self.cache_image = True
+        self.cache_image = False
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 0.001}
+        self.optimizer_args = {'lr': 0.01}
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({
@@ -108,7 +108,7 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
-            "enable": True,
+            "enable": False,
             "lr_flip": True,
             "reverse": True,
         })
