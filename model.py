@@ -227,12 +227,13 @@ class IMUKalmanFilter(nn.Module):
 
     @staticmethod
     def decode_state_b(state_vector):
-        g = state_vector[..., 0:3].view(-1, 3, 1)
-        C = state_vector[..., 3:12].view(-1, 3, 3)
-        r = state_vector[..., 12:15].view(-1, 3, 1)
-        v = state_vector[..., 15:18].view(-1, 3, 1)
-        bw = state_vector[..., 18:21].view(-1, 3, 1)
-        ba = state_vector[..., 21:24].view(-1, 3, 1)
+        sz = list(state_vector.shape[:-1])
+        g = state_vector[..., 0:3].view(sz + [3, 1])
+        C = state_vector[..., 3:12].view(sz + [3, 3])
+        r = state_vector[..., 12:15].view(sz + [3, 1])
+        v = state_vector[..., 15:18].view(sz + [3, 1])
+        bw = state_vector[..., 18:21].view(sz + [3, 1])
+        ba = state_vector[..., 21:24].view(sz + [3, 1])
 
         return g, C, r, v, bw, ba
 
@@ -241,7 +242,7 @@ class IMUKalmanFilter(nn.Module):
         return torch.cat((g.view(-1, 3),
                           C.view(-1, 9), r.view(-1, 3),
                           v.view(-1, 3),
-                          bw.view(-1, 3), ba.view(-1, 3),), 1)
+                          bw.view(-1, 3), ba.view(-1, 3),), -1)
 
     @staticmethod
     def encode_state(g, C, r, v, bw, ba):

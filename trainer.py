@@ -6,7 +6,7 @@ import time
 import se3
 import torch_se3
 from params import par
-from model import E2EVIO
+from model import E2EVIO, IMUKalmanFilter
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
 from log import logger
 from torch.utils.data import DataLoader
@@ -156,29 +156,38 @@ class _TrainAssistant(object):
         return loss
 
     def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses):
-        est_poses_inv = torch.inverse(est_poses)
-        errors = torch.matmul(est_poses_inv, gt_poses)
+        abs_errors = torch.matmul(torch.inverse(est_poses), gt_poses)
         # calculate the F norm squared from identity
         # I_minus_angle_errors = torch.eye(3, 3, device=errors.device) - errors[:, :, 0:3, 0:3]
         # I_minus_angle_errors_sq = torch.matmul(I_minus_angle_errors, I_minus_angle_errors.transpose(-2, -1))
         # angle_errors_F_norm_sq = torch.sum(torch.diagonal(I_minus_angle_errors_sq, dim1=-2, dim2=-1), dim=-1)
-        angle_errors = torch.squeeze(torch_se3.log_SO3_b(errors[:, :, 0:3, 0:3]), -1)
-        angle_errors_sq = torch.sum(angle_errors ** 2, dim=-1)
+        abs_angle_errors = torch.squeeze(torch_se3.log_SO3_b(abs_errors[:, :, 0:3, 0:3]), -1)
+        abs_angle_errors_sq = torch.sum(abs_angle_errors ** 2, dim=-1)
+        abs_trans_errors_sq = torch.sum(abs_errors[:, :, 0:3, 3] ** 2, dim=-1)
+        abs_angle_loss = torch.mean(abs_angle_errors_sq)
+        abs_trans_loss = torch.mean(abs_trans_errors_sq)
 
-        trans_errors_sq = torch.sum(errors[:, :, 0:3, 3] ** 2, dim=-1)
-        angle_loss = torch.mean(angle_errors_sq)
-        trans_loss = torch.mean(trans_errors_sq)
-        loss = (500 * angle_loss + trans_loss)
+        _, C_rel, r_rel, _, _, _ = IMUKalmanFilter.decode_state(ekf_states)
+        rel_angle_errors = torch.squeeze(torch_se3.log_SO3_b(
+                torch.matmul(C_rel.transpose(-2, -1), gt_rel_poses[:, :, 0:3, 0:3])), -1)
+        rel_angle_errors_sq = torch.sum(rel_angle_errors ** 2, dim=-1)
+        rel_trans_error_sq = torch.sum((gt_rel_poses[:, :, 0:3, 3] - r_rel) ** 2, dim=-1)
+        rel_angle_loss = torch.mean(rel_angle_errors_sq)
+        rel_trans_loss = torch.mean(rel_trans_error_sq)
+
+        loss_abs = (par.k2 * abs_angle_loss + abs_trans_loss)
+        loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
+        loss = par.k3 * loss_rel + (1 - par.k3) * loss_abs
 
         assert not torch.any(torch.isnan(loss))
 
         # add to tensorboard
-        trans_errors = errors[:, :, 0:3, 3].detach().cpu().numpy()
+        trans_errors = abs_errors[:, :, 0:3, 3].detach().cpu().numpy()
         angle_errors_np = []
-        errors_np = errors.detach().cpu().numpy()
-        for i in range(0, errors.size(0)):
+        errors_np = abs_errors.detach().cpu().numpy()
+        for i in range(0, abs_errors.size(0)):
             angle_errors_over_ts = []
-            for j in range(0, errors.size(1)):
+            for j in range(0, abs_errors.size(1)):
                 angle_errors_over_ts.append(se3.log_SO3(errors_np[i, j, 0:3, 0:3]))
             angle_errors_np.append(np.stack(angle_errors_over_ts))
         angle_errors_np = np.stack(angle_errors_np)
@@ -192,12 +201,12 @@ class _TrainAssistant(object):
 
         loss_name = "train_loss" if self.model.training else "val_loss"
         iterations = self.num_train_iterations if self.model.training else self.num_val_iterations
-        logger.tensorboard.add_scalar(loss_name + "/abs_total_loss", loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/abs_rot_loss", angle_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/abs_total_loss", loss_abs, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/abs_rot_loss", abs_angle_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/x", last_rot_x_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/y", last_rot_y_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/z", last_rot_z_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/abs_trans_loss", trans_loss, iterations)
+        logger.tensorboard.add_scalar(loss_name + "/abs_trans_loss", abs_trans_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/x", last_trans_x_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/y", last_trans_y_loss, iterations)
         logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/z", last_trans_z_loss, iterations)
