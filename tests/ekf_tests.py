@@ -497,5 +497,5 @@ if __name__ == '__main__':
     # Test_EKF().test_ekf_predict_cuda_graph()
     # Test_EKF().test_ekf_cuda_graph()
     # Test_EKF().test_ekf_K06_with_artificial_biases_plotted()
-    Test_EKF().imu_predict_kitti()
-    # unittest.main()
+    # Test_EKF().imu_predict_kitti()
+    unittest.main(verbosity=10)

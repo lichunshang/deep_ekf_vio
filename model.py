@@ -96,14 +96,18 @@ class IMUKalmanFilter(nn.Module):
         r_accum = torch.zeros(num_batches, 3, 1, device=imu_meas.device)
         v_accum = torch.zeros(num_batches, 3, 1, device=imu_meas.device)
         t_accum = torch.zeros(num_batches, 1, 1, device=imu_meas.device)
-        pred_covar = prev_covar
 
-        g_k, C_k, r_k, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state_b(prev_state)
+        # set C, r covariances to zero
+        U = torch.diag(torch.tensor([1.] * 3 + [0.] * 6 + [1.] * 9, device=imu_meas.device)).repeat(num_batches, 1, 1)
+        pred_covar = torch.matmul(torch.matmul(U, prev_covar), U.transpose(-2, -1))
+
+        # Note C and r always gonna be identity and at each time k
+        g_k, _, _, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state_b(prev_state)
         for tau in range(0, imu_meas.size(1) - 1):
             t, gyro_meas, accel_meas = data_loader.SubseqDataset.decode_imu_data_b(imu_meas[:, tau, :])
             tp1, _, _ = data_loader.SubseqDataset.decode_imu_data_b(imu_meas[:, tau + 1, :])
             dt = tp1 - t
-            sel = ~torch.isnan(dt).view(num_batches)
+            # sel = ~torch.isnan(dt).view(num_batches)
 
             # only update the selected batches
             # if torch.sum(sel) > 0:
@@ -117,8 +121,8 @@ class IMUKalmanFilter(nn.Module):
                                       gyro_meas, accel_meas, imu_noise_covar)
 
         pred_state = IMUKalmanFilter.encode_state_b(g_k,
-                                                    torch.matmul(C_k, C_accum),
-                                                    r_k + v_k * t_accum - 0.5 * g_k * t_accum * t_accum + r_accum,
+                                                    C_accum,
+                                                    v_k * t_accum - 0.5 * g_k * t_accum * t_accum + r_accum,
                                                     torch.matmul(C_accum.transpose(-2, -1),
                                                                  v_k - g_k * t_accum + v_accum),
                                                     bw_k, ba_k)
@@ -188,14 +192,10 @@ class IMUKalmanFilter(nn.Module):
         new_pose[:, 0:3, 3:4] = torch.matmul(C_transpose, prev_pose[:, 0:3, 3:4] - r)
         new_g = torch.matmul(C_transpose, g)
 
-        new_state = IMUKalmanFilter.encode_state_b(new_g,
-                                                   torch.eye(3, 3, device=prev_pose.device).repeat(batch_size, 1, 1),
-                                                   torch.zeros(batch_size, 3, 1, device=prev_pose.device),
-                                                   v, bw, ba)
-        U = torch.zeros(batch_size, 18, 18, device=prev_pose.device)
+        new_state = IMUKalmanFilter.encode_state_b(new_g, C, r, v, bw, ba)
+        U = torch.eye(18, 18, device=prev_pose.device).repeat(batch_size, 1, 1)
         U[:, 0:3, 0:3] = C_transpose
         U[:, 0:3, 3:6] = torch_se3.skew3_b(new_g)
-        U[:, 9:18, 9:18] = torch.eye(9, 9, device=prev_pose.device)
         new_covar = torch.matmul(torch.matmul(U, est_covar), U.transpose(-2, -1))
         new_covar = self.force_symmetrical(new_covar)
 
