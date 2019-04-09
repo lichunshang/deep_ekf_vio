@@ -167,11 +167,10 @@ class _TrainAssistant(object):
         abs_angle_loss = torch.mean(abs_angle_errors_sq)
         abs_trans_loss = torch.mean(abs_trans_errors_sq)
 
-        _, C_rel, r_rel, _, _, _ = IMUKalmanFilter.decode_state(ekf_states)
-        rel_angle_errors = torch.squeeze(torch_se3.log_SO3_b(
-                torch.matmul(C_rel.transpose(-2, -1), gt_rel_poses[:, :, 0:3, 0:3])), -1)
+        _, C_rel, r_rel, _, _, _ = IMUKalmanFilter.decode_state_b(ekf_states)
+        rel_angle_errors = (gt_rel_poses[:, :, 0:3] - torch.squeeze(torch_se3.log_SO3_b(C_rel[:, 1:]), -1)) ** 2
         rel_angle_errors_sq = torch.sum(rel_angle_errors ** 2, dim=-1)
-        rel_trans_error_sq = torch.sum((gt_rel_poses[:, :, 0:3, 3] - r_rel) ** 2, dim=-1)
+        rel_trans_error_sq = torch.sum((gt_rel_poses[:, :, 3:6] - torch.squeeze(r_rel[:, 1:], -1)) ** 2, dim=-1)
         rel_angle_loss = torch.mean(rel_angle_errors_sq)
         rel_trans_loss = torch.mean(rel_trans_error_sq)
 

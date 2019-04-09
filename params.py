@@ -97,9 +97,9 @@ class Parameters(object):
         self.epochs = 200
         self.batch_size = 32
         self.pin_mem = True
-        self.cache_image = False
+        self.cache_image = True
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 0.01}
+        self.optimizer_args = {'lr': 0.1}
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({
