@@ -30,6 +30,15 @@ def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
 class IMUKalmanFilter(nn.Module):
     def __init__(self):
         super(IMUKalmanFilter, self).__init__()
+        self.imu_noise_rnn = nn.LSTM(
+                input_size=7,
+                hidden_size=64,
+                num_layers=1,
+                dropout=0,
+                batch_first=True)
+        self.rnn_drop_out = nn.Dropout(0.25)
+        self.linear = nn.Linear(in_features=64, out_features=12)
+        self.lstm_states = None
 
     def force_symmetrical(self, M):
         M_upper = torch.triu(M)
@@ -77,7 +86,9 @@ class IMUKalmanFilter(nn.Module):
         Phi[:, 3:6, 3:6] = exp_int_w_transpose
         Phi[:, 9:12, 9:12] = exp_int_w_transpose
 
-        Q = mm(mm(mm(mm(Phi, G), imu_noise_covar.repeat(batch_size, 1, 1)),
+        # Q = mm(mm(mm(mm(Phi, G), imu_noise_covar.repeat(batch_size, 1, 1)),
+        #           G.transpose(-2, -1)), Phi.transpose(-2, -1)) * dt
+        Q = mm(mm(mm(mm(Phi, G), imu_noise_covar),
                   G.transpose(-2, -1)), Phi.transpose(-2, -1)) * dt
         covar = mm(mm(Phi, covar), Phi.transpose(-2, -1)) + Q
         covar = self.force_symmetrical(covar)
@@ -103,6 +114,9 @@ class IMUKalmanFilter(nn.Module):
 
         # Note C and r always gonna be identity and at each time k
         g_k, _, _, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state_b(prev_state)
+        rnn_out, self.lstm_states = self.imu_noise_rnn(imu_meas[:, 1:], self.lstm_states)
+        imu_noise_covar_diag_sqrt = self.linear(self.rnn_drop_out(rnn_out))
+        imu_noise_covar_rnn = torch.diag_embed(imu_noise_covar_diag_sqrt ** 2 + par.imu_noise_covar_diag_eps)
         for tau in range(0, imu_meas.size(1) - 1):
             t, gyro_meas, accel_meas = data_loader.SubseqDataset.decode_imu_data_b(imu_meas[:, tau, :])
             tp1, _, _ = data_loader.SubseqDataset.decode_imu_data_b(imu_meas[:, tau + 1, :])
@@ -118,7 +132,7 @@ class IMUKalmanFilter(nn.Module):
             t_accum, C_accum, r_accum, v_accum, pred_covar, _, _, _, _ = \
                 self.predict_one_step(t_accum, C_accum, r_accum, v_accum, dt, g_k,
                                       v_k, bw_k, ba_k, pred_covar,
-                                      gyro_meas, accel_meas, imu_noise_covar)
+                                      gyro_meas, accel_meas, imu_noise_covar_rnn[:, tau])
 
         pred_state = IMUKalmanFilter.encode_state_b(g_k,
                                                     C_accum,
@@ -204,6 +218,8 @@ class IMUKalmanFilter(nn.Module):
     def forward(self, imu_data, imu_noise_covar,
                 prev_pose, prev_state, prev_covar,
                 vis_meas, vis_meas_covar, T_imu_cam):
+
+        self.lstm_states = None
 
         num_timesteps = vis_meas.size(1)  # equals to imu_data.size(1) - 1
 
