@@ -39,6 +39,7 @@ class IMUKalmanFilter(nn.Module):
         self.rnn_drop_out = nn.Dropout(0.25)
         self.linear = nn.Linear(in_features=64, out_features=12)
         self.lstm_states = None
+        self.imu_covars = []
 
     def force_symmetrical(self, M):
         M_upper = torch.triu(M)
@@ -116,7 +117,9 @@ class IMUKalmanFilter(nn.Module):
         g_k, _, _, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state_b(prev_state)
         rnn_out, self.lstm_states = self.imu_noise_rnn(imu_meas[:, 1:], self.lstm_states)
         imu_noise_covar_diag_sqrt = self.linear(self.rnn_drop_out(rnn_out))
-        imu_noise_covar_rnn = torch.diag_embed(imu_noise_covar_diag_sqrt ** 2 + par.imu_noise_covar_diag_eps)
+        imu_noise_covar_rnn_diag = imu_noise_covar_diag_sqrt ** 2 + par.imu_noise_covar_diag_eps
+        self.imu_covars += list(imu_noise_covar_rnn_diag.view(-1, 12).detach().cpu())
+        imu_noise_covar_rnn = torch.diag_embed(imu_noise_covar_rnn_diag)
         for tau in range(0, imu_meas.size(1) - 1):
             t, gyro_meas, accel_meas = data_loader.SubseqDataset.decode_imu_data_b(imu_meas[:, tau, :])
             tp1, _, _ = data_loader.SubseqDataset.decode_imu_data_b(imu_meas[:, tau + 1, :])
@@ -220,6 +223,7 @@ class IMUKalmanFilter(nn.Module):
                 vis_meas, vis_meas_covar, T_imu_cam):
 
         self.lstm_states = None
+        self.imu_covars = []
 
         num_timesteps = vis_meas.size(1)  # equals to imu_data.size(1) - 1
 

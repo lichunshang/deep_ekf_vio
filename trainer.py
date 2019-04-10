@@ -212,7 +212,8 @@ class _TrainAssistant(object):
 
         if self.model.training:
             model = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
-            imu_noise_covar_diag = model.imu_noise_covar_diag_sqrt.detach().cpu() ** 2 + par.imu_noise_covar_diag_eps
+            # imu_noise_covar_diag = model.imu_noise_covar_diag_sqrt.detach().cpu() ** 2 + par.imu_noise_covar_diag_eps
+            imu_noise_covar_diag = torch.mean(torch.stack(model.ekf_module.imu_covars), -1)
             logger.tensorboard.add_scalar("imu_noise_diag/w_x", imu_noise_covar_diag[0], iterations)
             logger.tensorboard.add_scalar("imu_noise_diag/w_y", imu_noise_covar_diag[1], iterations)
             logger.tensorboard.add_scalar("imu_noise_diag/w_z", imu_noise_covar_diag[2], iterations)
