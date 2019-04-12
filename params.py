@@ -39,7 +39,7 @@ class Parameters(object):
 
         self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
         self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
-        # self.train_seqs = ['K06']
+        # self.train_seqs = ['K08']
         # self.valid_seqs = ['K07']
 
         self.seq_len = 32
@@ -49,10 +49,10 @@ class Parameters(object):
 
         self.k1 = 100.  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
-        self.k3 = 0.0  # (1-k3)*abs + k3*rel weighting
+        self.k3 = 0.5  # (1-k3)*abs + k3*rel weighting
 
         # VO Model parameters
-        self.fix_vo_weights = True
+        self.fix_vo_weights = False
         self.img_w = 320
         self.img_h = 96
         self.img_means = (-0.138843, -0.119405, -0.123209)
@@ -81,25 +81,25 @@ class Parameters(object):
         self.train_init_covar = False
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag_sqrt = np.array([1e0, 1e0, 1e0,
-                                                   1e0, 1e0, 1e0,
-                                                   1e0, 1e0, 1e0,
-                                                   1e0, 1e0, 1e0])
-        self.train_imu_noise_covar = True
-        self.imu_noise_covar_diag_eps = 1e-6
+        self.imu_noise_covar_diag_sqrt = np.sqrt(np.array([1e-7, 1e-7, 1e-7,
+                                                           1e-7, 1e-7, 1e-7,
+                                                           1e-2, 1e-2, 1e-2,
+                                                           1e-3, 1e-3, 1e-3]))
+        self.train_imu_noise_covar = False
+        self.imu_noise_covar_diag_eps = 1e-12
         #
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
-        self.vis_meas_covar_use_fixed = True
+        self.vis_meas_covar_use_fixed = False
         self.vis_meas_covar_diag_eps = 1e-12
 
         # Training parameters
         self.epochs = 200
-        self.batch_size = 32
+        self.batch_size = 16
         self.pin_mem = True
-        self.cache_image = True
+        self.cache_image = False
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 0.1}
+        self.optimizer_args = {'lr': 1e-4}
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({

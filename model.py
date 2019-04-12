@@ -378,12 +378,16 @@ class E2EVIO(nn.Module):
         self.ekf_module = IMUKalmanFilter()
 
     def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam):
-        vis_meas, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
+        vis_meas_and_covar, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
+
+        vis_meas = vis_meas_and_covar[:, :, 0:6]
 
         if par.vis_meas_covar_use_fixed:
             vis_meas_covar = torch.diag(torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32)). \
                 repeat(vis_meas.shape[0],
                        vis_meas.shape[1], 1, 1).cuda()
+        else:
+            vis_meas_covar = torch.diag_embed(vis_meas_and_covar[:, :, 6:12] ** 2 + par.vis_meas_covar_diag_eps)
 
         if not par.enable_ekf:
             return vis_meas, vis_meas_covar, lstm_states, None, None, None

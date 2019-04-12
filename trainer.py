@@ -113,7 +113,7 @@ class _TrainAssistant(object):
                                T_imu_cam.cuda())
 
         if par.enable_ekf:
-            loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda())
+            loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
             loss = self.vis_meas_loss(vis_meas, gt_rel_poses.cuda())
 
@@ -155,7 +155,7 @@ class _TrainAssistant(object):
 
         return loss
 
-    def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses):
+    def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses, vis_meas, vis_meas_covar):
         abs_errors = torch.matmul(torch.inverse(est_poses), gt_poses)
         # calculate the F norm squared from identity
         # I_minus_angle_errors = torch.eye(3, 3, device=errors.device) - errors[:, :, 0:3, 0:3]
@@ -200,31 +200,48 @@ class _TrainAssistant(object):
 
         loss_name = "train_loss" if self.model.training else "val_loss"
         iterations = self.num_train_iterations if self.model.training else self.num_val_iterations
-        logger.tensorboard.add_scalar(loss_name + "/abs_total_loss", loss_abs, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/abs_rot_loss", abs_angle_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/x", last_rot_x_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/y", last_rot_y_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/last_abs_rot_loss/z", last_rot_z_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/abs_trans_loss", abs_trans_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/x", last_trans_x_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/y", last_trans_y_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/last_abs_trans_loss/z", last_trans_z_loss, iterations)
+        add_scalar = logger.tensorboard.add_scalar
+        add_scalar(loss_name + "/abs_total_loss", loss_abs, iterations)
+        add_scalar(loss_name + "/abs_rot_loss", abs_angle_loss, iterations)
+        add_scalar(loss_name + "/last_abs_rot_loss/x", last_rot_x_loss, iterations)
+        add_scalar(loss_name + "/last_abs_rot_loss/y", last_rot_y_loss, iterations)
+        add_scalar(loss_name + "/last_abs_rot_loss/z", last_rot_z_loss, iterations)
+        add_scalar(loss_name + "/abs_trans_loss", abs_trans_loss, iterations)
+        add_scalar(loss_name + "/last_abs_trans_loss/x", last_trans_x_loss, iterations)
+        add_scalar(loss_name + "/last_abs_trans_loss/y", last_trans_y_loss, iterations)
+        add_scalar(loss_name + "/last_abs_trans_loss/z", last_trans_z_loss, iterations)
+
+        vis_meas_covar_diag = torch.diagonal(vis_meas_covar, dim1=-2, dim2=-1)
+        add_hist = logger.tensorboard.add_histogram
+        tag_name = "train_covar" if self.model.training else "val_covar"
+        add_scalar(tag_name + "/vis_meas_covar/trans_x", torch.mean(vis_meas_covar_diag[:, :, 0]), iterations)
+        add_scalar(tag_name + "/vis_meas_covar/trans_y", torch.mean(vis_meas_covar_diag[:, :, 1]), iterations)
+        add_scalar(tag_name + "/vis_meas_covar/trans_z", torch.mean(vis_meas_covar_diag[:, :, 2]), iterations)
+        add_scalar(tag_name + "/vis_meas_covar/rot_x", torch.mean(vis_meas_covar_diag[:, :, 3]), iterations)
+        add_scalar(tag_name + "/vis_meas_covar/rot_y", torch.mean(vis_meas_covar_diag[:, :, 4]), iterations)
+        add_scalar(tag_name + "/vis_meas_covar/rot_z", torch.mean(vis_meas_covar_diag[:, :, 5]), iterations)
+        add_hist(tag_name + "/vis_meas_covar_hist/trans_x", vis_meas_covar_diag[:, :, 0].view(-1), iterations)
+        add_hist(tag_name + "/vis_meas_covar_hist/trans_y", vis_meas_covar_diag[:, :, 1].view(-1), iterations)
+        add_hist(tag_name + "/vis_meas_covar_hist/trans_z", vis_meas_covar_diag[:, :, 2].view(-1), iterations)
+        add_hist(tag_name + "/vis_meas_covar_hist/rot_x", vis_meas_covar_diag[:, :, 3].view(-1), iterations)
+        add_hist(tag_name + "/vis_meas_covar_hist/rot_y", vis_meas_covar_diag[:, :, 4].view(-1), iterations)
+        add_hist(tag_name + "/vis_meas_covar_hist/rot_z", vis_meas_covar_diag[:, :, 5].view(-1), iterations)
 
         if self.model.training:
             model = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
             imu_noise_covar_diag = model.imu_noise_covar_diag_sqrt.detach().cpu() ** 2 + par.imu_noise_covar_diag_eps
-            logger.tensorboard.add_scalar("imu_noise_diag/w_x", imu_noise_covar_diag[0], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/w_y", imu_noise_covar_diag[1], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/w_z", imu_noise_covar_diag[2], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/bw_x", imu_noise_covar_diag[3], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/bw_y", imu_noise_covar_diag[4], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/bw_z", imu_noise_covar_diag[5], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/a_x", imu_noise_covar_diag[6], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/a_y", imu_noise_covar_diag[7], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/a_z", imu_noise_covar_diag[8], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/ba_x", imu_noise_covar_diag[9], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/ba_y", imu_noise_covar_diag[10], iterations)
-            logger.tensorboard.add_scalar("imu_noise_diag/ba_z", imu_noise_covar_diag[11], iterations)
+            add_scalar("imu_noise_diag/w_x", imu_noise_covar_diag[0], iterations)
+            add_scalar("imu_noise_diag/w_y", imu_noise_covar_diag[1], iterations)
+            add_scalar("imu_noise_diag/w_z", imu_noise_covar_diag[2], iterations)
+            add_scalar("imu_noise_diag/bw_x", imu_noise_covar_diag[3], iterations)
+            add_scalar("imu_noise_diag/bw_y", imu_noise_covar_diag[4], iterations)
+            add_scalar("imu_noise_diag/bw_z", imu_noise_covar_diag[5], iterations)
+            add_scalar("imu_noise_diag/a_x", imu_noise_covar_diag[6], iterations)
+            add_scalar("imu_noise_diag/a_y", imu_noise_covar_diag[7], iterations)
+            add_scalar("imu_noise_diag/a_z", imu_noise_covar_diag[8], iterations)
+            add_scalar("imu_noise_diag/ba_x", imu_noise_covar_diag[9], iterations)
+            add_scalar("imu_noise_diag/ba_y", imu_noise_covar_diag[10], iterations)
+            add_scalar("imu_noise_diag/ba_z", imu_noise_covar_diag[11], iterations)
 
         return loss
 
