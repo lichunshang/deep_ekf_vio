@@ -99,7 +99,7 @@ class Parameters(object):
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 0.1}
+        self.optimizer_args = {'lr': 0.001}
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({
