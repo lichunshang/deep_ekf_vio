@@ -133,9 +133,9 @@ class _TrainAssistant(object):
         angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
 
-        if par.train_covar:
-            Q_norm = torch.norm(vis_meas_covar, dim=(-2, -1,))
-            log_Q_norm = torch.log(Q_norm + par.vis_meas_covar_diag_eps)
+        if par.gaussian_pdf_loss:
+            Q_det = torch.prod(torch.diagonal(vis_meas_covar, dim1=-2, dim2=-1), -1)
+            log_Q_norm = torch.log(Q_det)
             err = predicted_rel_poses - gt_rel_poses
             scale = np.ones(6, dtype=np.float32)
             scale[0:3] = scale[0:3] * np.sqrt(par.k1)
@@ -373,7 +373,7 @@ def train(resume_model_path, resume_optimizer_path):
             count += 1
         logger.print('Train take {:.1f} sec'.format(time.time() - st_t))
         loss_mean /= len(train_dl)
-        logger.tensorboard.add_scalar("train_loss/epochs", loss_mean, epoch)
+        logger.tensorboard.add_scalar("epoch/train_loss", loss_mean, epoch)
 
         # Validation
         st_t = time.time()
@@ -386,13 +386,13 @@ def train(resume_model_path, resume_optimizer_path):
             loss_mean_valid += float(v_ls)
         logger.print('Valid take {:.1f} sec'.format(time.time() - st_t))
         loss_mean_valid /= len(valid_dl)
-        logger.tensorboard.add_scalar("val_loss/epochs", loss_mean_valid, epoch)
+        logger.tensorboard.add_scalar("epoch/val_loss", loss_mean_valid, epoch)
 
         logger.print('Epoch {}\ntrain loss mean: {}, std: {}\nvalid loss mean: {}, std: {}\n'.
                      format(epoch + 1, loss_mean, np.std(t_loss_list), loss_mean_valid, np.std(v_loss_list)))
 
         err_eval = online_evaluator.evaluate()
-        logger.tensorboard.add_scalar("eval_loss/epochs", err_eval, epoch)
+        logger.tensorboard.add_scalar("epoch/eval_loss", err_eval, epoch)
 
         # Save model
         if (epoch + 1) % 5 == 0:

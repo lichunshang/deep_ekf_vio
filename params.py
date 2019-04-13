@@ -37,7 +37,7 @@ class Parameters(object):
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.train_seqs = self.wc(['K00_*', 'K02_*', 'K05_*', 'K08', 'K09'])
+        self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
         self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
         # self.train_seqs = ['K08']
         # self.valid_seqs = ['K07']
@@ -67,7 +67,7 @@ class Parameters(object):
         self.clip = None
         self.batch_norm = True
         self.stateful_training = True
-        self.train_covar = True
+        self.gaussian_pdf_loss = True
 
         # EKF parameters
         self.enable_ekf = True
