@@ -115,7 +115,7 @@ class _TrainAssistant(object):
         if par.enable_ekf:
             loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
-            loss = self.vis_meas_loss(vis_meas, gt_rel_poses.cuda())
+            loss = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses.cuda())
 
         if par.stateful_training:
             lstm_states = lstm_states.detach().cpu()
@@ -128,30 +128,57 @@ class _TrainAssistant(object):
 
         return loss
 
-    def vis_meas_loss(self, predicted_rel_poses, gt_rel_poses):
+    def vis_meas_loss(self, predicted_rel_poses, vis_meas_covar, gt_rel_poses):
         # Weighted MSE Loss
         angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-        loss = (100 * angle_loss + trans_loss)
+
+        if par.train_covar:
+            Q_norm = torch.norm(vis_meas_covar, dim=(-2, -1,))
+            log_Q_norm = torch.log(Q_norm + par.vis_meas_covar_diag_eps)
+            err = predicted_rel_poses - gt_rel_poses
+            scale = np.ones(6, dtype=np.float32)
+            scale[0:3] = scale[0:3] * np.sqrt(par.k1)
+            err = torch.unsqueeze(err * torch.tensor(scale, device=vis_meas_covar.device).view(1, 1, 6), -1)
+            err_weighted_by_covar = torch.matmul(torch.matmul(err.transpose(-2, -1), vis_meas_covar.inverse()), err)
+            loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
+        else:
+            loss = (par.k1 * angle_loss + trans_loss)
 
         # log the loss
-        loss_name = "train_loss" if self.model.training else "val_loss"
+        tag_name = "train" if self.model.training else "val"
         iterations = self.num_train_iterations if self.model.training else self.num_val_iterations
+        add_scalar = logger.tensorboard.add_scalar
         rot_x_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0], gt_rel_poses[:, :, 0])
         rot_y_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 1], gt_rel_poses[:, :, 1])
         rot_z_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 2], gt_rel_poses[:, :, 2])
         trans_x_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3], gt_rel_poses[:, :, 3])
         trans_y_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 4], gt_rel_poses[:, :, 4])
         trans_z_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 5], gt_rel_poses[:, :, 5])
-        logger.tensorboard.add_scalar(loss_name + "/total_loss", loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/rot_loss", angle_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/rot_loss/x", rot_x_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/rot_loss/y", rot_y_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/rot_loss/z", rot_z_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/trans_loss", trans_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/trans_loss/x", trans_x_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/trans_loss/y", trans_y_loss, iterations)
-        logger.tensorboard.add_scalar(loss_name + "/trans_loss/z", trans_z_loss, iterations)
+        add_scalar(tag_name + "_vis/total_loss", loss, iterations)
+        add_scalar(tag_name + "_vis/rot_loss", angle_loss, iterations)
+        add_scalar(tag_name + "_vis/rot_loss/x", rot_x_loss, iterations)
+        add_scalar(tag_name + "_vis/rot_loss/y", rot_y_loss, iterations)
+        add_scalar(tag_name + "_vis/rot_loss/z", rot_z_loss, iterations)
+        add_scalar(tag_name + "_vis/trans_loss", trans_loss, iterations)
+        add_scalar(tag_name + "_vis/trans_loss/x", trans_x_loss, iterations)
+        add_scalar(tag_name + "_vis/trans_loss/y", trans_y_loss, iterations)
+        add_scalar(tag_name + "_vis/trans_loss/z", trans_z_loss, iterations)
+
+        vis_meas_covar_diag = torch.diagonal(vis_meas_covar, dim1=-2, dim2=-1)
+        add_hist = logger.tensorboard.add_histogram
+        add_scalar(tag_name + "_vis_covar/ave/trans_x", torch.mean(vis_meas_covar_diag[:, :, 0]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/trans_y", torch.mean(vis_meas_covar_diag[:, :, 1]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/trans_z", torch.mean(vis_meas_covar_diag[:, :, 2]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_x", torch.mean(vis_meas_covar_diag[:, :, 3]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_y", torch.mean(vis_meas_covar_diag[:, :, 4]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_z", torch.mean(vis_meas_covar_diag[:, :, 5]), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_x", vis_meas_covar_diag[:, :, 0].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_y", vis_meas_covar_diag[:, :, 1].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_z", vis_meas_covar_diag[:, :, 2].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_x", vis_meas_covar_diag[:, :, 3].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_y", vis_meas_covar_diag[:, :, 4].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_z", vis_meas_covar_diag[:, :, 5].view(-1), iterations)
 
         return loss
 
@@ -198,34 +225,33 @@ class _TrainAssistant(object):
         last_trans_y_loss = np.mean(np.abs(trans_errors[:, -1, 1]))
         last_trans_z_loss = np.mean(np.abs(trans_errors[:, -1, 2]))
 
-        loss_name = "train_loss" if self.model.training else "val_loss"
+        tag_name = "train" if self.model.training else "val"
         iterations = self.num_train_iterations if self.model.training else self.num_val_iterations
         add_scalar = logger.tensorboard.add_scalar
-        add_scalar(loss_name + "/abs_total_loss", loss_abs, iterations)
-        add_scalar(loss_name + "/abs_rot_loss", abs_angle_loss, iterations)
-        add_scalar(loss_name + "/last_abs_rot_loss/x", last_rot_x_loss, iterations)
-        add_scalar(loss_name + "/last_abs_rot_loss/y", last_rot_y_loss, iterations)
-        add_scalar(loss_name + "/last_abs_rot_loss/z", last_rot_z_loss, iterations)
-        add_scalar(loss_name + "/abs_trans_loss", abs_trans_loss, iterations)
-        add_scalar(loss_name + "/last_abs_trans_loss/x", last_trans_x_loss, iterations)
-        add_scalar(loss_name + "/last_abs_trans_loss/y", last_trans_y_loss, iterations)
-        add_scalar(loss_name + "/last_abs_trans_loss/z", last_trans_z_loss, iterations)
+        add_scalar(tag_name + "_abs/abs_total_loss", loss_abs, iterations)
+        add_scalar(tag_name + "_abs/abs_rot_loss", abs_angle_loss, iterations)
+        add_scalar(tag_name + "_abs/last_rot_loss/x", last_rot_x_loss, iterations)
+        add_scalar(tag_name + "_abs/last_rot_loss/y", last_rot_y_loss, iterations)
+        add_scalar(tag_name + "_abs/last_rot_loss/z", last_rot_z_loss, iterations)
+        add_scalar(tag_name + "_abs/abs_loss", abs_trans_loss, iterations)
+        add_scalar(tag_name + "_abs/last_trans_loss/x", last_trans_x_loss, iterations)
+        add_scalar(tag_name + "_abs/last_trans_loss/y", last_trans_y_loss, iterations)
+        add_scalar(tag_name + "_abs/last_trans_loss/z", last_trans_z_loss, iterations)
 
         vis_meas_covar_diag = torch.diagonal(vis_meas_covar, dim1=-2, dim2=-1)
         add_hist = logger.tensorboard.add_histogram
-        tag_name = "train_covar" if self.model.training else "val_covar"
-        add_scalar(tag_name + "/vis_meas_covar/trans_x", torch.mean(vis_meas_covar_diag[:, :, 0]), iterations)
-        add_scalar(tag_name + "/vis_meas_covar/trans_y", torch.mean(vis_meas_covar_diag[:, :, 1]), iterations)
-        add_scalar(tag_name + "/vis_meas_covar/trans_z", torch.mean(vis_meas_covar_diag[:, :, 2]), iterations)
-        add_scalar(tag_name + "/vis_meas_covar/rot_x", torch.mean(vis_meas_covar_diag[:, :, 3]), iterations)
-        add_scalar(tag_name + "/vis_meas_covar/rot_y", torch.mean(vis_meas_covar_diag[:, :, 4]), iterations)
-        add_scalar(tag_name + "/vis_meas_covar/rot_z", torch.mean(vis_meas_covar_diag[:, :, 5]), iterations)
-        add_hist(tag_name + "/vis_meas_covar_hist/trans_x", vis_meas_covar_diag[:, :, 0].view(-1), iterations)
-        add_hist(tag_name + "/vis_meas_covar_hist/trans_y", vis_meas_covar_diag[:, :, 1].view(-1), iterations)
-        add_hist(tag_name + "/vis_meas_covar_hist/trans_z", vis_meas_covar_diag[:, :, 2].view(-1), iterations)
-        add_hist(tag_name + "/vis_meas_covar_hist/rot_x", vis_meas_covar_diag[:, :, 3].view(-1), iterations)
-        add_hist(tag_name + "/vis_meas_covar_hist/rot_y", vis_meas_covar_diag[:, :, 4].view(-1), iterations)
-        add_hist(tag_name + "/vis_meas_covar_hist/rot_z", vis_meas_covar_diag[:, :, 5].view(-1), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/trans_x", torch.mean(vis_meas_covar_diag[:, :, 0]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/trans_y", torch.mean(vis_meas_covar_diag[:, :, 1]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/trans_z", torch.mean(vis_meas_covar_diag[:, :, 2]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_x", torch.mean(vis_meas_covar_diag[:, :, 3]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_y", torch.mean(vis_meas_covar_diag[:, :, 4]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_z", torch.mean(vis_meas_covar_diag[:, :, 5]), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_x", vis_meas_covar_diag[:, :, 0].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_y", vis_meas_covar_diag[:, :, 1].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_z", vis_meas_covar_diag[:, :, 2].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_x", vis_meas_covar_diag[:, :, 3].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_y", vis_meas_covar_diag[:, :, 4].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_z", vis_meas_covar_diag[:, :, 5].view(-1), iterations)
 
         if self.model.training:
             model = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
