@@ -50,6 +50,7 @@ class Parameters(object):
         self.k1 = 100.  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = 0.5  # (1-k3)*abs + k3*rel weighting
+        self.k4 = 100  # error scale for covar loss
 
         # VO Model parameters
         self.fix_vo_weights = False
