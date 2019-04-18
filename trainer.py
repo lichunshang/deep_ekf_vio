@@ -37,7 +37,7 @@ class _OnlineDatasetEvaluator(object):
         start_time = time.time()
         seqs = sorted(list(self.dataloaders.keys()))
         for seq in seqs:
-            predicted_abs_poses = gen_trajectory_rel_iter(self.model, self.dataloaders[seq], True)
+            predicted_abs_poses, _, _ = gen_trajectory_rel_iter(self.model, self.dataloaders[seq], True)
             self.error_calc.accumulate_error(seq, predicted_abs_poses)
         ave_err = self.error_calc.get_average_error()
         self.error_calc.clear()
@@ -139,7 +139,7 @@ class _TrainAssistant(object):
             err = predicted_rel_poses - gt_rel_poses
             scale = np.ones(6, dtype=np.float32)
             scale[0:3] = scale[0:3] * np.sqrt(par.k1)
-            err = torch.unsqueeze(err * torch.tensor(scale, device=vis_meas_covar.device).view(1, 1, 6), -1)
+            err = par.k4 * torch.unsqueeze(err * torch.tensor(scale, device=vis_meas_covar.device).view(1, 1, 6), -1)
             err_weighted_by_covar = torch.matmul(torch.matmul(err.transpose(-2, -1), vis_meas_covar.inverse()), err)
             loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
         else:

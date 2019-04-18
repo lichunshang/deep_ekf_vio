@@ -12,10 +12,14 @@ def plot_errors(working_dir):
     errors_dir = os.path.join(working_dir, "errors")
     rel_errors_dir = os.path.join(errors_dir, "rel")
     abs_errors_dir = os.path.join(errors_dir, "abs")
+    vis_meas_errors_dir = os.path.join(errors_dir, "vis_meas")
+    vis_meas_covars_dir = os.path.join(working_dir, "vis_meas", "covar")
     abs_errors_files = sorted(os.listdir(abs_errors_dir))
     rel_errors_files = sorted(os.listdir(rel_errors_dir))
+    vis_meas_errors_files = sorted(os.listdir(vis_meas_errors_dir))
+    vis_meas_covars_files = sorted(os.listdir(vis_meas_covars_dir))
 
-    assert (abs_errors_files == rel_errors_files)
+    assert (abs_errors_files == rel_errors_files == vis_meas_errors_files == vis_meas_covars_files)
     sequences = [f[:-4] for f in abs_errors_files]
 
     logger.initialize(working_dir=working_dir, use_tensorboard=False)
@@ -26,6 +30,8 @@ def plot_errors(working_dir):
     for i, sequence in enumerate(sequences):
         error_rel = np.load(os.path.join(rel_errors_dir, "%s.npy" % sequence))
         error_abs = np.load(os.path.join(abs_errors_dir, "%s.npy" % sequence))
+        error_vis_meas = np.load(os.path.join(vis_meas_errors_dir, "%s.npy" % sequence))
+        covar_vis_meas = np.load(os.path.join(vis_meas_covars_dir, "%s.npy" % sequence))
 
         labels = ["Trans X", "Trans Y", "Trans Z", "Rot X", "Rot Y", "Rot Z"]
 
@@ -54,6 +60,25 @@ def plot_errors(working_dir):
             plt.savefig(Logger.ensure_file_dir_exists(
                     os.path.join(errors_dir, "rel_error_histograms",
                                  "fig_%s_%02d_%s_rel_err_hist.png" % (
+                                     sequence, j, "_".join(labels[j].lower().split())))))
+
+        for j in range(0, 6):
+            err = np.abs(error_vis_meas[:, j]) * 100
+            covar = covar_vis_meas[:, j, j]
+            covar_sig = np.sqrt(covar)
+            plt.clf()
+            plt.plot(err, color="r", label="Err")
+            plt.plot(-err, color="r", label="Err")
+            plt.plot(covar_sig, color="b", label="3sig")
+            plt.plot(-covar_sig, color="b", label="3sig")
+            plt.plot()
+            plt.xlabel("frame # []")
+            plt.ylabel(labels[j].lower())
+            plt.title("Seq. %s %s Vis Meas Error & Covar" % (sequence, labels[j]))
+            plt.legend()
+            plt.savefig(Logger.ensure_file_dir_exists(
+                    os.path.join(errors_dir, "vis_meas_error_covar_figures",
+                                 "fig_%s_%02d_%s_vis_meas_error_covar.png" % (
                                      sequence, j, "_".join(labels[j].lower().split())))))
 
         for j in range(0, 6):
