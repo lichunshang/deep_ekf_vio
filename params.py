@@ -92,7 +92,7 @@ class Parameters(object):
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
         self.vis_meas_covar_use_fixed = False
-        self.vis_meas_covar_diag_eps = 1e-5
+        self.vis_meas_covar_diag_eps = np.array([1e-3, 1e-3, 1e-3, 1e-6, 1e-6, 1e-6])
 
         # Training parameters
         self.epochs = 200
