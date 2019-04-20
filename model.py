@@ -387,7 +387,7 @@ class E2EVIO(nn.Module):
                 repeat(vis_meas.shape[0],
                        vis_meas.shape[1], 1, 1).cuda()
         else:
-            eps = torch.tensor(par.vis_meas_covar_diag_eps, device=vis_meas.device).view(1, 1, 6)
+            eps = torch.tensor(par.vis_meas_covar_diag_eps, device=vis_meas.device, dtype=torch.float32).view(1, 1, 6)
             vis_meas_covar = torch.diag_embed(vis_meas_and_covar[:, :, 6:12] ** 2 + eps)
 
         if not par.enable_ekf:
