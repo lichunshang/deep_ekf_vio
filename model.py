@@ -403,9 +403,13 @@ class E2EVIO(nn.Module):
             init_covar = prev_covar
 
         # vis model outputs positions first
+        vis_meas_covar_scale = torch.ones(6, device=vis_meas.device) * par.k1
+        vis_meas_covar_scale[0:3] = vis_meas_covar_scale * par.k4
+        vis_meas_covar_scale = torch.diag(vis_meas_covar_scale).view(1, 1, 6, 6)
         poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data, imu_noise_covar,
                                                                 prev_pose, prev_state, init_covar,
                                                                 torch.unsqueeze(vis_meas, -1),
-                                                                vis_meas_covar, T_imu_cam)
+                                                                vis_meas_covar * vis_meas_covar_scale,
+                                                                T_imu_cam)
 
         return vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars

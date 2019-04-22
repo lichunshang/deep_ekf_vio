@@ -194,16 +194,18 @@ class _TrainAssistant(object):
         abs_angle_loss = torch.mean(abs_angle_errors_sq)
         abs_trans_loss = torch.mean(abs_trans_errors_sq)
 
-        _, C_rel, r_rel, _, _, _ = IMUKalmanFilter.decode_state_b(ekf_states)
-        rel_angle_errors = (gt_rel_poses[:, :, 0:3] - torch.squeeze(torch_se3.log_SO3_b(C_rel[:, 1:]), -1)) ** 2
-        rel_angle_errors_sq = torch.sum(rel_angle_errors ** 2, dim=-1)
-        rel_trans_error_sq = torch.sum((gt_rel_poses[:, :, 3:6] - torch.squeeze(r_rel[:, 1:], -1)) ** 2, dim=-1)
-        rel_angle_loss = torch.mean(rel_angle_errors_sq)
-        rel_trans_loss = torch.mean(rel_trans_error_sq)
+        # _, C_rel, r_rel, _, _, _ = IMUKalmanFilter.decode_state_b(ekf_states)
+        # rel_angle_errors = (gt_rel_poses[:, :, 0:3] - torch.squeeze(torch_se3.log_SO3_b(C_rel[:, 1:]), -1)) ** 2
+        # rel_angle_errors_sq = torch.sum(rel_angle_errors ** 2, dim=-1)
+        # rel_trans_error_sq = torch.sum((gt_rel_poses[:, :, 3:6] - torch.squeeze(r_rel[:, 1:], -1)) ** 2, dim=-1)
+        # rel_angle_loss = torch.mean(rel_angle_errors_sq)
+        # rel_trans_loss = torch.mean(rel_trans_error_sq)
 
         loss_abs = (par.k2 * abs_angle_loss + abs_trans_loss)
-        loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
-        loss = par.k3 * loss_rel + (1 - par.k3) * loss_abs
+        # loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
+        # loss = par.k3 * loss_rel + (1 - par.k3) * loss_abs
+        loss_vis_meas = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses)
+        loss = par.k3 * loss_vis_meas + (1 - par.k3) * loss_abs
 
         assert not torch.any(torch.isnan(loss))
 
