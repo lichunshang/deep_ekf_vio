@@ -382,16 +382,21 @@ class E2EVIO(nn.Module):
 
         vis_meas = vis_meas_and_covar[:, :, 0:6]
 
+        vis_meas_covar_scale = torch.ones(6, device=vis_meas.device) * par.k1
+        vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * par.k4
+
         if par.vis_meas_covar_use_fixed:
-            vis_meas_covar = torch.diag(torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32)). \
-                repeat(vis_meas.shape[0],
-                       vis_meas.shape[1], 1, 1).cuda()
+            vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32, device=vis_meas.device)
+            vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
+            vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
         else:
             eps = torch.tensor(par.vis_meas_covar_diag_eps, device=vis_meas.device, dtype=torch.float32).view(1, 1, 6)
-            vis_meas_covar = torch.diag_embed(vis_meas_and_covar[:, :, 6:12] ** 2 + eps)
+            vis_meas_covar_diag = vis_meas_and_covar[:, :, 6:12] ** 2 + eps
+
+        vis_meas_covar_diag_scaled = vis_meas_covar_diag / vis_meas_covar_scale.view(1, 1, 6)
 
         if not par.enable_ekf:
-            return vis_meas, vis_meas_covar, lstm_states, None, None, None
+            return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, None, None, None
 
         imu_noise_covar = torch.diag(self.imu_noise_covar_diag_sqrt * self.imu_noise_covar_diag_sqrt +
                                      par.imu_noise_covar_diag_eps)
@@ -403,13 +408,11 @@ class E2EVIO(nn.Module):
             init_covar = prev_covar
 
         # vis model outputs positions first
-        vis_meas_covar_scale = torch.ones(6, device=vis_meas.device) * par.k1
-        vis_meas_covar_scale[0:3] = vis_meas_covar_scale * par.k4
-        vis_meas_covar_scale = torch.diag(vis_meas_covar_scale).view(1, 1, 6, 6)
+
         poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data, imu_noise_covar,
                                                                 prev_pose, prev_state, init_covar,
                                                                 torch.unsqueeze(vis_meas, -1),
-                                                                vis_meas_covar * vis_meas_covar_scale,
+                                                                torch.diag_embed(vis_meas_covar_diag_scaled),
                                                                 T_imu_cam)
-
-        return vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars
+        # vis_meas_covar = torch.diag_embed(vis_meas_and_covar[:, :, 6:12] ** 2 + eps)
+        return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, poses, ekf_states, ekf_covars
