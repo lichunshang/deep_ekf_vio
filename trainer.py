@@ -183,14 +183,15 @@ class _TrainAssistant(object):
         return loss
 
     def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses, vis_meas, vis_meas_covar):
-        abs_errors = torch.matmul(torch.inverse(est_poses), gt_poses)
+        abs_errors = torch.matmul(torch.inverse(est_poses[:, 1:]), gt_poses[:, 1:])
+        length_div = torch.range(start=1, end=abs_errors.size(1)).view(1, -1, 1)
         # calculate the F norm squared from identity
         # I_minus_angle_errors = torch.eye(3, 3, device=errors.device) - errors[:, :, 0:3, 0:3]
         # I_minus_angle_errors_sq = torch.matmul(I_minus_angle_errors, I_minus_angle_errors.transpose(-2, -1))
         # angle_errors_F_norm_sq = torch.sum(torch.diagonal(I_minus_angle_errors_sq, dim1=-2, dim2=-1), dim=-1)
-        abs_angle_errors = torch.squeeze(torch_se3.log_SO3_b(abs_errors[:, :, 0:3, 0:3]), -1)
+        abs_angle_errors = torch.squeeze(torch_se3.log_SO3_b(abs_errors[:, :, 0:3, 0:3]), -1) / length_div
         abs_angle_errors_sq = torch.sum(abs_angle_errors ** 2, dim=-1)
-        abs_trans_errors_sq = torch.sum(abs_errors[:, :, 0:3, 3] ** 2, dim=-1)
+        abs_trans_errors_sq = torch.sum((abs_errors[:, :, 0:3, 3] / length_div) ** 2, dim=-1)
         abs_angle_loss = torch.mean(abs_angle_errors_sq)
         abs_trans_loss = torch.mean(abs_trans_errors_sq)
 
