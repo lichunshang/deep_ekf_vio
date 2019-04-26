@@ -32,24 +32,30 @@ def last_frame_from_segment_length(distances, first_frame, length):
 # written according to KITTI
 def calc_kitti_seq_errors(gt_poses, est_poses):
     assert (len(gt_poses) == len(est_poses))
-    errors = []
+    gt_poses = gt_poses.astype(np.float64)
+    est_poses = est_poses.astype(np.float64)
+    errors_div_length = []
     step_size = 10
     distances = calc_trajectory_dist(gt_poses)
 
     lengths = [100, 200, 300, 400, 500, 600, 700, 800]
+    errors_by_length = {k: [] for k in lengths}
+    errors_by_length_div_nframes = {k: [] for k in lengths}
 
     for i in range(0, len(gt_poses), step_size):
         for length in lengths:
             j = last_frame_from_segment_length(distances, i, length)
             if j < 0:
                 continue
-            gt_T_ij = np.linalg.inv(gt_poses[i]).dot(gt_poses[j])
-            est_T_ij = np.linalg.inv(est_poses[i]).dot(est_poses[j])
+            gt_t_ij = np.linalg.inv(gt_poses[i]).dot(gt_poses[j])
+            est_t_ij = np.linalg.inv(est_poses[i]).dot(est_poses[j])
 
-            trans_err, rot_err = calc_error(gt_T_ij, est_T_ij)
-            errors.append([trans_err / length, rot_err / length, ])
+            trans_err, rot_err = calc_error(gt_t_ij, est_t_ij)
+            errors_div_length.append([trans_err / length, rot_err / length, ])
+            errors_by_length[length].append([trans_err, rot_err])
+            errors_by_length_div_nframes[length].append([trans_err / (j - i), rot_err / (j - i)])
 
-    return errors
+    return errors_div_length, errors_by_length, errors_by_length_div_nframes
 
 
 class KittiErrorCalc(object):
@@ -63,7 +69,7 @@ class KittiErrorCalc(object):
 
     def accumulate_error(self, seq, est):
         assert (seq in self.gt_poses)
-        self.errors += calc_kitti_seq_errors(self.gt_poses[seq][:len(est)], est)
+        self.errors += calc_kitti_seq_errors(self.gt_poses[seq][:len(est)], est)[0]
 
     def get_average_error(self):
         # only use translation as average error

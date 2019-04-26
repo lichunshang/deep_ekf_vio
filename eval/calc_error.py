@@ -35,7 +35,7 @@ def calc_error(working_dir):
             pose_gt = traj_gt[j]
 
             abs_pose_err = np.linalg.inv(pose_est).dot(pose_gt)
-            abs_traj_error.append(np.concatenate([r_from_T(abs_pose_err), log_SO3(C_from_T(abs_pose_err))]))
+            abs_traj_error.append(np.concatenate([log_SO3(C_from_T(abs_pose_err)), r_from_T(abs_pose_err)]))
 
         for j in range(1, traj_est.shape[0]):
             rel_pose_gt = np.linalg.inv(traj_gt[j - 1]).dot(traj_gt[j])

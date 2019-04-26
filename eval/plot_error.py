@@ -34,7 +34,7 @@ def plot_errors(working_dir):
         error_vis_meas = np.load(os.path.join(vis_meas_errors_dir, "%s.npy" % sequence))
         covar_vis_meas = np.load(os.path.join(vis_meas_covars_dir, "%s.npy" % sequence))
 
-        labels = ["Trans X", "Trans Y", "Trans Z", "Rot X", "Rot Y", "Rot Z"]
+        labels = ["Rot X", "Rot Y", "Rot Z", "Trans X", "Trans Y", "Trans Z"]
 
         for j in range(0, 6):
             err = error_rel[:, j]
