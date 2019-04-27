@@ -273,14 +273,19 @@ class DeepVO(nn.Module):
         __tmp = self.encode_image(__tmp)
 
         # RNN
-        self.rnn = nn.LSTM(
-                input_size=int(np.prod(__tmp.size())),
-                hidden_size=par.rnn_hidden_size,
-                num_layers=par.rnn_num_layers,
-                dropout=par.rnn_dropout_between,
-                batch_first=True)
-        self.rnn_drop_out = nn.Dropout(par.rnn_dropout_out)
-        self.linear = nn.Linear(in_features=par.rnn_hidden_size, out_features=12)
+        # self.rnn = nn.LSTM(
+        #         input_size=int(np.prod(__tmp.size())),
+        #         hidden_size=par.rnn_hidden_size,
+        #         num_layers=par.rnn_num_layers,
+        #         dropout=par.rnn_dropout_between,
+        #         batch_first=True)
+        # self.rnn_drop_out = nn.Dropout(par.rnn_dropout_out)
+        self.dropout1 = nn.Dropout(par.rnn_dropout_out)
+        self.linear1 = nn.Linear(in_features=int(np.prod(__tmp.size())), out_features=par.rnn_hidden_size)
+        self.dropout2 = nn.Dropout(par.rnn_dropout_out)
+        self.linear2 = nn.Linear(in_features=par.rnn_hidden_size, out_features=128)
+        self.dropout3 = nn.Dropout(par.rnn_dropout_out)
+        self.linear3 = nn.Linear(in_features=128, out_features=12)
 
         # Initilization
         for m in self.modules():
@@ -323,24 +328,37 @@ class DeepVO(nn.Module):
         x = self.encode_image(x)
         x = x.view(batch_size, seq_len, -1)
 
+
+        #         self.dropout1 = nn.Dropout(par.rnn_dropout_out)
+        # self.linear1 = nn.Linear(in_features=int(np.prod(__tmp.size())), out_features=par.rnn_hidden_size)
+        # self.dropout2 = nn.Dropout(par.rnn_dropout_out)
+        # self.linear2 = nn.Linear(in_features=par.rnn_hidden_size, out_features=12)
+
+        out = self.linear1(x)
+        out = self.dropout1(out)
+        out = self.linear2(out)
+        out = self.dropout2(out)
+        out = self.linear3(out)
+        out = self.dropout3(out)
+
         # lstm_init_state has the dimension of (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
-        if lstm_init_state is not None:
-            hidden_state = lstm_init_state[:, 0, :, :].permute(1, 0, 2).contiguous()
-            cell_state = lstm_init_state[:, 1, :, :].permute(1, 0, 2).contiguous()
-            lstm_init_state = (hidden_state, cell_state,)
+        # if lstm_init_state is not None:
+        #     hidden_state = lstm_init_state[:, 0, :, :].permute(1, 0, 2).contiguous()
+        #     cell_state = lstm_init_state[:, 1, :, :].permute(1, 0, 2).contiguous()
+        #     lstm_init_state = (hidden_state, cell_state,)
 
         # RNN
         # lstm_state is (hidden state, cell state,)
         # each hidden/cell state has the shape (lstm layers, batch size, lstm hidden size)
-        out, lstm_state = self.rnn(x, lstm_init_state)
-        out = self.rnn_drop_out(out)
-        out = self.linear(out)
+        # out, lstm_state = self.rnn(x, lstm_init_state)
+        # out = self.rnn_drop_out(out)
+        # out = self.linear(out)
 
         # rearrange the shape back to (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
-        lstm_state = torch.stack(lstm_state, dim=0)
-        lstm_state = lstm_state.permute(2, 0, 1, 3)
+        # lstm_state = torch.stack(lstm_state, dim=0)
+        # lstm_state = lstm_state.permute(2, 0, 1, 3)
 
-        return out, lstm_state
+        return out, torch.ones(1, 1)
 
     def encode_image(self, x):
         out_conv2 = self.conv2(self.conv1(x))

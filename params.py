@@ -42,7 +42,7 @@ class Parameters(object):
         # self.train_seqs = ['K08']
         # self.valid_seqs = ['K07']
 
-        self.seq_len = 32
+        self.seq_len = 2
         self.sample_times = 3
 
         self.exclude_resume_weights = ["imu_noise_covar_diag_sqrt", "init_covar_diag_sqrt"]
@@ -67,11 +67,11 @@ class Parameters(object):
         self.rnn_dropout_between = 0  # 0: no dropout
         self.clip = None
         self.batch_norm = True
-        self.stateful_training = True
+        self.stateful_training = False
         self.gaussian_pdf_loss = True
 
         # EKF parameters
-        self.enable_ekf = True
+        self.enable_ekf = False
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
         #
@@ -93,13 +93,13 @@ class Parameters(object):
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
         self.vis_meas_covar_use_fixed = False
-        self.vis_meas_covar_diag_eps = np.array([1e-3, 1e-3, 1e-3, 1e-6, 1e-6, 1e-6])
+        self.vis_meas_covar_diag_eps = np.array([1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2])
 
         # Training parameters
         self.epochs = 200
-        self.batch_size = 16
+        self.batch_size = 512
         self.pin_mem = True
-        self.cache_image = False
+        self.cache_image = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
 
@@ -114,7 +114,7 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
-            "enable": False,
+            "enable": True,
             "lr_flip": True,
             "reverse": True,
         })
