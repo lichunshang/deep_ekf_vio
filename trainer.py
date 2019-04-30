@@ -206,11 +206,13 @@ class _TrainAssistant(object):
         # rel_angle_loss = torch.mean(rel_angle_errors_sq)
         # rel_trans_loss = torch.mean(rel_trans_error_sq)
 
+        k3 = self.schedule(par.k3)
+
         loss_abs = (par.k2 * abs_angle_loss + abs_trans_loss) * par.k4 ** 2
         # loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
-        # loss = par.k3 * loss_rel + (1 - par.k3) * loss_abs
+        # loss = k3 * loss_rel + (1 - k3) * loss_abs
         loss_vis_meas = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses)
-        loss = par.k3 * loss_vis_meas + (1 - par.k3) * loss_abs
+        loss = k3 * loss_vis_meas + (1 - k3) * loss_abs
 
         assert not torch.any(torch.isnan(loss))
 
@@ -274,6 +276,13 @@ class _TrainAssistant(object):
                 torch.nn.utils.clip_grad_norm(self.model.rnn.parameters(), self.clip)
         optimizer.step()
         return loss
+
+    def schedule(self, d):
+        epochs = sorted(list(d.keys()))
+        for i in range(0, len(epochs)):
+            if epochs[len(epochs) - i - 1] <= self.epoch:
+                return d[epochs[len(epochs) - i - 1]]
+        raise ValueError("Invalid Schedule")
 
 
 def train(resume_model_path, resume_optimizer_path):
