@@ -47,7 +47,7 @@ class Parameters(object):
 
         self.exclude_resume_weights = ["imu_noise_covar_diag_sqrt", "init_covar_diag_sqrt"]
 
-        self.k1 = 100.  # rel loss angle multiplier
+        self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = 0.5  # (1-k3)*abs + k3*rel weighting
         self.k4 = 100  # error scale for covar loss
@@ -93,13 +93,13 @@ class Parameters(object):
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
         self.vis_meas_covar_use_fixed = False
-        self.vis_meas_covar_diag_eps = np.array([1e-3, 1e-3, 1e-3, 1e-6, 1e-6, 1e-6])
+        self.vis_meas_covar_diag_eps = np.array([1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2])
 
         # Training parameters
         self.epochs = 200
         self.batch_size = 16
         self.pin_mem = True
-        self.cache_image = False
+        self.cache_image = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
 
