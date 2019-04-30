@@ -10,6 +10,8 @@ logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
 
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
+arg_parser.add_argument('--run_eval_only', default=False, action='store_true',
+                        help="Only run evaluation in current working directory")
 arg_parser.add_argument('--resume_model_from', type=str, help="path of model state to resume from")
 arg_parser.add_argument('--resume_optimizer_from', type=str, help="path of optimizer state to resume from")
 arg_parsed = arg_parser.parse_args()
@@ -22,12 +24,17 @@ if gpu_ids:
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(i) for i in gpu_ids])
     logger.print("CUDA_VISIVLE_DEVICES: %s" % os.environ["CUDA_VISIBLE_DEVICES"])
 
-start_t = time.time()
-trainer.train(resume_model_path, resume_optimizer_path)
-logger.print("Training took %.2fs" % (time.time() - start_t))
+
+if not arg_parsed.run_eval_only:
+    results_dir = par.results_dir
+    start_t = time.time()
+    trainer.train(resume_model_path, resume_optimizer_path)
+    logger.print("Training took %.2fs" % (time.time() - start_t))
+else:
+    results_dir = "./"
 
 for tag in ["valid", "train", "checkpoint", "eval"]:
-    seq_results_dir = gen_trajectory(os.path.join(par.results_dir, "saved_model.%s" % tag),
+    seq_results_dir = gen_trajectory(os.path.join(results_dir, "saved_model.%s" % tag),
                                      par.valid_seqs + par.train_seqs, 2, True)
     plot_trajectory(seq_results_dir)
     calc_error(seq_results_dir)

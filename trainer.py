@@ -262,7 +262,7 @@ class _TrainAssistant(object):
             add_scalar("imu_noise_diag/ba_x", imu_noise_covar_diag[9], iterations)
             add_scalar("imu_noise_diag/ba_y", imu_noise_covar_diag[10], iterations)
             add_scalar("imu_noise_diag/ba_z", imu_noise_covar_diag[11], iterations)
-
+            add_scalar("params/k3", k3, iterations)
         return loss
 
     def step(self, data, optimizer):

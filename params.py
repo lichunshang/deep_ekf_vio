@@ -50,12 +50,12 @@ class Parameters(object):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting
-            0: 0.025,
-            40: 0.05,
-            80: 0.1,
-            120: 0.2,
-            160: 0.4,
-            200: 0.8,
+            0: 0.1,
+            # 40: 0.05,
+            # 80: 0.1,
+            # 120: 0.2,
+            # 160: 0.4,
+            # 200: 0.8,
         }
         self.k4 = 100  # error scale for covar loss
 
