@@ -384,8 +384,8 @@ class E2EVIO(nn.Module):
 
         vis_meas = vis_meas_and_covar[:, :, 0:6]
 
-        vis_meas_covar_scale = torch.ones(6, device=vis_meas.device) * par.k1
-        vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * par.k4
+        vis_meas_covar_scale = torch.ones(6, device=vis_meas.device) * par.k4 ** 2
+        vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * par.k1
 
         if par.vis_meas_covar_use_fixed:
             vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32, device=vis_meas.device)
