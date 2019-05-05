@@ -53,22 +53,23 @@ class Logger(object):
     def log_source_files(self):
         # log files
         files_to_log = []
-        for filename in glob.iglob(os.path.join(par.project_dir, "**"), recursive=True):
+        curr_dir = os.path.abspath(os.path.dirname(__file__))
+        for filename in glob.iglob(os.path.join(curr_dir, "**"), recursive=True):
             if "/results/" not in filename and filename.endswith(".py"):
                 files_to_log.append(filename)
 
         Logger.log_file_content(self.working_dir, files_to_log)
 
         # log git commit number and status
-        git_commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=par.project_dir).decode(
+        git_commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=curr_dir).decode(
                 'ascii').strip()
-        git_status_output = subprocess.check_output(['git', 'status'], cwd=par.project_dir).decode('ascii')
+        git_status_output = subprocess.check_output(['git', 'status'], cwd=curr_dir).decode('ascii')
         git_file = open(os.path.join(self.working_dir, git_commit_hash), 'w')
         git_file.write(git_status_output)
         git_file.close()
 
         # log git diff
-        diff_ret = subprocess.check_output(['git', '--no-pager', 'diff'], cwd=par.project_dir).decode('ascii')
+        diff_ret = subprocess.check_output(['git', '--no-pager', 'diff'], cwd=curr_dir).decode('ascii')
         diff_file = open(os.path.join(self.working_dir, 'diff'), "w")
         diff_file.write(diff_ret)
         diff_file.close()
