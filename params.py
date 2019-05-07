@@ -50,12 +50,10 @@ class Parameters(object):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting
-            0: 0.1,
-            # 40: 0.05,
-            # 80: 0.1,
-            # 120: 0.2,
-            # 160: 0.4,
-            # 200: 0.8,
+            0: 0.999,
+            # 80: 0.01,
+            # 160: 0.1,
+            # 240: 0.9
         }
         self.k4 = 100  # error scale for covar loss
 
@@ -103,7 +101,7 @@ class Parameters(object):
         self.vis_meas_covar_diag_eps = np.array([1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2])
 
         # Training parameters
-        self.epochs = 200
+        self.epochs = 400
         self.batch_size = 16
         self.pin_mem = True
         self.cache_image = True
