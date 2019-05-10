@@ -62,6 +62,7 @@ class SequenceData(object):
 
         self.g_i = self.constants["g_i"]
         self.T_cam_imu = self.constants["T_cam_imu"]
+        self.bw_0 = self.constants["bw_0"]
 
     def get_poses(self):
         return np.array(list(self.df.loc[:, "T_i_vk"].values))
@@ -94,7 +95,7 @@ class SequenceData(object):
         return frames
 
     @staticmethod
-    def save_as_pd(data_frames, g_i, T_cam_imu, output_dir):
+    def save_as_pd(data_frames, g_i, bw_0, T_cam_imu, output_dir):
         start_time = time.time()
         data = {"image_path": [f.image_path for f in data_frames],
                 "timestamp": [f.timestamp for f in data_frames],
@@ -109,7 +110,8 @@ class SequenceData(object):
 
         constants = {
             "g_i": g_i,
-            "T_cam_imu": T_cam_imu
+            "T_cam_imu": T_cam_imu,
+            "bw_0": bw_0
         }
 
         np.save(os.path.join(output_dir, "constants.npy"), constants)
