@@ -37,7 +37,7 @@ class Subsequence(object):
 class SequenceData(object):
     class Frame(object):
         def __init__(self, image_path, timestamp, T_i_vk, v_vk_i_vk,
-                     imu_poses, imu_timestamps, accel_measurements, gyro_measurements):
+                     imu_poses, imu_timestamps, accel_measurements, gyro_measurements, timestamp_raw=0):
             self.image_path = image_path
             self.timestamp = timestamp
             self.T_i_vk = T_i_vk  # inertial to vehicle frame pose
@@ -46,6 +46,7 @@ class SequenceData(object):
             self.imu_poses = imu_poses
             self.accel_measurements = accel_measurements
             self.gyro_measurements = gyro_measurements
+            self.timestamp_raw = timestamp_raw
 
             assert (len(imu_timestamps) == len(accel_measurements))
             assert (len(imu_timestamps) == len(gyro_measurements))
@@ -85,8 +86,9 @@ class SequenceData(object):
         imu_timestamps = self.df.loc[i, "imu_timestamps"]
         accel_measurements = self.df.loc[i, "accel_measurements"]
         gyro_measurements = self.df.loc[i, "gyro_measurements"]
+        timestamp_raw = self.df.loc[i, "timestamp_raw"]
         return SequenceData.Frame(image_path, timestamp, T_i_vk, v_vk_i_vk,
-                                  imu_poses, imu_timestamps, accel_measurements, gyro_measurements)
+                                  imu_poses, imu_timestamps, accel_measurements, gyro_measurements, timestamp_raw)
 
     def as_frames(self):
         frames = []
@@ -104,7 +106,8 @@ class SequenceData(object):
                 "imu_timestamps": [f.imu_timestamps for f in data_frames],
                 "imu_poses": [f.imu_poses for f in data_frames],
                 "accel_measurements": [f.accel_measurements for f in data_frames],
-                "gyro_measurements": [f.gyro_measurements for f in data_frames]}
+                "gyro_measurements": [f.gyro_measurements for f in data_frames],
+                "timestamp_raw": [f.timestamp_raw for f in data_frames]},
         df = pd.DataFrame(data, columns=data.keys())
         df.to_pickle(os.path.join(output_dir, "data.pickle"))
 

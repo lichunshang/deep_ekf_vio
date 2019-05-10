@@ -42,7 +42,7 @@ class Parameters(object):
         # self.train_seqs = ['K08']
         # self.valid_seqs = ['K07']
 
-        self.seq_len = 32
+        self.seq_len = 5
         self.sample_times = 3
 
         self.exclude_resume_weights = ["imu_noise_covar_diag_sqrt", "init_covar_diag_sqrt"]
@@ -101,10 +101,10 @@ class Parameters(object):
         self.vis_meas_covar_diag_eps = np.array([1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2])
 
         # Training parameters
-        self.epochs = 400
-        self.batch_size = 16
+        self.epochs = 200
+        self.batch_size = 2
         self.pin_mem = True
-        self.cache_image = True
+        self.cache_image = False
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
 

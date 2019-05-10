@@ -85,7 +85,8 @@ def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, 
                                      imu_poses,
                                      imu_timestamps_k_kp1,
                                      accel_measurements_k_kp1,
-                                     gyro_measurements_k_kp1)
+                                     gyro_measurements_k_kp1,
+                                     timestamp_raw=t_k)
 
         data_frames.append(frame_k)
 
@@ -94,7 +95,8 @@ def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, 
                                           np.datetime64(t_kp1, "ns") - ref_time,
                                           T_i_vkp1,
                                           gt_data[imu_end_idx, [vx, vy, vz]],
-                                          np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3])))
+                                          np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3]),
+                                          timestamp_raw=t_kp1))
 
     return data_frames
 
