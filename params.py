@@ -45,7 +45,7 @@ class Parameters(object):
         self.seq_len = 32
         self.sample_times = 3
 
-        self.exclude_resume_weights = ["imu_noise_covar_diag_sqrt", "init_covar_diag_sqrt"]
+        self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
 
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
