@@ -392,8 +392,9 @@ class E2EVIO(nn.Module):
             vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
             vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
         else:
-            eps = torch.tensor(par.vis_meas_covar_diag_eps, device=vis_meas.device, dtype=torch.float32).view(1, 1, 6)
-            vis_meas_covar_diag = vis_meas_and_covar[:, :, 6:12] ** 2 + eps
+            vis_meas_covar_diag = par.vis_meas_covar_init_guess * \
+                                  10 ** (par.vis_meas_covar_beta *
+                                         torch.tanh(par.vis_meas_covar_gamma * vis_meas_and_covar[:, :, 6:12]))
 
         vis_meas_covar_diag_scaled = vis_meas_covar_diag / vis_meas_covar_scale.view(1, 1, 6)
 
@@ -416,5 +417,4 @@ class E2EVIO(nn.Module):
                                                                 torch.unsqueeze(vis_meas, -1),
                                                                 torch.diag_embed(vis_meas_covar_diag_scaled),
                                                                 T_imu_cam)
-        # vis_meas_covar = torch.diag_embed(vis_meas_and_covar[:, :, 6:12] ** 2 + eps)
         return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, poses, ekf_states, ekf_covars

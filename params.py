@@ -98,7 +98,9 @@ class Parameters(object):
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
         self.vis_meas_covar_use_fixed = False
-        self.vis_meas_covar_diag_eps = np.array([1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2])
+        self.vis_meas_covar_init_guess = 1e1
+        self.vis_meas_covar_beta = 3
+        self.vis_meas_covar_gamma = 4
 
         # Training parameters
         self.epochs = 400
