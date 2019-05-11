@@ -17,8 +17,8 @@ gpu_ids = arg_parsed.gpu_id
 resume_model_path = os.path.abspath(arg_parsed.resume_model_from) if arg_parsed.resume_model_from else None
 resume_optimizer_path = os.path.abspath(arg_parsed.resume_optimizer_from) if arg_parsed.resume_optimizer_from else None
 
-results_dir = par.results_dir if arg_parsed.run_eval_only else os.path.abspath(os.path.dirname(__file__))
-logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
+results_dir = os.path.abspath(os.path.dirname(__file__)) if arg_parsed.run_eval_only else par.results_dir
+logger.initialize(working_dir=results_dir, use_tensorboard=True)
 
 # set the visible GPUs
 if gpu_ids:
