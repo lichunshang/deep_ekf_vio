@@ -94,7 +94,7 @@ class Parameters(object):
                                               1e-3, 1e-3, 1e-3])
         self.train_imu_noise_covar = False
         self.imu_noise_covar_beta = 3
-        self.imu_noise_covar_gamma = 1
+        self.imu_noise_covar_gamma = 4
         #
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
