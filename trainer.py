@@ -249,19 +249,19 @@ class _TrainAssistant(object):
 
         if self.model.training:
             model = self.model.module if isinstance(self.model, torch.nn.DataParallel) else self.model
-            imu_noise_covar_diag = model.get_imu_noise_covar()
-            add_scalar("imu_noise_diag/w_x", imu_noise_covar_diag[0], iterations)
-            add_scalar("imu_noise_diag/w_y", imu_noise_covar_diag[1], iterations)
-            add_scalar("imu_noise_diag/w_z", imu_noise_covar_diag[2], iterations)
-            add_scalar("imu_noise_diag/bw_x", imu_noise_covar_diag[3], iterations)
-            add_scalar("imu_noise_diag/bw_y", imu_noise_covar_diag[4], iterations)
-            add_scalar("imu_noise_diag/bw_z", imu_noise_covar_diag[5], iterations)
-            add_scalar("imu_noise_diag/a_x", imu_noise_covar_diag[6], iterations)
-            add_scalar("imu_noise_diag/a_y", imu_noise_covar_diag[7], iterations)
-            add_scalar("imu_noise_diag/a_z", imu_noise_covar_diag[8], iterations)
-            add_scalar("imu_noise_diag/ba_x", imu_noise_covar_diag[9], iterations)
-            add_scalar("imu_noise_diag/ba_y", imu_noise_covar_diag[10], iterations)
-            add_scalar("imu_noise_diag/ba_z", imu_noise_covar_diag[11], iterations)
+            imu_noise_covar = torch.diagonal(model.get_imu_noise_covar())
+            add_scalar("imu_noise_diag/w_x", imu_noise_covar[0], iterations)
+            add_scalar("imu_noise_diag/w_y", imu_noise_covar[1], iterations)
+            add_scalar("imu_noise_diag/w_z", imu_noise_covar[2], iterations)
+            add_scalar("imu_noise_diag/bw_x", imu_noise_covar[3], iterations)
+            add_scalar("imu_noise_diag/bw_y", imu_noise_covar[4], iterations)
+            add_scalar("imu_noise_diag/bw_z", imu_noise_covar[5], iterations)
+            add_scalar("imu_noise_diag/a_x", imu_noise_covar[6], iterations)
+            add_scalar("imu_noise_diag/a_y", imu_noise_covar[7], iterations)
+            add_scalar("imu_noise_diag/a_z", imu_noise_covar[8], iterations)
+            add_scalar("imu_noise_diag/ba_x", imu_noise_covar[9], iterations)
+            add_scalar("imu_noise_diag/ba_y", imu_noise_covar[10], iterations)
+            add_scalar("imu_noise_diag/ba_z", imu_noise_covar[11], iterations)
             add_scalar("params/k3", k3, iterations)
         return loss
 

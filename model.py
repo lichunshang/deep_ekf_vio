@@ -380,11 +380,12 @@ class E2EVIO(nn.Module):
         self.ekf_module = IMUKalmanFilter()
 
     def get_imu_noise_covar(self):
-        imu_noise_covar = par.imu_noise_covar_diag * \
-                          10 ** (par.imu_noise_covar_beta *
-                                 torch.tanh(par.imu_noise_covar_gamma * self.imu_noise_covar_weights))
+        imu_noise_covar_diag = torch.tensor(par.imu_noise_covar_diag, dtype=torch.float32,
+                                            device=self.imu_noise_covar_weights.device) * \
+                               10 ** (par.imu_noise_covar_beta *
+                                      torch.tanh(par.imu_noise_covar_gamma * self.imu_noise_covar_weights))
 
-        return imu_noise_covar
+        return torch.diag(imu_noise_covar_diag)
 
     def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam):
         vis_meas_and_covar, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
