@@ -4,6 +4,7 @@ import os
 import transformations
 from data_loader import SequenceData
 import yaml
+from shutil import copyfile
 
 px = 0  # p_RS_R_x [m]
 py = 1  # p_RS_R_y [m]
@@ -259,7 +260,7 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
 
     SequenceData.save_as_pd(data_frames, gravity_from_gt, gyro_bias_from_still, T_cam_imu, output_dir)
 
-    # for testing
+    # for evaluation
     imu_cam_aligned_start_idx = imu_timestamps.index(cam_timestamps[cam_imu_aligned_start_idx])
     imu_cam_aligned_end_idx = imu_timestamps.index(cam_timestamps[cam_imu_aligned_end_idx])
     imu_timestamps_cam_aligned = imu_timestamps[imu_cam_aligned_start_idx:imu_cam_aligned_end_idx]
@@ -272,7 +273,11 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
                                      imu_data_cam_aligned,
                                      imu_timestamps_cam_aligned,
                                      zeros_gt)
-    SequenceData.save_as_pd(data_frames, gravity_from_still, gyro_bias_from_still, T_cam_imu, output_dir)
+    eval_output_dir = output_dir + "_eval"
+    logger.make_dir_if_not_exist(eval_output_dir)
+    SequenceData.save_as_pd(data_frames, gravity_from_still, gyro_bias_from_still, T_cam_imu, eval_output_dir)
+    copyfile(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"),
+             os.path.join(eval_output_dir, "groundtruth.csv"))
 
 
 # preprocess_euroc("/home/cs4li/Dev/EUROC/V2_03_difficult", "/home/cs4li/Dev/deep_ekf_vio/results/euroc_proprocess_test",

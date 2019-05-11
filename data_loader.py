@@ -107,7 +107,7 @@ class SequenceData(object):
                 "imu_poses": [f.imu_poses for f in data_frames],
                 "accel_measurements": [f.accel_measurements for f in data_frames],
                 "gyro_measurements": [f.gyro_measurements for f in data_frames],
-                "timestamp_raw": [f.timestamp_raw for f in data_frames]},
+                "timestamp_raw": [f.timestamp_raw for f in data_frames]}
         df = pd.DataFrame(data, columns=data.keys())
         df.to_pickle(os.path.join(output_dir, "data.pickle"))
 
