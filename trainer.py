@@ -208,7 +208,7 @@ class _TrainAssistant(object):
 
         k3 = self.schedule(par.k3)
 
-        loss_abs = (par.k2 * abs_angle_loss + abs_trans_loss) * par.k4 ** 2
+        loss_abs = abs_trans_loss * par.k4 ** 2
         # loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
         # loss = k3 * loss_rel + (1 - k3) * loss_abs
         loss_vis_meas = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses)
