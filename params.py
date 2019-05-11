@@ -88,12 +88,13 @@ class Parameters(object):
         self.train_init_covar = False
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag_sqrt = np.sqrt(np.array([1e-7, 1e-7, 1e-7,
-                                                           1e-7, 1e-7, 1e-7,
-                                                           1e-2, 1e-2, 1e-2,
-                                                           1e-3, 1e-3, 1e-3]))
+        self.imu_noise_covar_diag = np.array([1e-7, 1e-7, 1e-7,
+                                              1e-7, 1e-7, 1e-7,
+                                              1e-2, 1e-2, 1e-2,
+                                              1e-3, 1e-3, 1e-3])
         self.train_imu_noise_covar = False
-        self.imu_noise_covar_diag_eps = 1e-12
+        self.imu_noise_covar_beta = 3
+        self.imu_noise_covar_gamma = 1
         #
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
