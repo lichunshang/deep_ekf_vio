@@ -6,8 +6,6 @@ from params import par
 from log import logger
 from eval import gen_trajectory, plot_trajectory, kitti_eval, np_traj_to_kitti, calc_error, plot_errors
 
-logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
-
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
 arg_parser.add_argument('--run_eval_only', default=False, action='store_true',
@@ -19,19 +17,18 @@ gpu_ids = arg_parsed.gpu_id
 resume_model_path = os.path.abspath(arg_parsed.resume_model_from) if arg_parsed.resume_model_from else None
 resume_optimizer_path = os.path.abspath(arg_parsed.resume_optimizer_from) if arg_parsed.resume_optimizer_from else None
 
+results_dir = par.results_dir if arg_parsed.run_eval_only else os.path.abspath(os.path.dirname(__file__))
+logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
+
 # set the visible GPUs
 if gpu_ids:
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(i) for i in gpu_ids])
     logger.print("CUDA_VISIVLE_DEVICES: %s" % os.environ["CUDA_VISIBLE_DEVICES"])
 
-
 if not arg_parsed.run_eval_only:
-    results_dir = par.results_dir
     start_t = time.time()
     trainer.train(resume_model_path, resume_optimizer_path)
     logger.print("Training took %.2fs" % (time.time() - start_t))
-else:
-    results_dir = "./"
 
 for tag in ["valid", "train", "checkpoint", "eval"]:
     seq_results_dir = gen_trajectory(os.path.join(results_dir, "saved_model.%s" % tag),
