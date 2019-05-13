@@ -365,9 +365,16 @@ class E2EVIO(nn.Module):
 
         self.vo_module = DeepVO(par.img_h, par.img_w, par.batch_norm)
 
-        self.imu_noise_covar_weights = nn.Parameter(torch.zeros(12, dtype=torch.float32))
+        # self.imu_noise_covar_weights = nn.Parameter(torch.zeros(12, dtype=torch.float32))
+        # if not par.train_imu_noise_covar:
+        #     self.imu_noise_covar_weights.requires_grad = False
+
+        self.imu_noise_covar_weights = torch.nn.Linear(1, 4, bias=False)
         if not par.train_imu_noise_covar:
             self.imu_noise_covar_weights.requires_grad = False
+            self.imu_noise_covar_weights.weight.data.zero_()
+        else:
+            self.imu_noise_covar_weights.weight.data /= 10
 
         self.init_covar_diag_sqrt = nn.Parameter(torch.tensor(par.init_covar_diag_sqrt, dtype=torch.float32))
         if not par.train_init_covar:
@@ -380,11 +387,15 @@ class E2EVIO(nn.Module):
         self.ekf_module = IMUKalmanFilter()
 
     def get_imu_noise_covar(self):
-        imu_noise_covar_diag = torch.tensor(par.imu_noise_covar_diag, dtype=torch.float32,
-                                            device=self.imu_noise_covar_weights.device) * \
-                               10 ** (par.imu_noise_covar_beta *
-                                      torch.tanh(par.imu_noise_covar_gamma * self.imu_noise_covar_weights))
+        covar = 10 ** (par.imu_noise_covar_beta * torch.tanh(par.imu_noise_covar_gamma * self.imu_noise_covar_weights(
+                torch.ones(1, device=self.imu_noise_covar_weights.weight.device))))
 
+        imu_noise_covar_diag = torch.tensor(par.imu_noise_covar_diag, dtype=torch.float32,
+                                            device=self.imu_noise_covar_weights.weight.device).repeat_interleave(3) * \
+                               torch.stack([covar[0], covar[0], covar[0],
+                                            covar[1], covar[1], covar[1],
+                                            covar[2], covar[2], covar[2],
+                                            covar[3], covar[3], covar[3]])
         return torch.diag(imu_noise_covar_diag)
 
     def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam):
