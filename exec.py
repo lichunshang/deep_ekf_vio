@@ -5,8 +5,8 @@ from params import par
 import preprocess
 
 choices = ["gen_trajectory", "plot_trajectory", "plot_ekf_states", "np_traj_to_kitti", "kitti_eval", "calc_error",
-           "plot_error",
-           "preprocess_kitti_raw", "check_time_discontinuities", "calc_image_mean_std"]
+           "plot_error", "preprocess_kitti_raw", "preprocess_euroc", "check_time_discontinuities",
+           "calc_image_mean_std"]
 
 top_level_arg_parser = argparse.ArgumentParser(description='Execute scripts')
 top_level_arg_parser.add_argument('script', type=str, help='The program to run', choices=choices)
@@ -85,6 +85,17 @@ elif top_level_arg_parsed.script == "check_time_discontinuities":
     arg_parser.add_argument('kitti_raw_dir', type=str, help='KITTI raw data path (extract)')
     arg_parsed = arg_parser.parse_args(args=args)
     preprocess.check_time_discontinuities(arg_parsed.kitti_raw_dir)
+
+elif top_level_arg_parsed.script == "preprocess_euroc":
+    arg_parser = argparse.ArgumentParser(description='Preprocess EUROC Data')
+    arg_parser.add_argument('euroc_dir', type=str, help='EUROC_dir')
+    arg_parser.add_argument('output_dir', type=str,
+                            help='Output directory, the name of the output dir is also the sequence name')
+    arg_parser.add_argument('cam_still_range', type=int, nargs=2,
+                            help="The portion of the sequence when the drone is not moving, "
+                                 "used for inference time evaluation")
+    arg_parsed = arg_parser.parse_args(args=args)
+    preprocess.preprocess_euroc(arg_parsed.euroc_dir, arg_parsed.output_dir, arg_parsed.cam_still_range)
 
 elif top_level_arg_parsed.script == "calc_image_mean_std":
     arg_parser = argparse.ArgumentParser(description='Calculate the image channel mean and std')

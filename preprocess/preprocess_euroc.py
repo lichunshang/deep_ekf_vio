@@ -35,41 +35,39 @@ def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, 
     assert len(gt_timestamps) == len(imu_timestamps)
     assert len(gt_timestamps) == len(imu_data)
     assert np.max(np.abs(np.array(imu_timestamps) - np.array(gt_timestamps))) < 1000
+    assert cam_timestamps[0] == imu_timestamps[0]
+    assert cam_timestamps[-1] == imu_timestamps[-1]
 
     data_frames = []
-    first_image_found = False
     ref_time = np.datetime64(int(min([cam_timestamps[0], imu_timestamps[0], ])), "ns")
-    for i in range(0, len(cam_timestamps) - 1):
-        t_k = cam_timestamps[i]
-        t_kp1 = cam_timestamps[i + 1]
 
-        # raises value error is not found
-        try:
-            imu_start_idx = imu_timestamps.index(t_k)
-        except ValueError as e:
-            if not first_image_found:
-                continue
-            else:
-                raise e
+    cam_period = 100 * 10 ** 6  # nanoseconds
+    imu_skip = 2
+    i_start = 0
+    # for i in range(0, len(cam_timestamps) - 1):
+    while i_start < len(cam_timestamps) - 1:
+        t_k = cam_timestamps[i_start]
+        i_end = (np.abs(np.array(cam_timestamps) - (cam_timestamps[i_start] + cam_period))).argmin()
+        t_kp1 = cam_timestamps[i_end]
 
-        try:
-            imu_end_idx = imu_timestamps.index(t_kp1)
-        except ValueError:
-            break
+        imu_start_idx = imu_timestamps.index(t_k)
+        imu_end_idx = imu_timestamps.index(t_kp1)
 
-        if not first_image_found:
-            logger.print("First image idx %d ts %d" % (i, t_k))
-            first_image_found = True
+        if not t_kp1 - t_k == cam_period:
+            # ignore the last frame if it is does not at the desired rate
+            if i_end == len(cam_timestamps) - 1:
+                break
 
-        if not imu_end_idx - imu_start_idx == 10:
-            logger.print("WARN imu_end_idx - imu_start_idx != 10, image: [%d -> %d] imu: [%d -> %d, %d -> %d]" %
-                         (i, i + 1, imu_start_idx, imu_end_idx, t_k, t_kp1))
+            logger.print("WARN imu_end_idx - imu_start_idx != %.5s, "
+                         "image: [%d -> %d] imu: [%d -> %d] time: [%d -> %d] diff %.5f"
+                         % (cam_period / 10 ** 9, i_start, i_end, imu_start_idx, imu_end_idx, t_k, t_kp1,
+                            (t_kp1 - t_k) / 10 ** 9))
 
         imu_poses = []
         imu_timestamps_k_kp1 = []
         accel_measurements_k_kp1 = []
         gyro_measurements_k_kp1 = []
-        for j in range(imu_start_idx, imu_end_idx + 1, 1):
+        for j in range(imu_start_idx, imu_end_idx + 1, imu_skip):
             imu_pose = transformations.quaternion_matrix(gt_data[j, [qw, qx, qy, qz]])
             imu_pose[0:3, 3] = gt_data[j, [px, py, pz]]
             imu_poses.append(imu_pose)
@@ -90,6 +88,7 @@ def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, 
                                      timestamp_raw=t_k)
 
         data_frames.append(frame_k)
+        i_start = i_end
 
     T_i_vkp1 = imu_poses[-1]
     data_frames.append(SequenceData.Frame("%09d.png" % t_kp1,
@@ -148,6 +147,7 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     logger.print("================ PREPROCESS EUROC ================")
     logger.print("Preprocessing %s" % seq_dir)
     logger.print("Output to: %s" % output_dir)
+    logger.print("Camera still range [%d -> %d]" % (cam_still_range[0], cam_still_range[1]))
 
     left_cam_csv = open(os.path.join(seq_dir, 'cam0', 'data.csv'), 'r')
     imu_csv = open(os.path.join(seq_dir, 'imu0', "data.csv"), 'r')
@@ -229,6 +229,7 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     print("still estimated g_b0 norm: ", np.linalg.norm(gravity_from_still))
 
     # for training /validation
+    logger.print("Processing data for training...")
     every_N_frames = 10
     rounded_length = len(imu_timestamps_gt_aligned) // every_N_frames * every_N_frames
     gravity_from_gt = find_initial_gravity(imu_timestamps_gt_aligned[0:rounded_length],
@@ -252,23 +253,26 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     gt_cam_aligned_start_idx = imu_timestamps_gt_aligned.index(cam_timestamps[cam_gt_aligned_start_idx])
     gt_cam_aligned_end_idx = imu_timestamps_gt_aligned.index(cam_timestamps[cam_gt_aligned_end_idx])
 
+    logger.print("Camera index [%d -> %d]" % (cam_gt_aligned_start_idx, cam_gt_aligned_end_idx))
     data_frames = package_euroc_data(cam_timestamps[cam_gt_aligned_start_idx:cam_gt_aligned_end_idx + 1],
-                                     imu_timestamps_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx],
-                                     imu_data_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx],
-                                     gt_timestamps[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx],
-                                     gt_data[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx])
+                                     imu_timestamps_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
+                                     imu_data_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
+                                     gt_timestamps[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
+                                     gt_data[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1])
 
     SequenceData.save_as_pd(data_frames, gravity_from_gt, gyro_bias_from_still, T_cam_imu, output_dir)
 
     # for evaluation
-    imu_cam_aligned_start_idx = imu_timestamps.index(cam_timestamps[cam_imu_aligned_start_idx])
+    logger.print("Processing data for evaluation...")
+    imu_cam_aligned_start_idx = imu_timestamps.index(cam_timestamps[cam_still_range[1]])
     imu_cam_aligned_end_idx = imu_timestamps.index(cam_timestamps[cam_imu_aligned_end_idx])
-    imu_timestamps_cam_aligned = imu_timestamps[imu_cam_aligned_start_idx:imu_cam_aligned_end_idx]
-    imu_data_cam_aligned = imu_data[imu_cam_aligned_start_idx:imu_cam_aligned_end_idx]
+    imu_timestamps_cam_aligned = imu_timestamps[imu_cam_aligned_start_idx:imu_cam_aligned_end_idx + 1]
+    imu_data_cam_aligned = imu_data[imu_cam_aligned_start_idx:imu_cam_aligned_end_idx + 1]
     zeros_gt = np.zeros([len(imu_timestamps_cam_aligned), 16])
     zeros_gt[: qw] = 1
 
-    data_frames = package_euroc_data(cam_timestamps[cam_imu_aligned_start_idx:cam_imu_aligned_end_idx + 1],
+    logger.print("Camera index [%d -> %d]" % (cam_still_range[1], cam_imu_aligned_end_idx))
+    data_frames = package_euroc_data(cam_timestamps[cam_still_range[1]:cam_imu_aligned_end_idx + 1],
                                      imu_timestamps_cam_aligned,
                                      imu_data_cam_aligned,
                                      imu_timestamps_cam_aligned,
@@ -278,17 +282,3 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     SequenceData.save_as_pd(data_frames, gravity_from_still, gyro_bias_from_still, T_cam_imu, eval_output_dir)
     copyfile(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"),
              os.path.join(eval_output_dir, "groundtruth.csv"))
-
-
-# preprocess_euroc("/home/cs4li/Dev/EUROC/V2_03_difficult", "/home/cs4li/Dev/deep_ekf_vio/results/euroc_proprocess_test",
-#                  [0, 70])
-preprocess_euroc("/home/cs4li/Dev/EUROC/MH_01_easy", "/home/cs4li/Dev/deep_ekf_vio/results/euroc_proprocess_test",
-                 [421, 621])
-# preprocess_euroc("/home/cs4li/Dev/EUROC/MH_03_medium", "/home/cs4li/Dev/deep_ekf_vio/results/euroc_proprocess_test",
-#                  [0, 40])
-# preprocess_euroc("/home/cs4li/Dev/EUROC/MH_04_difficult", "/home/cs4li/Dev/deep_ekf_vio/results/euroc_proprocess_test",
-#                  [0, 20])
-# preprocess_euroc("/home/cs4li/Dev/EUROC/V2_03_difficult", "/home/cs4li/Dev/deep_ekf_vio/results/euroc_proprocess_test",
-#                  0, 0)
-# preprocess_euroc("/home/cs4li/Dev/EUROC/V2_03_difficult", "/home/cs4li/Dev/deep_ekf_vio/results/euroc_proprocess_test",
-#                  0, 0)
