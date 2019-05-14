@@ -45,7 +45,7 @@ class Parameters(object):
         self.seq_len = 5
         self.sample_times = 3
 
-        self.exclude_resume_weights = ["imu_noise_covar_diag_sqrt", "init_covar_diag_sqrt"]
+        self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
 
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
@@ -88,17 +88,20 @@ class Parameters(object):
         self.train_init_covar = False
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag_sqrt = np.sqrt(np.array([1e-7, 1e-7, 1e-7,
-                                                           1e-7, 1e-7, 1e-7,
-                                                           1e-2, 1e-2, 1e-2,
-                                                           1e-3, 1e-3, 1e-3]))
-        self.train_imu_noise_covar = False
-        self.imu_noise_covar_diag_eps = 1e-12
+        self.imu_noise_covar_diag = np.array([1e-7,  # w
+                                              1e-7,  # bw
+                                              1e-2,  # a
+                                              1e-3])  # ba
+        self.train_imu_noise_covar = True
+        self.imu_noise_covar_beta = 3
+        self.imu_noise_covar_gamma = 4
         #
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
         self.vis_meas_covar_use_fixed = False
-        self.vis_meas_covar_diag_eps = np.array([1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2])
+        self.vis_meas_covar_init_guess = 1e1
+        self.vis_meas_covar_beta = 3
+        self.vis_meas_covar_gamma = 4
 
         # Training parameters
         self.epochs = 200

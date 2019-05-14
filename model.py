@@ -365,9 +365,16 @@ class E2EVIO(nn.Module):
 
         self.vo_module = DeepVO(par.img_h, par.img_w, par.batch_norm)
 
-        self.imu_noise_covar_diag_sqrt = nn.Parameter(torch.tensor(par.imu_noise_covar_diag_sqrt, dtype=torch.float32))
+        # self.imu_noise_covar_weights = nn.Parameter(torch.zeros(12, dtype=torch.float32))
+        # if not par.train_imu_noise_covar:
+        #     self.imu_noise_covar_weights.requires_grad = False
+
+        self.imu_noise_covar_weights = torch.nn.Linear(1, 4, bias=False)
         if not par.train_imu_noise_covar:
-            self.imu_noise_covar_diag_sqrt.requires_grad = False
+            self.imu_noise_covar_weights.requires_grad = False
+            self.imu_noise_covar_weights.weight.data.zero_()
+        else:
+            self.imu_noise_covar_weights.weight.data /= 10
 
         self.init_covar_diag_sqrt = nn.Parameter(torch.tensor(par.init_covar_diag_sqrt, dtype=torch.float32))
         if not par.train_init_covar:
@@ -378,6 +385,18 @@ class E2EVIO(nn.Module):
                 param.requires_grad = False
 
         self.ekf_module = IMUKalmanFilter()
+
+    def get_imu_noise_covar(self):
+        covar = 10 ** (par.imu_noise_covar_beta * torch.tanh(par.imu_noise_covar_gamma * self.imu_noise_covar_weights(
+                torch.ones(1, device=self.imu_noise_covar_weights.weight.device))))
+
+        imu_noise_covar_diag = torch.tensor(par.imu_noise_covar_diag, dtype=torch.float32,
+                                            device=self.imu_noise_covar_weights.weight.device).repeat_interleave(3) * \
+                               torch.stack([covar[0], covar[0], covar[0],
+                                            covar[1], covar[1], covar[1],
+                                            covar[2], covar[2], covar[2],
+                                            covar[3], covar[3], covar[3]])
+        return torch.diag(imu_noise_covar_diag)
 
     def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam):
         vis_meas_and_covar, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
@@ -392,16 +411,16 @@ class E2EVIO(nn.Module):
             vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
             vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
         else:
-            eps = torch.tensor(par.vis_meas_covar_diag_eps, device=vis_meas.device, dtype=torch.float32).view(1, 1, 6)
-            vis_meas_covar_diag = vis_meas_and_covar[:, :, 6:12] ** 2 + eps
+            vis_meas_covar_diag = par.vis_meas_covar_init_guess * \
+                                  10 ** (par.vis_meas_covar_beta *
+                                         torch.tanh(par.vis_meas_covar_gamma * vis_meas_and_covar[:, :, 6:12]))
 
         vis_meas_covar_diag_scaled = vis_meas_covar_diag / vis_meas_covar_scale.view(1, 1, 6)
 
         if not par.enable_ekf:
             return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, None, None, None
 
-        imu_noise_covar = torch.diag(self.imu_noise_covar_diag_sqrt * self.imu_noise_covar_diag_sqrt +
-                                     par.imu_noise_covar_diag_eps)
+        imu_noise_covar = self.get_imu_noise_covar()
 
         if prev_covar is None:
             init_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
@@ -416,5 +435,4 @@ class E2EVIO(nn.Module):
                                                                 torch.unsqueeze(vis_meas, -1),
                                                                 torch.diag_embed(vis_meas_covar_diag_scaled),
                                                                 T_imu_cam)
-        # vis_meas_covar = torch.diag_embed(vis_meas_and_covar[:, :, 6:12] ** 2 + eps)
         return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, poses, ekf_states, ekf_covars
