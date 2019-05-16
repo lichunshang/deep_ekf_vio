@@ -112,7 +112,7 @@ def check_time_discontinuities(raw_seq_dir):
                   (dt, i - 1, i, imu_timestamps[i - 1], imu_timestamps[i], ",".join([str(j) for j in img])))
 
 
-def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
+def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range, plot_figures=True):
     logger.initialize(working_dir=output_dir, use_tensorboard=False)
     logger.print("================ PREPROCESS KITTI RAW ================")
     logger.print("Preprocessing %s" % raw_seq_dir)
@@ -239,6 +239,10 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range):
 
     df = SequenceData.save_as_pd(data_frames, np.array([0, 0, 9.808679801065017]), np.zeros(3), T_cam_imu, output_dir)
     data = df.to_dict("list")
+
+    if not plot_figures:
+        logger.print("All done!")
+        return
 
     # ============================== FIGURES FOR SANITY TESTS ==============================
     # plot trajectory

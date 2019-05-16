@@ -71,16 +71,15 @@ def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, 
             imu_pose = transformations.quaternion_matrix(gt_data[j, [qw, qx, qy, qz]])
             imu_pose[0:3, 3] = gt_data[j, [px, py, pz]]
             imu_poses.append(imu_pose)
-            imu_timestamps_k_kp1.append(np.datetime64(imu_timestamps[j], "ns") - ref_time)
+            imu_timestamps_k_kp1.append((np.datetime64(imu_timestamps[j], "ns") - ref_time) / np.timedelta64(1, "s"))
             accel_measurements_k_kp1.append(imu_data[j, [ax, ay, az]])
             gyro_measurements_k_kp1.append(imu_data[j, [wx, wy, wz]])
 
-        v_vk = gt_data[imu_start_idx, [vx, vy, vz]]
         T_i_vk = imu_poses[0]
         frame_k = SequenceData.Frame("%09d.png" % t_k,
-                                     np.datetime64(t_k, "ns") - ref_time,
+                                     (np.datetime64(t_k, "ns") - ref_time) / np.timedelta64(1, "s"),
                                      T_i_vk,
-                                     v_vk,
+                                     T_i_vk[0:3, 0:3].transpose().dot(gt_data[imu_start_idx, [vx, vy, vz]]),  # v_vk
                                      imu_poses,
                                      imu_timestamps_k_kp1,
                                      accel_measurements_k_kp1,
@@ -92,9 +91,9 @@ def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, 
 
     T_i_vkp1 = imu_poses[-1]
     data_frames.append(SequenceData.Frame("%09d.png" % t_kp1,
-                                          np.datetime64(t_kp1, "ns") - ref_time,
+                                          (np.datetime64(t_kp1, "ns") - ref_time) / np.timedelta64(1, "s"),
                                           T_i_vkp1,
-                                          gt_data[imu_end_idx, [vx, vy, vz]],
+                                          T_i_vkp1[0:3, 0:3].transpose().dot(gt_data[imu_end_idx, [vx, vy, vz]]),
                                           np.zeros([0, 4, 4]), np.zeros([0]), np.zeros([0, 3]), np.zeros([0, 3]),
                                           timestamp_raw=t_kp1))
 

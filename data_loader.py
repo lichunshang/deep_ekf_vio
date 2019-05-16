@@ -15,7 +15,7 @@ from params import par
 
 class Subsequence(object):
 
-    def __init__(self, frames, g_i, T_cam_imu, length, seq, type, idx, idx_next):
+    def __init__(self, frames, g_i, bw_0, T_cam_imu, length, seq, type, idx, idx_next):
         assert (length == len(frames))
         assert (length == len(frames))
         self.gt_poses = np.array([f.T_i_vk for f in frames])
@@ -26,6 +26,7 @@ class Subsequence(object):
         self.gyro_measurements = [f.gyro_measurements for f in frames]
 
         self.g_i = g_i
+        self.bw_0 = bw_0
         self.T_cam_imu = T_cam_imu
         self.length = length
         self.type = type
@@ -158,7 +159,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             sub_seqs_vanilla = []
             for i in range(st, len(frames), jump):
                 if i + seq_len <= len(frames):  # this will discard a few frames at the end
-                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.T_cam_imu,
+                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.bw_0, seq_data.T_cam_imu,
                                          length=seq_len, seq=seq, type="vanilla", idx=i, idx_next=i + jump)
                     sub_seqs_vanilla.append(subseq)
             subseqs_buffer += sub_seqs_vanilla
@@ -202,7 +203,7 @@ class SubseqDataset(Dataset):
     __cache = {}  # cache using across multiple SubseqDataset objects
 
     def __init__(self, subseqs, img_size=None, img_mean=None, img_std=(1, 1, 1),
-                 minus_point_5=False, training=True):
+                 minus_point_5=False, training=True, no_image=False):
 
         # Transforms
         self.pre_runtime_transformer = transforms.Compose([
@@ -221,6 +222,7 @@ class SubseqDataset(Dataset):
         # Normalization
         self.minus_point_5 = minus_point_5
         self.normalizer = transforms.Normalize(mean=img_mean, std=img_std)
+        self.no_image = no_image
 
         # log
         # logger.print("Transform parameters: ")
@@ -279,6 +281,25 @@ class SubseqDataset(Dataset):
         gt_velocities = torch.tensor(subseq.gt_velocities, dtype=torch.float32)
         imu_data = torch.tensor(imu_data, dtype=torch.float32)
 
+        init_g = torch.tensor(subseq.gt_poses[0, 0:3, 0:3].transpose().dot(subseq.g_i), dtype=torch.float32)
+        bw_0 = torch.tensor(subseq.bw_0, dtype=torch.float32)
+
+        if par.cal_override_enable:
+            T_imu_cam = torch.tensor(par.T_imu_cam_override, dtype=torch.float32)
+        else:
+            T_imu_cam = torch.tensor(np.linalg.inv(subseq.T_cam_imu), dtype=torch.float32)  # EKF takes T_imu_cam
+
+        init_state = model.IMUKalmanFilter.encode_state(init_g,
+                                                        torch.eye(3, 3),  # C
+                                                        torch.zeros(3),  # r
+                                                        gt_velocities[0],  # v
+                                                        bw_0,  # bw
+                                                        torch.zeros(3))  # ba
+
+        if self.no_image:
+            return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
+                   torch.zeros(1), imu_data, init_state, T_imu_cam, gt_poses_inv, gt_rel_poses
+
         # process images
         images = []
         for img_path in subseq.image_paths:
@@ -297,19 +318,6 @@ class SubseqDataset(Dataset):
             images.append(image)
         images = torch.stack(images, 0)
 
-        init_g = torch.tensor(subseq.gt_poses[0, 0:3, 0:3].transpose().dot(subseq.g_i), dtype=torch.float32)
-
-        if par.cal_override_enable:
-            T_imu_cam = torch.tensor(par.T_imu_cam_override, dtype=torch.float32)
-        else:
-            T_imu_cam = torch.tensor(np.linalg.inv(subseq.T_cam_imu), dtype=torch.float32)  # EKF takes T_imu_cam
-
-        init_state = model.IMUKalmanFilter.encode_state(init_g,
-                                                        torch.eye(3, 3),  # C
-                                                        torch.zeros(3),  # r
-                                                        gt_velocities[0],  # v
-                                                        torch.zeros(3),  # bw
-                                                        torch.zeros(3))  # ba
         return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
                images, imu_data, init_state, T_imu_cam, gt_poses_inv, gt_rel_poses
 

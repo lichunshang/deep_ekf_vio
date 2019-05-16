@@ -16,10 +16,10 @@ mkdir -p "$OUTPUT_DIR"
 # now generate the sequences
 seq_data=(
 MH_01_easy       MH_01   421 621
-MH_02_easy       MH_01   534 594
-MH_03_medium     MH_01   0 40
-MH_04_difficult  MH_01   0 20
-MH_05_difficult  MH_01   0 60
+MH_02_easy       MH_02   534 594
+MH_03_medium     MH_03   0 40
+MH_04_difficult  MH_04   0 20
+MH_05_difficult  MH_05   0 60
 V1_01_easy       V1_01   0 90
 V1_02_medium     V1_02   0 70
 V1_03_difficult  V1_03   0 90

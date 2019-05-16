@@ -80,6 +80,7 @@ def gen_trajectory_abs_iter(model, dataloaders):
             model.forward(images, imu_data, lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam)
 
         for j, k in enumerate(data):
+            # if it is the first estimate, include the initial pose as well, otherwise just 1: onwards
             slice_start = 1 if i > 0 else 0
             est_poses_dict[k] += list(est_poses[j].detach().cpu().numpy())[slice_start:]
             est_states_dict[k] += list(est_ekf_states[j].detach().cpu().numpy())[slice_start:]
