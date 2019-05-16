@@ -74,14 +74,14 @@ class Logger(object):
         diff_file.write(diff_ret)
         diff_file.close()
 
-    def print(self, *args):
+    def print(self, *args, end="\n"):
         string = " ".join([str(arg) for arg in args])
         sys.stdout.write(string)
-        sys.stdout.write("\n")
+        sys.stdout.write(end)
         sys.stdout.flush()
         if self.record_file_handle:
             self.record_file_handle.write(string)
-            self.record_file_handle.write("\n")
+            self.record_file_handle.write(end)
             self.record_file_handle.flush()
 
     def log_training_state(self, tag, epoch, model_state_dict, optimizer_state_dict=None):

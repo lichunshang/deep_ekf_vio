@@ -75,6 +75,9 @@ class SequenceData(object):
     def get_timestamps(self):
         return np.array(list(self.df.loc[:, "timestamp"]))
 
+    def get_timestamps_raw(self):
+        return np.array(list(self.df.loc[:, "timestamp_raw"]))
+
     def get_images_paths(self):
         return list(self.df.loc[:, "image_path"].values)
 

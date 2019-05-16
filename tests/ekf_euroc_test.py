@@ -7,6 +7,7 @@ from model import IMUKalmanFilter
 from data_loader import get_subseqs, SubseqDataset, SequenceData
 from params import par
 from log import logger
+from eval.euroc_eval import EurocErrorCalc
 
 
 class Test_EKF_EUROC(unittest.TestCase):
@@ -14,15 +15,18 @@ class Test_EKF_EUROC(unittest.TestCase):
         output_dir = os.path.join(par.results_coll_dir, "test_ekf_euroc")
         logger.initialize(output_dir, use_tensorboard=False)
 
+        # seqs = ["MH_01"]
         seqs = ["MH_01", "MH_02", "MH_03", "MH_04", "MH_05", "V1_01", "V1_02", "V1_03", "V2_01", "V2_02", "V2_03"]
         # seqs2 = ["MH_01_eval", "MH_02_eval", "MH_03_eval", "MH_04_eval", "MH_05_eval",
         #          "V1_01_eval", "V1_02_eval", "V1_03_eval", "V2_01_eval", "V2_02_eval", "V2_03_eval"]
         # seqs = seqs + seqs2
 
+        error_calc = EurocErrorCalc(seqs)
+
         imu_covar = torch.diag(torch.tensor([1e-3, 1e-3, 1e-3,
                                              1e-5, 1e-5, 1e-5,
                                              1e-1, 1e-1, 1e-1,
-                                             1e-4, 1e-4, 1e-4]))
+                                             1e-2, 1e-2, 1e-2]))
         vis_meas_covar = torch.diag(torch.tensor([1e-3, 1e-3, 1e-3,
                                                   1e-3, 1e-3, 1e-3])).view(1, 1, 6, 6)
         init_covar = np.eye(18, 18)
@@ -72,12 +76,19 @@ class Test_EKF_EUROC(unittest.TestCase):
                     est_ekf_states.append(ekf_state[:, -1])
                     est_ekf_covars.append(ekf_covar[:, -1])
 
+            est_poses_np = torch.stack(est_poses, 1).squeeze().detach().cpu().numpy().astype("float64")
+            err = error_calc.accumulate_error(seq, np.linalg.inv(est_poses_np))
+
+            logger.print("Error: %.5f" % err)
+
             logger.print("Plotting figures...")
             plot_ekf_data(os.path.join(output_dir, seq), seq_data.get_timestamps(),
                           seq_data.get_poses(), seq_data.get_velocities(),
                           torch.stack(est_poses, 1).squeeze(), torch.stack(est_ekf_states, 1).squeeze())
 
             logger.print("Finished Sequence %s" % seq)
+
+        logger.print("Done! Ave Error: %.5f" % error_calc.get_average_error())
 
 
 if __name__ == '__main__':

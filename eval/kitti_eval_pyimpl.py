@@ -69,7 +69,9 @@ class KittiErrorCalc(object):
 
     def accumulate_error(self, seq, est):
         assert (seq in self.gt_poses)
-        self.errors += calc_kitti_seq_errors(self.gt_poses[seq][:len(est)], est)[0]
+        errors = calc_kitti_seq_errors(self.gt_poses[seq][:len(est)], est)[0]
+        self.errors += errors
+        return np.average(np.array(errors)[:, 0])
 
     def get_average_error(self):
         # only use translation as average error
