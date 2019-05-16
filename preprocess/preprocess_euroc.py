@@ -260,6 +260,8 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
                                      gt_data[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1])
 
     SequenceData.save_as_pd(data_frames, gravity_from_gt, gyro_bias_from_still, T_cam_imu, output_dir)
+    copyfile(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"),
+             os.path.join(output_dir, "groundtruth.csv"))
 
     # for evaluation
     logger.print("Processing data for evaluation...")

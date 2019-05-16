@@ -6,3 +6,4 @@ from eval.kitti_eval_pyimpl import KittiErrorCalc
 from eval.calc_error import calc_error
 from eval.plot_error import plot_errors
 from eval.plot_ekf_states import plot_ekf_data, plot_ekf_states
+from eval.euroc_eval import euroc_eval, EurocErrorCalc

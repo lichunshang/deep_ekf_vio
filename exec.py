@@ -6,7 +6,7 @@ import preprocess
 
 choices = ["gen_trajectory", "plot_trajectory", "plot_ekf_states", "np_traj_to_kitti", "kitti_eval", "calc_error",
            "plot_error", "preprocess_kitti_raw", "preprocess_euroc", "check_time_discontinuities",
-           "calc_image_mean_std"]
+           "calc_image_mean_std", "euroc_eval"]
 
 top_level_arg_parser = argparse.ArgumentParser(description='Execute scripts')
 top_level_arg_parser.add_argument('script', type=str, help='The program to run', choices=choices)
@@ -96,6 +96,13 @@ elif top_level_arg_parsed.script == "preprocess_euroc":
                                  "used for inference time evaluation")
     arg_parsed = arg_parser.parse_args(args=args)
     preprocess.preprocess_euroc(arg_parsed.euroc_dir, arg_parsed.output_dir, arg_parsed.cam_still_range)
+
+elif top_level_arg_parsed.script == "euroc_eval":
+    arg_parser = argparse.ArgumentParser(description='Evaluate EUROC')
+    arg_parser.add_argument('working_dir', type=str, help='path to the saved model state dict')
+    arg_parser.add_argument('seqs', type=str, nargs="+", help="select sequences")
+    arg_parsed = arg_parser.parse_args(args=args)
+    eval.euroc_eval(arg_parsed.working_dir, arg_parsed.seqs)
 
 elif top_level_arg_parsed.script == "calc_image_mean_std":
     arg_parser = argparse.ArgumentParser(description='Calculate the image channel mean and std')
