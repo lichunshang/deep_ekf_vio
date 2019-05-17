@@ -2,9 +2,10 @@ import os
 import argparse
 import trainer
 import time
+import params
 from params import par
 from log import logger
-from eval import gen_trajectory, plot_trajectory, kitti_eval, np_traj_to_kitti, calc_error, plot_errors
+from eval import gen_trajectory, plot_trajectory, kitti_eval, np_traj_to_kitti, calc_error, plot_errors, euroc_eval
 
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
@@ -36,5 +37,10 @@ for tag in ["valid", "train", "checkpoint", "eval"]:
     plot_trajectory(seq_results_dir)
     calc_error(seq_results_dir)
     plot_errors(seq_results_dir)
-    np_traj_to_kitti(seq_results_dir)
-    kitti_eval(seq_results_dir, par.train_seqs, par.valid_seqs)
+
+    if isinstance(par, params.KITTIParams):
+        np_traj_to_kitti(seq_results_dir)
+        kitti_eval(seq_results_dir, par.train_seqs, par.valid_seqs)
+    elif isinstance(par, params.EUROCParams):
+        euroc_eval(seq_results_dir, par.train_seqs)
+        euroc_eval(seq_results_dir, par.valid_seqs)

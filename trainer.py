@@ -4,13 +4,13 @@ import numpy as np
 import os
 import time
 import se3
-import torch_se3
+import params
 from params import par
-from model import E2EVIO, IMUKalmanFilter
+from model import E2EVIO
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
 from log import logger
 from torch.utils.data import DataLoader
-from eval.kitti_eval_pyimpl import KittiErrorCalc
+from eval import EurocErrorCalc, KittiErrorCalc
 from eval.gen_trajectory import gen_trajectory_rel_iter, gen_trajectory_abs_iter
 
 
@@ -18,7 +18,12 @@ class _OnlineDatasetEvaluator(object):
     def __init__(self, model, sequences, eval_length):
         self.model = model  # this is a reference
         self.dataloaders = {}
-        self.error_calc = KittiErrorCalc(sequences)
+
+        if isinstance(par, params.KITTIParams):
+            self.error_calc = KittiErrorCalc(sequences)
+        elif isinstance(par, params.EUROCParams):
+            self.error_calc = EurocErrorCalc(sequences)
+
         logger.print("Loading data for the online dataset evaluator...")
         for seq in sequences:
             subseqs = get_subseqs([seq], eval_length, overlap=1, sample_times=1, training=False)
