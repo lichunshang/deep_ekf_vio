@@ -65,7 +65,7 @@ class Parameters(object):
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
 
-        self.rnn_hidden_size = 1000
+        self.rnn_hidden_size = 256
         self.rnn_num_layers = 2
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
@@ -88,11 +88,11 @@ class Parameters(object):
         self.train_init_covar = False
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag = np.array([1e-2,  # w
-                                              1e-2,  # bw
+        self.imu_noise_covar_diag = np.array([1e-7,  # w
+                                              1e-7,  # bw
                                               1e-2,  # a
-                                              1e-2])  # ba
-        self.train_imu_noise_covar = True
+                                              1e-3])  # ba
+        self.train_imu_noise_covar = False
         self.imu_noise_covar_beta = 4
         self.imu_noise_covar_gamma = 1
         #

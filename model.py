@@ -365,13 +365,10 @@ class E2EVIO(nn.Module):
 
         self.vo_module = DeepVO(par.img_h, par.img_w, par.batch_norm)
 
-        # self.imu_noise_covar_weights = nn.Parameter(torch.zeros(12, dtype=torch.float32))
-        # if not par.train_imu_noise_covar:
-        #     self.imu_noise_covar_weights.requires_grad = False
-
         self.imu_noise_covar_weights = torch.nn.Linear(1, 4, bias=False)
         if not par.train_imu_noise_covar:
-            self.imu_noise_covar_weights.requires_grad = False
+            for p in self.imu_noise_covar_weights.parameters():
+                p.requires_grad = False
             self.imu_noise_covar_weights.weight.data.zero_()
         else:
             self.imu_noise_covar_weights.weight.data /= 10

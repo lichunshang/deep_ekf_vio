@@ -108,11 +108,12 @@ class _TrainAssistant(object):
             self.model.forward(images.cuda(),
                                imu_data.cuda(),
                                prev_lstm_states,
-                               gt_poses[:, 0].cuda(),
+                               gt_poses[:, 0].inverse().cuda(),
                                prev_state.cuda(), None,
                                T_imu_cam.cuda())
 
         if par.enable_ekf:
+            # note that the estimated poses are already inversed
             loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
             loss = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses.cuda())
@@ -183,7 +184,7 @@ class _TrainAssistant(object):
         return loss
 
     def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses, vis_meas, vis_meas_covar):
-        abs_errors = torch.matmul(torch.inverse(est_poses[:, 1:]), gt_poses[:, 1:])
+        abs_errors = torch.matmul(est_poses[:, 1:], gt_poses[:, 1:])
         length_div = torch.arange(start=1, end=abs_errors.size(1) + 1, device=abs_errors.device,
                                   dtype=torch.float32).view(1, -1, 1)
         # calculate the F norm squared from identity
