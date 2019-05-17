@@ -42,12 +42,7 @@ class Parameters(object):
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
-        self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
-        # self.train_seqs = ['K08']
-        # self.valid_seqs = ['K07']
-
-        self.seq_len = 5
+        self.seq_len = 32
         self.sample_times = 3
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
@@ -64,11 +59,6 @@ class Parameters(object):
 
         # VO Model parameters
         self.fix_vo_weights = False
-        self.img_w = 320
-        self.img_h = 96
-        self.img_means = (-0.138843, -0.119405, -0.123209)
-        self.img_stds = (1, 1, 1)
-        self.minus_point_5 = True
 
         self.rnn_hidden_size = 256
         self.rnn_num_layers = 2
@@ -84,33 +74,14 @@ class Parameters(object):
         self.enable_ekf = True
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
-        #
-        self.init_covar_diag_sqrt = np.array([1e-4, 1e-4, 1e-4,  # g
-                                              0, 0, 0, 0, 0, 0,  # C, r
-                                              1e-2, 1e-2, 1e-2,  # v
-                                              1e-8, 1e-8, 1e-8,  # bw
-                                              1e-1, 1e-1, 1e-1])  # ba
+
         self.train_init_covar = False
-        self.init_covar_diag_eps = 1e-12
-        #
-        self.imu_noise_covar_diag = np.array([1e-7,  # w
-                                              1e-7,  # bw
-                                              1e-2,  # a
-                                              1e-3])  # ba
         self.train_imu_noise_covar = False
-        self.imu_noise_covar_beta = 4
-        self.imu_noise_covar_gamma = 1
-        #
-        self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
-                                              1e0, 1e0, 1e0])
         self.vis_meas_covar_use_fixed = False
-        self.vis_meas_covar_init_guess = 1e1
-        self.vis_meas_covar_beta = 3
-        self.vis_meas_covar_gamma = 1
 
         # Training parameters
-        self.epochs = 200
-        self.batch_size = 2
+        self.epochs = 400
+        self.batch_size = 16
         self.pin_mem = True
         self.cache_image = False
         self.optimizer = torch.optim.Adam
@@ -139,9 +110,6 @@ class Parameters(object):
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
         # './pretrained/flownets_EPE1.951.pth.tar'
 
-        # validation
-        assert (len(list(set(self.train_seqs) & set(self.valid_seqs))) == 0)
-
     def wc(self, seqs):
         available_seqs = [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
         ret_seqs = []
@@ -155,14 +123,77 @@ class Parameters(object):
         return ret_seqs
 
 
-class EUROCParams(Parameters):
-    def __init__(self):
-        Parameters.__init__(self)
-
-
 class KITTIParams(Parameters):
     def __init__(self):
         Parameters.__init__(self)
 
+        self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
+        self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
+        # self.train_seqs = ['K08']
+        # self.valid_seqs = ['K07']
 
-par = KITTIParams()
+        self.img_w = 320
+        self.img_h = 96
+        self.img_means = (-0.138843, -0.119405, -0.123209)
+        self.img_stds = (1, 1, 1)
+        self.minus_point_5 = True
+
+        #
+        self.init_covar_diag_sqrt = np.array([1e-4, 1e-4, 1e-4,  # g
+                                              0, 0, 0, 0, 0, 0,  # C, r
+                                              1e-2, 1e-2, 1e-2,  # v
+                                              1e-8, 1e-8, 1e-8,  # bw
+                                              1e-1, 1e-1, 1e-1])  # ba
+        self.init_covar_diag_eps = 1e-12
+        #
+        self.imu_noise_covar_diag = np.array([1e-7,  # w
+                                              1e-7,  # bw
+                                              1e-2,  # a
+                                              1e-3])  # ba
+        self.imu_noise_covar_beta = 4
+        self.imu_noise_covar_gamma = 1
+
+        self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
+                                              1e0, 1e0, 1e0])
+        self.vis_meas_covar_init_guess = 1e1
+        self.vis_meas_covar_beta = 3
+        self.vis_meas_covar_gamma = 1
+
+
+class EUROCParams(Parameters):
+    def __init__(self):
+        Parameters.__init__(self)
+
+        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04']
+        self.valid_seqs = ['MH_05']
+
+        self.img_w = 188
+        self.img_h = 120
+        self.img_means = (-0.138843, -0.119405, -0.123209)
+        self.img_stds = (1, 1, 1)
+        self.minus_point_5 = True
+
+        #
+        self.init_covar_diag_sqrt = np.array([1e-1, 1e-1, 1e-1,  # g
+                                              0, 0, 0, 0, 0, 0,  # C, r
+                                              1e-2, 1e-2, 1e-2,  # v
+                                              1e-1, 1e-1, 1e-1,  # bw
+                                              1e1, 1e1, 1e1])  # ba
+        self.init_covar_diag_eps = 1e-12
+        #
+        self.imu_noise_covar_diag = np.array([1e-3,  # w
+                                              1e-5,  # bw
+                                              1e-1,  # a
+                                              1e-2])  # ba
+        self.imu_noise_covar_beta = 4
+        self.imu_noise_covar_gamma = 1
+
+        self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
+                                              1e0, 1e0, 1e0])
+        self.vis_meas_covar_init_guess = 1e1
+        self.vis_meas_covar_beta = 3
+        self.vis_meas_covar_gamma = 1
+
+
+# par = KITTIParams()
+par = EUROCParams()
