@@ -301,7 +301,7 @@ class SubseqDataset(Dataset):
 
         if self.no_image:
             return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
-                   torch.zeros(1), imu_data, init_state, T_imu_cam, gt_poses_inv, gt_rel_poses
+                   torch.zeros(1), imu_data, init_state, T_imu_cam, gt_poses, gt_rel_poses
 
         # process images
         images = []
@@ -318,6 +318,11 @@ class SubseqDataset(Dataset):
             if self.minus_point_5:
                 image = image - 0.5  # from [0, 1] -> [-0.5, 0.5]
             image = self.normalizer(image)
+
+            # if monochrome, repeat channel 3 times
+            if image.shape[0] == 1:
+                image = image.repeat(3, 1, 1)
+
             images.append(image)
         images = torch.stack(images, 0)
 

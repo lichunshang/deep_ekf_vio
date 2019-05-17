@@ -31,7 +31,7 @@ ay = 4  # a_RS_S_y [m s^-2]
 az = 5  # a_RS_S_z [m s^-2]
 
 
-def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, gt_data):
+def package_euroc_data(seq_dir, cam_timestamps, imu_timestamps, imu_data, gt_timestamps, gt_data):
     assert len(gt_timestamps) == len(imu_timestamps)
     assert len(gt_timestamps) == len(imu_data)
     assert np.max(np.abs(np.array(imu_timestamps) - np.array(gt_timestamps))) < 1000
@@ -76,7 +76,7 @@ def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, 
             gyro_measurements_k_kp1.append(imu_data[j, [wx, wy, wz]])
 
         T_i_vk = imu_poses[0]
-        frame_k = SequenceData.Frame("%09d.png" % t_k,
+        frame_k = SequenceData.Frame(os.path.join(seq_dir, "cam0", "data", "%09d.png" % t_k),
                                      (np.datetime64(t_k, "ns") - ref_time) / np.timedelta64(1, "s"),
                                      T_i_vk,
                                      T_i_vk[0:3, 0:3].transpose().dot(gt_data[imu_start_idx, [vx, vy, vz]]),  # v_vk
@@ -90,7 +90,7 @@ def package_euroc_data(cam_timestamps, imu_timestamps, imu_data, gt_timestamps, 
         i_start = i_end
 
     T_i_vkp1 = imu_poses[-1]
-    data_frames.append(SequenceData.Frame("%09d.png" % t_kp1,
+    data_frames.append(SequenceData.Frame(os.path.join(seq_dir, "cam0", "data", "%09d.png" % t_kp1),
                                           (np.datetime64(t_kp1, "ns") - ref_time) / np.timedelta64(1, "s"),
                                           T_i_vkp1,
                                           T_i_vkp1[0:3, 0:3].transpose().dot(gt_data[imu_end_idx, [vx, vy, vz]]),
@@ -253,7 +253,7 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     gt_cam_aligned_end_idx = imu_timestamps_gt_aligned.index(cam_timestamps[cam_gt_aligned_end_idx])
 
     logger.print("Camera index [%d -> %d]" % (cam_gt_aligned_start_idx, cam_gt_aligned_end_idx))
-    data_frames = package_euroc_data(cam_timestamps[cam_gt_aligned_start_idx:cam_gt_aligned_end_idx + 1],
+    data_frames = package_euroc_data(seq_dir, cam_timestamps[cam_gt_aligned_start_idx:cam_gt_aligned_end_idx + 1],
                                      imu_timestamps_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
                                      imu_data_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
                                      gt_timestamps[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
@@ -273,12 +273,12 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     zeros_gt[: qw] = 1
 
     logger.print("Camera index [%d -> %d]" % (cam_still_range[1], cam_imu_aligned_end_idx))
-    data_frames = package_euroc_data(cam_timestamps[cam_still_range[1]:cam_imu_aligned_end_idx + 1],
+    eval_output_dir = output_dir + "_eval"
+    data_frames = package_euroc_data(seq_dir, cam_timestamps[cam_still_range[1]:cam_imu_aligned_end_idx + 1],
                                      imu_timestamps_cam_aligned,
                                      imu_data_cam_aligned,
                                      imu_timestamps_cam_aligned,
                                      zeros_gt)
-    eval_output_dir = output_dir + "_eval"
     logger.make_dir_if_not_exist(eval_output_dir)
     SequenceData.save_as_pd(data_frames, gravity_from_still, gyro_bias_from_still, T_cam_imu, eval_output_dir)
     copyfile(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"),

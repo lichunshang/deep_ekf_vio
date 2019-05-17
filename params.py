@@ -169,8 +169,8 @@ class EUROCParams(Parameters):
 
         self.img_w = 188
         self.img_h = 120
-        self.img_means = (-0.138843, -0.119405, -0.123209)
-        self.img_stds = (1, 1, 1)
+        self.img_means = (0,)
+        self.img_stds = (1,)
         self.minus_point_5 = True
 
         #
