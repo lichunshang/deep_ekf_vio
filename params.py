@@ -23,6 +23,11 @@ class AttrDict(dict):
 class Parameters(object):
     __instance = None
 
+    def __new__(cls, *args, **kwargs):
+        if not cls.__instance:
+            cls.__instance = super(Parameters, cls).__new__(cls, *args, **kwargs)
+        return cls.__instance
+
     def __init__(self):
         self.timestamp = datetime.datetime.today()
 
@@ -137,12 +142,6 @@ class Parameters(object):
         # validation
         assert (len(list(set(self.train_seqs) & set(self.valid_seqs))) == 0)
 
-    @staticmethod
-    def get_instance():
-        if not Parameters.__instance:
-            Parameters.__instance = Parameters()
-        return Parameters.__instance
-
     def wc(self, seqs):
         available_seqs = [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
         ret_seqs = []
@@ -156,4 +155,14 @@ class Parameters(object):
         return ret_seqs
 
 
-par = Parameters.get_instance()
+class EUROCParams(Parameters):
+    def __init__(self):
+        Parameters.__init__(self)
+
+
+class KITTIParams(Parameters):
+    def __init__(self):
+        Parameters.__init__(self)
+
+
+par = KITTIParams()
