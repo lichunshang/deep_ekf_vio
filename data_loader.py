@@ -280,7 +280,7 @@ class SubseqDataset(Dataset):
             imu_data.append(imu_dat_padded)
 
         gt_rel_poses = torch.tensor(gt_rel_poses, dtype=torch.float32)
-        gt_poses_inv = torch.tensor(np.linalg.inv(subseq.gt_poses), dtype=torch.float32)
+        gt_poses = torch.tensor(subseq.gt_poses, dtype=torch.float32)
         gt_velocities = torch.tensor(subseq.gt_velocities, dtype=torch.float32)
         imu_data = torch.tensor(imu_data, dtype=torch.float32)
 
@@ -322,7 +322,7 @@ class SubseqDataset(Dataset):
         images = torch.stack(images, 0)
 
         return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
-               images, imu_data, init_state, T_imu_cam, gt_poses_inv, gt_rel_poses
+               images, imu_data, init_state, T_imu_cam, gt_poses, gt_rel_poses
 
     @staticmethod
     def decode_batch_meta_info(batch_meta_info):

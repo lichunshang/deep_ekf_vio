@@ -71,7 +71,7 @@ def gen_trajectory_abs_iter(model, dataloaders):
             prev_covar = torch.stack([torch.tensor(est_covars_dict[k][-1]) for k in data_keys]).cuda()
             lstm_states = torch.stack([lstm_states_dict[k] for k in data_keys])
         else:
-            prev_pose = torch.stack([torch.squeeze(d[5], 0) for d in data_list])[:, 0].cuda()
+            prev_pose = torch.stack([torch.squeeze(d[5], 0) for d in data_list])[:, 0].inverse().cuda()
             prev_state = torch.stack([torch.squeeze(d[3], 0) for d in data_list]).cuda()
             prev_covar = None
             lstm_states = None

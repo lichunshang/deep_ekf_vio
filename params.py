@@ -55,7 +55,7 @@ class Parameters(object):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting
-            0: 0.999,
+            0: 0.5,
             # 80: 0.01,
             # 160: 0.1,
             # 240: 0.9
@@ -70,7 +70,7 @@ class Parameters(object):
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
 
-        self.rnn_hidden_size = 1000
+        self.rnn_hidden_size = 256
         self.rnn_num_layers = 2
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
@@ -97,16 +97,16 @@ class Parameters(object):
                                               1e-7,  # bw
                                               1e-2,  # a
                                               1e-3])  # ba
-        self.train_imu_noise_covar = True
-        self.imu_noise_covar_beta = 3
-        self.imu_noise_covar_gamma = 4
+        self.train_imu_noise_covar = False
+        self.imu_noise_covar_beta = 4
+        self.imu_noise_covar_gamma = 1
         #
         self.vis_meas_fixed_covar = np.array([1e0, 1e0, 1e0,
                                               1e0, 1e0, 1e0])
         self.vis_meas_covar_use_fixed = False
         self.vis_meas_covar_init_guess = 1e1
         self.vis_meas_covar_beta = 3
-        self.vis_meas_covar_gamma = 4
+        self.vis_meas_covar_gamma = 1
 
         # Training parameters
         self.epochs = 200
