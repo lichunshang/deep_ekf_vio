@@ -86,6 +86,10 @@ class Parameters(object):
         self.cache_image = False
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
+        self.param_specific_lr = {
+            "init_covar_diag_sqrt": 1e-1,
+            "imu_noise_covar_weights.*": 1e-1
+        }
 
         # data augmentation
         self.data_aug_rand_color = AttrDict({

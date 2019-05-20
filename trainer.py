@@ -5,6 +5,7 @@ import os
 import time
 import se3
 import params
+import re
 from params import par
 from model import E2EVIO
 from data_loader import get_subseqs, SubseqDataset, convert_subseqs_list_to_panda
@@ -341,7 +342,23 @@ def train(resume_model_path, resume_optimizer_path):
         e2e_vio_model.vo_module.load_state_dict(vo_model_dict)
 
     # Create optimizer
-    optimizer = par.optimizer(e2e_vio_model.parameters(), **par.optimizer_args)
+    logger.print("Optimizing on parameters:")
+    optimizer_params = []
+    for p_name, p in e2e_vio_model.named_parameters():
+        specific_lr_found = False
+        for k in par.param_specific_lr:
+            regex = re.compile(k)
+            if regex.match(p_name):
+                optimizer_params.append({"params": p, "lr": par.param_specific_lr[k]})
+                logger.print("%s, lr:%f" % (p_name, par.param_specific_lr[k]))
+                specific_lr_found = True
+
+        if not specific_lr_found:
+            optimizer_params.append({"params": p})
+            logger.print(p_name)
+    assert(len(optimizer_params) == sum(1 for _ in e2e_vio_model.parameters()))
+
+    optimizer = par.optimizer(optimizer_params, **par.optimizer_args)
 
     # Load trained DeepVO model and optimizer
     if resume_model_path:
