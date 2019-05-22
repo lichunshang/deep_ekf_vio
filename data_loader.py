@@ -181,6 +181,32 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
                         subseq_flipped_buffer.append(subseq_flipped)
                     subseqs_buffer += subseq_flipped_buffer
 
+                if par.data_aug_transforms.ud_flip:
+                    assert par.dataset() == "EUROC", "up down flips only supported for EUROC"
+                    subseq_flipped_buffer = []
+                    H = np.diag([-1, 1, 1])  # reflection matrix, flip x, across the yz plane, only for EUROC
+                    for subseq in sub_seqs_vanilla:
+                        subseq_flipped = copy.deepcopy(subseq)
+                        subseq_flipped.gt_poses = \
+                            np.array([se3.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())), H.dot(T[0:3, 3]))
+                                      for T in subseq.gt_poses])
+                        subseq_flipped.type = subseq.type + "_flippedud"
+                        subseq_flipped_buffer.append(subseq_flipped)
+                    subseqs_buffer += subseq_flipped_buffer
+
+                if par.data_aug_transforms.lrud_flip:
+                    assert par.dataset() == "EUROC", "left right up down flips only supported for EUROC"
+                    subseq_flipped_buffer = []
+                    H = np.diag([-1, -1, 1])  # reflection matrix, flip x, across the yz plane, only for EUROC
+                    for subseq in sub_seqs_vanilla:
+                        subseq_flipped = copy.deepcopy(subseq)
+                        subseq_flipped.gt_poses = \
+                            np.array([se3.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())), H.dot(T[0:3, 3]))
+                                      for T in subseq.gt_poses])
+                        subseq_flipped.type = subseq.type + "_flippedlrud"
+                        subseq_flipped_buffer.append(subseq_flipped)
+                    subseqs_buffer += subseq_flipped_buffer
+
                 # Reverse, effectively doubles the number of examples
                 if par.data_aug_transforms.reverse:
                     subseqs_rev_buffer = []
@@ -314,6 +340,12 @@ class SubseqDataset(Dataset):
 
             if "flippedlr" in subseq.type:
                 image = image.transpose(Image.FLIP_LEFT_RIGHT)
+            elif "flippedud" in subseq.type:
+                image = image.transpose(Image.FLIP_TOP_BOTTOM)
+            elif "flippedlrud" in subseq.type:
+                image = image.transpose(Image.FLIP_LEFT_RIGHT)
+                image = image.transpose(Image.FLIP_TOP_BOTTOM)
+
             image = self.runtime_transformer(image)
             if self.minus_point_5:
                 image = image - 0.5  # from [0, 1] -> [-0.5, 0.5]

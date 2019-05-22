@@ -38,9 +38,9 @@ for tag in ["valid", "train", "checkpoint", "eval"]:
     calc_error(seq_results_dir)
     plot_errors(seq_results_dir)
 
-    if isinstance(par, params.KITTIParams):
+    if par.dataset() == "KITTI":
         np_traj_to_kitti(seq_results_dir)
         kitti_eval(seq_results_dir, par.train_seqs, par.valid_seqs)
-    elif isinstance(par, params.EUROCParams):
+    elif par.dataset() == "EUROC":
         euroc_eval(seq_results_dir, par.train_seqs)
         euroc_eval(seq_results_dir, par.valid_seqs)

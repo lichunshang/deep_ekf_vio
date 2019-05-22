@@ -104,6 +104,8 @@ class Parameters(object):
         self.data_aug_transforms = AttrDict({
             "enable": False,
             "lr_flip": True,
+            "ud_flip": True,
+            "lrud_flip": True,
             "reverse": True,
         })
 
@@ -125,6 +127,9 @@ class Parameters(object):
                     ret_seqs.append(available_seq)
             assert (len(ret_seqs) > start_cnt)
         return ret_seqs
+
+    def dataset(self):
+        raise NotImplementedError("Dataset no specified")
 
 
 class KITTIParams(Parameters):
@@ -163,8 +168,12 @@ class KITTIParams(Parameters):
         self.vis_meas_covar_beta = 3
         self.vis_meas_covar_gamma = 1
 
+    def dataset(self):
+        return "KITTI"
+
 
 class EUROCParams(Parameters):
+
     def __init__(self):
         Parameters.__init__(self)
 
@@ -197,6 +206,9 @@ class EUROCParams(Parameters):
         self.vis_meas_covar_init_guess = 1e1
         self.vis_meas_covar_beta = 3
         self.vis_meas_covar_gamma = 1
+
+    def dataset(self):
+        return "EUROC"
 
 
 # par = KITTIParams()

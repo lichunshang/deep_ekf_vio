@@ -20,9 +20,9 @@ class _OnlineDatasetEvaluator(object):
         self.model = model  # this is a reference
         self.dataloaders = {}
 
-        if isinstance(par, params.KITTIParams):
+        if par.dataset() == "KITTI":
             self.error_calc = KittiErrorCalc(sequences)
-        elif isinstance(par, params.EUROCParams):
+        elif par.dataset() == "EUROC":
             self.error_calc = EurocErrorCalc(sequences)
 
         logger.print("Loading data for the online dataset evaluator...")
