@@ -2,12 +2,12 @@ import os
 import argparse
 import trainer
 import time
-import params
 from params import par
 from log import logger
 from eval import gen_trajectory, plot_trajectory, kitti_eval, np_traj_to_kitti, calc_error, plot_errors, euroc_eval
 
 arg_parser = argparse.ArgumentParser(description='Train E2E VIO')
+arg_parser.add_argument('--description', type=str, help="Description of this training run")
 arg_parser.add_argument('--gpu_id', type=int, nargs="+", help="select the GPU to perform training on")
 arg_parser.add_argument('--run_eval_only', default=False, action='store_true',
                         help="Only run evaluation in current working directory")
@@ -28,7 +28,7 @@ if gpu_ids:
 
 if not arg_parsed.run_eval_only:
     start_t = time.time()
-    trainer.train(resume_model_path, resume_optimizer_path)
+    trainer.train(resume_model_path, resume_optimizer_path, arg_parsed.description)
     logger.print("Training took %.2fs" % (time.time() - start_t))
 
 for tag in ["valid", "train", "checkpoint", "eval"]:

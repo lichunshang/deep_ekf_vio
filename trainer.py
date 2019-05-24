@@ -296,11 +296,12 @@ class _TrainAssistant(object):
         raise ValueError("Invalid Schedule")
 
 
-def train(resume_model_path, resume_optimizer_path):
+def train(resume_model_path, resume_optimizer_path, train_description):
     logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
     logger.print("================ TRAIN ================")
 
-    train_description = input("Enter a description of this training run: ")
+    if not train_description:
+        train_description = input("Enter a description of this training run: ")
     logger.print("Train description: ", train_description)
     logger.tensorboard.add_text("description", train_description)
 
