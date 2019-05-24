@@ -115,7 +115,7 @@ class _TrainAssistant(object):
             prev_lstm_states = prev_lstm_states.cuda()
 
         vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars = \
-            self.model.forward(images.cuda(),
+            self.model.forward(gt_rel_poses.cuda(),
                                imu_data.cuda(),
                                prev_lstm_states,
                                gt_poses[:, 0].inverse().cuda(),
@@ -223,7 +223,8 @@ class _TrainAssistant(object):
         # loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
         # loss = k3 * loss_rel + (1 - k3) * loss_abs
         loss_vis_meas = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses)
-        loss = k3 * loss_vis_meas + (1 - k3) * loss_abs
+        # loss = k3 * loss_vis_meas + (1 - k3) * loss_abs
+        loss = abs_trans_loss
 
         assert not torch.any(torch.isnan(loss))
 
@@ -312,7 +313,7 @@ def train(resume_model_path, resume_optimizer_path, train_description):
     train_subseqs = get_subseqs(par.train_seqs, par.seq_len, overlap=1, sample_times=par.sample_times, training=True)
     convert_subseqs_list_to_panda(train_subseqs).to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
     train_dataset = SubseqDataset(train_subseqs, (par.img_h, par.img_w), par.img_means,
-                                  par.img_stds, par.minus_point_5)
+                                  par.img_stds, par.minus_point_5, no_image=True)
     train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
     logger.print('Number of samples in training dataset: %d' % len(train_subseqs))
@@ -320,7 +321,7 @@ def train(resume_model_path, resume_optimizer_path, train_description):
     valid_subseqs = get_subseqs(par.valid_seqs, par.seq_len, overlap=1, sample_times=1, training=False)
     convert_subseqs_list_to_panda(valid_subseqs).to_pickle(os.path.join(par.results_dir, "valid_df.pickle"))
     valid_dataset = SubseqDataset(valid_subseqs, (par.img_h, par.img_w), par.img_means,
-                                  par.img_stds, par.minus_point_5, training=False)
+                                  par.img_stds, par.minus_point_5, training=False, no_image=True)
     valid_dl = DataLoader(valid_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
     logger.print('Number of samples in validation dataset: %d' % len(valid_subseqs))

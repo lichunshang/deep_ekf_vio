@@ -396,26 +396,27 @@ class E2EVIO(nn.Module):
         return torch.diag(imu_noise_covar_diag)
 
     def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam):
-        vis_meas_and_covar, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
+        # vis_meas_and_covar, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
 
-        vis_meas = vis_meas_and_covar[:, :, 0:6]
+        vis_meas = images
+        vis_meas = vis_meas + torch.randn_like(vis_meas) * 1
 
-        vis_meas_covar_scale = torch.ones(6, device=vis_meas.device)
-        vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * par.k1
+        # vis_meas_covar_scale = torch.ones(6, device=vis_meas.device)
+        # vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * par.k1
+        #
+        # if par.vis_meas_covar_use_fixed:
+        #     vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32, device=vis_meas.device)
+        #     vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
+        #     vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
+        # else:
+        #     vis_meas_covar_diag = par.vis_meas_covar_init_guess * \
+        #                           10 ** (par.vis_meas_covar_beta *
+        #                                  torch.tanh(par.vis_meas_covar_gamma * vis_meas_and_covar[:, :, 6:12]))
 
-        if par.vis_meas_covar_use_fixed:
-            vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32, device=vis_meas.device)
-            vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
-            vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
-        else:
-            vis_meas_covar_diag = par.vis_meas_covar_init_guess * \
-                                  10 ** (par.vis_meas_covar_beta *
-                                         torch.tanh(par.vis_meas_covar_gamma * vis_meas_and_covar[:, :, 6:12]))
+        vis_meas_covar_diag = torch.ones_like(vis_meas.squeeze(-1))
 
-        vis_meas_covar_diag_scaled = vis_meas_covar_diag / vis_meas_covar_scale.view(1, 1, 6)
-
-        if not par.enable_ekf:
-            return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, None, None, None
+        # if not par.enable_ekf:
+        #     return vis_meas, torch.diag_embed(vis_meas_covar_diag), torch.zeros(0.0, device=imu_data.device), None, None, None
 
         imu_noise_covar = self.get_imu_noise_covar()
 
@@ -430,6 +431,7 @@ class E2EVIO(nn.Module):
         poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data, imu_noise_covar,
                                                                 prev_pose, prev_state, init_covar,
                                                                 torch.unsqueeze(vis_meas, -1),
-                                                                torch.diag_embed(vis_meas_covar_diag_scaled),
+                                                                torch.diag_embed(vis_meas_covar_diag),
                                                                 T_imu_cam)
-        return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, poses, ekf_states, ekf_covars
+        return vis_meas, torch.diag_embed(vis_meas_covar_diag), torch.zeros(1, device=imu_data.device), \
+               poses, ekf_states, ekf_covars

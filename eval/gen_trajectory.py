@@ -60,7 +60,7 @@ def gen_trajectory_abs_iter(model, dataloaders):
         data_list = list(data.values())
         data_keys = list(data.keys())
         # meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses
-        images = torch.stack([torch.squeeze(d[1], 0) for d in data_list]).cuda()
+        images = torch.stack([torch.squeeze(d[6], 0) for d in data_list]).cuda()
         imu_data = torch.stack([torch.squeeze(d[2], 0) for d in data_list]).cuda()
         T_imu_cam = torch.stack([torch.squeeze(d[4], 0) for d in data_list]).cuda()
 

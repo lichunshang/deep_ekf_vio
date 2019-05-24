@@ -67,7 +67,7 @@ class Parameters(object):
         self.rnn_dropout_between = 0  # 0: no dropout
         self.clip = None
         self.batch_norm = True
-        self.stateful_training = True
+        self.stateful_training = False
         self.gaussian_pdf_loss = True
 
         # EKF parameters
@@ -76,7 +76,7 @@ class Parameters(object):
         self.cal_override_enable = True
 
         self.train_init_covar = False
-        self.train_imu_noise_covar = False
+        self.train_imu_noise_covar = True
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
@@ -155,10 +155,10 @@ class KITTIParams(Parameters):
                                               1e-1, 1e-1, 1e-1])  # ba
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag = np.array([1e-7,  # w
-                                              1e-7,  # bw
+        self.imu_noise_covar_diag = np.array([1e-2,  # w
+                                              1e-2,  # bw
                                               1e-2,  # a
-                                              1e-3])  # ba
+                                              1e-2])  # ba
         self.imu_noise_covar_beta = 4
         self.imu_noise_covar_gamma = 1
 
@@ -211,5 +211,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-# par = KITTIParams()
-par = EUROCParams()
+par = KITTIParams()
+# par = EUROCParams()
