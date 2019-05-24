@@ -1,6 +1,6 @@
 # SET BASE IMAGE:
 # Typically offered by whatever primary library/environment you wish to develop against.
-FROM nvidia/cuda:10.0-cudnn7-runtime-ubuntu16.04
+FROM nvidia/cuda:10.1-cudnn7-runtime-ubuntu16.04
 
 RUN apt-get update
 RUN apt-get install python3 python3-pip git -y
