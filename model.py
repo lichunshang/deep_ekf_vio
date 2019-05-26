@@ -399,7 +399,7 @@ class E2EVIO(nn.Module):
         # vis_meas_and_covar, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
 
         vis_meas = images
-        vis_meas = vis_meas + torch.randn_like(vis_meas) * 1
+        vis_meas = vis_meas + torch.randn_like(vis_meas) * 0.1
 
         # vis_meas_covar_scale = torch.ones(6, device=vis_meas.device)
         # vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * par.k1
@@ -433,5 +433,5 @@ class E2EVIO(nn.Module):
                                                                 torch.unsqueeze(vis_meas, -1),
                                                                 torch.diag_embed(vis_meas_covar_diag),
                                                                 T_imu_cam)
-        return vis_meas, torch.diag_embed(vis_meas_covar_diag), torch.zeros(1, device=imu_data.device), \
+        return vis_meas, torch.diag_embed(vis_meas_covar_diag), torch.zeros(vis_meas.size(0), device=imu_data.device), \
                poses, ekf_states, ekf_covars
