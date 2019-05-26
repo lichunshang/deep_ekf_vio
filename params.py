@@ -83,7 +83,7 @@ class Parameters(object):
         self.epochs = 400
         self.batch_size = 16
         self.pin_mem = True
-        self.cache_image = False
+        self.cache_image = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
@@ -105,8 +105,8 @@ class Parameters(object):
             "enable": False,
             "lr_flip": True,
             "ud_flip": True,
-            "lrud_flip": True,
-            "reverse": True,
+            "lrud_flip": False,
+            "reverse": False,
         })
 
         # Pretrain, Resume training
@@ -177,11 +177,11 @@ class EUROCParams(Parameters):
     def __init__(self):
         Parameters.__init__(self)
 
-        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04']
-        self.valid_seqs = ['MH_05']
+        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
+        self.valid_seqs = ['MH_05', "V1_03", "V2_02"]
 
-        self.img_w = 188
-        self.img_h = 120
+        self.img_w = 235
+        self.img_h = 150
         self.img_means = (0,)
         self.img_stds = (1,)
         self.minus_point_5 = True
