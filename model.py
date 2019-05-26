@@ -71,16 +71,18 @@ class IMUKalmanFilter(nn.Module):
         G[:, 12:15, 3:6] = I3
         G[:, 15:18, 9:12] = I3
 
-        Phi = torch.eye(18, 18, device=covar.device).repeat(batch_size, 1, 1) + \
-              F * dt + 0.5 * mm(F, F) * dt2
-        Phi[:, 6:9, 12:15] = torch.zeros(3, 3, device=covar.device)  # this blocks is exactly zero in 2nd order approx
-        Phi[:, 3:6, 3:6] = exp_int_w_transpose
-        Phi[:, 9:12, 9:12] = exp_int_w_transpose
+        # Phi = torch.eye(18, 18, device=covar.device).repeat(batch_size, 1, 1) + \
+        #       F * dt + 0.5 * mm(F, F) * dt2
+        # Phi[:, 6:9, 12:15] = torch.zeros(3, 3, device=covar.device)  # this blocks is exactly zero in 2nd order approx
+        # Phi[:, 3:6, 3:6] = exp_int_w_transpose
+        # Phi[:, 9:12, 9:12] = exp_int_w_transpose
+        Phi = torch.eye(18, 18, device=covar.device).repeat(batch_size, 1, 1) + F * dt
 
-        Q = mm(mm(mm(mm(Phi, G), imu_noise_covar.repeat(batch_size, 1, 1)),
-                  G.transpose(-2, -1)), Phi.transpose(-2, -1)) * dt
+        # Q = mm(mm(mm(mm(Phi, G), imu_noise_covar.repeat(batch_size, 1, 1)),
+        #           G.transpose(-2, -1)), Phi.transpose(-2, -1)) * dt
+        Q = mm(mm(G, imu_noise_covar.repeat(batch_size, 1, 1)), G.transpose(-2, -1)) * dt
         covar = mm(mm(Phi, covar), Phi.transpose(-2, -1)) + Q
-        covar = self.force_symmetrical(covar)
+        # covar = self.force_symmetrical(covar)
 
         # propagate nominal states
         r_accum = r_accum + v_accum * dt + 0.5 * mm(C_accum, (dt2 * a))
@@ -199,7 +201,7 @@ class IMUKalmanFilter(nn.Module):
         U[:, 0:3, 0:3] = C_transpose
         U[:, 0:3, 3:6] = torch_se3.skew3_b(new_g)
         new_covar = torch.matmul(torch.matmul(U, est_covar), U.transpose(-2, -1))
-        new_covar = self.force_symmetrical(new_covar)
+        # new_covar = self.force_symmetrical(new_covar)
 
         return new_pose, new_state, new_covar
 
