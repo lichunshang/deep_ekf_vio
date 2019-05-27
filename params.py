@@ -42,7 +42,7 @@ class Parameters(object):
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.seq_len = 32
+        self.seq_len = 9
         self.sample_times = 3
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
@@ -60,7 +60,7 @@ class Parameters(object):
         # VO Model parameters
         self.fix_vo_weights = False
 
-        self.rnn_hidden_size = 1000
+        self.rnn_hidden_size = 100
         self.rnn_num_layers = 2
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)
         self.rnn_dropout_out = 0.5
@@ -81,9 +81,9 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 400
-        self.batch_size = 16
+        self.batch_size = 4
         self.pin_mem = True
-        self.cache_image = True
+        self.cache_image = False
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
@@ -211,5 +211,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-# par = KITTIParams()
-par = EUROCParams()
+par = KITTIParams()
+# par = EUROCParams()
