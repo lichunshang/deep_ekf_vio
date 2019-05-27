@@ -203,29 +203,29 @@ class IMUKalmanFilter(nn.Module):
 
         return new_pose, new_state, new_covar
 
-    # def forward(self, imu_data, imu_noise_covar,
-    #             prev_pose, prev_state, prev_covar,
-    #             vis_meas, vis_meas_covar, T_imu_cam):
-    #
-    #     num_timesteps = vis_meas.size(1)  # equals to imu_data.size(1) - 1
-    #
-    #     poses_over_timesteps = [prev_pose]
-    #     states_over_timesteps = [prev_state]
-    #     covars_over_timesteps = [prev_covar]
-    #     for k in range(0, num_timesteps):
-    #         pred_state, pred_covar = self.predict(imu_data[:, k], imu_noise_covar,
-    #                                               states_over_timesteps[-1], covars_over_timesteps[-1])
-    #         est_state, est_covar = self.update(pred_state, pred_covar,
-    #                                            vis_meas[:, k], vis_meas_covar[:, k], T_imu_cam)
-    #         new_pose, new_state, new_covar = self.composition(poses_over_timesteps[-1], est_state, est_covar)
-    #
-    #         poses_over_timesteps.append(new_pose)
-    #         states_over_timesteps.append(new_state)
-    #         covars_over_timesteps.append(new_covar)
-    #
-    #     return torch.stack(poses_over_timesteps, 1), \
-    #            torch.stack(states_over_timesteps, 1), \
-    #            torch.stack(covars_over_timesteps, 1)
+    def forward(self, imu_data, imu_noise_covar,
+                prev_pose, prev_state, prev_covar,
+                vis_meas, vis_meas_covar, T_imu_cam):
+
+        num_timesteps = vis_meas.size(1)  # equals to imu_data.size(1) - 1
+
+        poses_over_timesteps = [prev_pose]
+        states_over_timesteps = [prev_state]
+        covars_over_timesteps = [prev_covar]
+        for k in range(0, num_timesteps):
+            pred_state, pred_covar = self.predict(imu_data[:, k], imu_noise_covar,
+                                                  states_over_timesteps[-1], covars_over_timesteps[-1])
+            est_state, est_covar = self.update(pred_state, pred_covar,
+                                               vis_meas[:, k], vis_meas_covar[:, k], T_imu_cam)
+            new_pose, new_state, new_covar = self.composition(poses_over_timesteps[-1], est_state, est_covar)
+
+            poses_over_timesteps.append(new_pose)
+            states_over_timesteps.append(new_state)
+            covars_over_timesteps.append(new_covar)
+
+        return torch.stack(poses_over_timesteps, 1), \
+               torch.stack(states_over_timesteps, 1), \
+               torch.stack(covars_over_timesteps, 1)
 
     @staticmethod
     def decode_state_b(state_vector):
@@ -485,29 +485,6 @@ class E2EVIO(nn.Module):
             vis_meas_over_timesteps.append(vis_meas)
             vis_meas_covar_over_timesteps.append(vis_meas_covar)
 
-        # vis_meas = vis_meas_and_covar[:, :, 0:6]
-        #
-        # if par.vis_meas_covar_use_fixed:
-        #     vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32, device=vis_meas.device)
-        #     vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
-        #     vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
-        # else:
-        #     vis_meas_covar_diag = par.vis_meas_covar_init_guess * \
-        #                           10 ** (par.vis_meas_covar_beta *
-        #                                  torch.tanh(par.vis_meas_covar_gamma * vis_meas_and_covar[:, :, 6:12]))
-        #
-        # vis_meas_covar_diag_scaled = vis_meas_covar_diag / vis_meas_covar_scale.view(1, 1, 6)
-
-        # if not par.enable_ekf:
-        #     return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, None, None, None
-
-        # vis model outputs positions first
-
-        # poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data, imu_noise_covar,
-        #                                                         prev_pose, prev_state, init_covar,
-        #                                                         torch.unsqueeze(vis_meas, -1),
-        #                                                         torch.diag_embed(vis_meas_covar_diag_scaled),
-        #                                                         T_imu_cam)
         return torch.stack(vis_meas_over_timesteps, 1), \
                torch.stack(vis_meas_covar_over_timesteps, 1), \
                lstm_states, \
