@@ -209,11 +209,11 @@ class Test_EKF(unittest.TestCase):
                                                       gyro_measurements[:, i],
                                                       accel_measurements[:, i])
             imu_data = torch.tensor(imu_data, dtype=torch.float32).to(device)
-            state, covar = ekf.predict(imu_data, imu_noise, states[-1], covars[-1])
+            pred_states, pred_covars = ekf.predict(imu_data, imu_noise, states[-1], covars[-1])
 
-            precomp_covars.append(covar)
+            precomp_covars.append(pred_covars[-1])
 
-            pose, state, covar = ekf.composition(poses[-1], state, covar)
+            pose, state, covar = ekf.composition(poses[-1], pred_states[-1], pred_covars[-1])
 
             states.append(state)
             covars.append(covar)
