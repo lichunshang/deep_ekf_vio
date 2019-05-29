@@ -3,7 +3,7 @@
 FROM nvidia/cuda:9.0-cudnn7-runtime
 
 RUN apt-get update
-RUN apt-get install python3 python3-pip git -y
+RUN apt-get install python3 python3-pip git tzdata -y
 
 # Install python packages within container
 ENV PYTHON_PACKAGES="\
