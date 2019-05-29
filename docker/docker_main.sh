@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 
-while getopts ":hi:g:d:" opt; do
+while getopts ":he:i:g:d:" opt; do
     case $opt in
         h)
-            echo "-i image_name -g gpu_ids -d description"
+            echo "-i image_name -g gpu_ids -d description [-e result_dir]"
             exit 0
             ;;
         i)
@@ -20,6 +20,10 @@ while getopts ":hi:g:d:" opt; do
             echo $OPTARG
             descrip=$OPTARG
             ;;
+        e)
+#            echo "-e triggered"
+            eval=$OPTARG
+            ;;
         *)
             echo "Invalid option -$OPTARG"
             exit 1
@@ -27,15 +31,16 @@ while getopts ":hi:g:d:" opt; do
   esac
 done
 
+echo "Docker image: $image"
+echo "Selected GPUs: $gpu_ids"
+echo "Description: $descrip"
+echo "Eval: $eval"
+
 if [[ -z "$image" ]] || [[ -z "$gpu_ids" ]] || [[ -z "$descrip" ]]
 then
       echo "insufficient input"
       exit 1
 fi
-
-echo "Docker image: $image"
-echo "Selected GPUs: $gpu_ids"
-echo "Description: $descrip"
 
 IFS=',' read -ra gpu_ids_expanded <<< "$gpu_ids"
 
@@ -45,6 +50,7 @@ gpu_ids_seen_by_container=$(seq -s " " 0 ${j})
 uid=$(id -u)
 gid=(id -g)
 
+if [[ -z "${eval}" ]]; then
 set -x
 docker run -u ${uid}:${gid} \
            -v /home/cs4li/Dev/deep_ekf_vio:/scratch/cs4li/deep_ekf_vio \
@@ -55,3 +61,15 @@ docker run -u ${uid}:${gid} \
            python3 /home/cs4li/Dev/deep_ekf_vio/main.py \
            --description ${descrip} --gpu_id ${gpu_ids_seen_by_container}
 set +x
+else
+set -x
+docker run -u ${uid}:${gid} \
+           -v /home/cs4li/Dev/deep_ekf_vio:/scratch/cs4li/deep_ekf_vio \
+           -v /home/cs4li/Dev/KITTI:/scratch/cs4li/KITTI \
+           -v /home/cs4li/Dev/EUROC:/scratch/cs4li/EUROC \
+           -e NVIDIA_VISIBLE_DEVICES=${gpu} \
+           --shm-size 128g --runtime=nvidia --rm ${image} \
+           python3 /home/cs4li/Dev/deep_ekf_vio/results/${eval}/main.py \
+           --gpu_id 0 --run_eval_only
+set +x
+fi
