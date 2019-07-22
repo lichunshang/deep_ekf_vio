@@ -7,7 +7,7 @@ class Plotter(object):
         self.output_dir = output_dir
         self.counter = 0
 
-    def plot(self, plots, xlabel, ylabel, title, labels=None, equal_axes=False):
+    def plot(self, plots, xlabel, ylabel, title, labels=None, equal_axes=False, filename=None):
         if not labels:
             labels_txt = [None] * len(plots)
         else:
@@ -29,6 +29,7 @@ class Plotter(object):
             plt.legend()
 
         plt.grid()
-        filename = "%02d_%s.png" % (self.counter, "_".join(title.lower().split()))
+        if filename is None:
+            filename = "%02d_%s.png" % (self.counter, "_".join(title.lower().split()))
         plt.savefig(log.Logger.ensure_file_dir_exists(os.path.join(self.output_dir, filename)))
         self.counter += 1
