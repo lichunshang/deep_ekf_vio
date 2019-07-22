@@ -60,6 +60,7 @@ class Parameters(object):
         # VO Model parameters
         self.fix_vo_weights = False
 
+        self.hybrid_recurrency = False
         self.rnn_hidden_size = 1000
         self.rnn_num_layers = 2
         self.conv_dropout = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.5)

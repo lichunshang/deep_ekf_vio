@@ -297,7 +297,11 @@ class DeepVO(nn.Module):
         tmp = self.cnn(tmp)
 
         # RNN
-        lstm_input_size = IMUKalmanFilter.STATE_VECTOR_DIM ** 2 + IMUKalmanFilter.STATE_VECTOR_DIM
+        if par.hybrid_recurrency:
+            lstm_input_size = IMUKalmanFilter.STATE_VECTOR_DIM ** 2 + IMUKalmanFilter.STATE_VECTOR_DIM
+        else:
+            lstm_input_size = 0
+
         self.rnn = nn.LSTM(
                 input_size=int(np.prod(tmp.size())) + lstm_input_size,
                 hidden_size=par.rnn_hidden_size,
@@ -450,10 +454,13 @@ class E2EVIO(nn.Module):
             pred_states, pred_covars = self.ekf_module.predict(imu_data[:, k], imu_noise_covar,
                                                                states_over_timesteps[-1], covars_over_timesteps[-1])
 
-            # concatenate the predicted states and covar with the encoded images to feed into LSTM
-            last_pred_state_so3 = IMUKalmanFilter.state_to_so3(pred_states[-1])
-            last_pred_covar_flattened = pred_covars[-1].view(-1, IMUKalmanFilter.STATE_VECTOR_DIM ** 2)
-            feature_vector = torch.cat([last_pred_state_so3, last_pred_covar_flattened, encoded_images[:, k]], -1)
+            if par.hybrid_recurrency:
+                # concatenate the predicted states and covar with the encoded images to feed into LSTM
+                last_pred_state_so3 = IMUKalmanFilter.state_to_so3(pred_states[-1])
+                last_pred_covar_flattened = pred_covars[-1].view(-1, IMUKalmanFilter.STATE_VECTOR_DIM ** 2)
+                feature_vector = torch.cat([last_pred_state_so3, last_pred_covar_flattened, encoded_images[:, k]], -1)
+            else:
+                feature_vector = encoded_images[:, k]
 
             # get vis measurement
             vis_meas_and_covar, lstm_states = self.vo_module.forward_one_ts(feature_vector, lstm_states)
