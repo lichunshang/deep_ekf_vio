@@ -1,5 +1,6 @@
 KITTI
 *.png
+!docs/*.png
 records/
 result/
 models/

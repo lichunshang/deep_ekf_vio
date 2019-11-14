@@ -1,4 +1,4 @@
-# ${1:Project Name}
+# Deep EKF VIO
 This is the continuation of using an EKF as part of an end-to-end learnable network (https://github.com/lichunshang/end_to_end_odometry) 
 to fuse vision and IMU. In this work
 an robocentric EKF formulation is used as part of a deep CNN LSTM network to learn visual inertial odoemtry in an end to 
