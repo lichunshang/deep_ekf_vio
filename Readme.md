@@ -9,7 +9,7 @@ This repository started out as a fork to https://github.com/ChiWeiHsiao/DeepVO-p
 extensively.
 
 ## Dependencies:
-Look at `docker/cuda10.1/Dockerfile for list of dependencies`
+Look at `docker/cuda10.1/Dockerfile` for list of dependencies
 
 ## Example Usage:
 Help:
