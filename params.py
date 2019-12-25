@@ -84,7 +84,7 @@ class Parameters(object):
         self.epochs = 400
         self.batch_size = 16
         self.pin_mem = True
-        self.cache_image = False
+        self.cache_image = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
