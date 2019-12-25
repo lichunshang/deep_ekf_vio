@@ -12,6 +12,7 @@ import scipy.linalg
 import time
 from eval import kitti_eval_pyimpl
 from eval import plot_ekf_data
+from eval import EurocErrorCalc, KittiErrorCalc
 
 
 class Test_EKF(unittest.TestCase):
@@ -132,7 +133,8 @@ class Test_EKF(unittest.TestCase):
 
     def imu_predict_kitti(self):
         output_dir = os.path.join(par.results_coll_dir, "imu_predict_kitti")
-        seqs = ['K01', 'K04', 'K06', 'K07', 'K08', 'K09', 'K10', ]
+        seqs = ["K04", "K06", "K07", "K10"]
+        error_calc = KittiErrorCalc(seqs)
 
         for i in range(0, len(seqs)):
             logger.initialize(os.path.join(output_dir, seqs[i]), use_tensorboard=False)
@@ -140,15 +142,52 @@ class Test_EKF(unittest.TestCase):
             timestamps, gt_poses, gt_vels, poses, states, covars, precomp_covars = \
                 self.predict_test_case([seqs[i]], None, "cpu", False)
 
-            plot_ekf_data(os.path.join(output_dir, seqs[i]),
-                          timestamps[0], gt_poses[0], gt_vels[0], poses[0], states[0])
+            poses_np = np.linalg.inv(poses[0].numpy().astype(np.float64))
+            np.save(logger.ensure_file_dir_exists(os.path.join(output_dir, seqs[i], "est.npy")), poses_np)
+
+            # plot_ekf_data(os.path.join(output_dir, seqs[i]),
+            #               timestamps[0], gt_poses[0], gt_vels[0], poses[0], states[0])
 
             logger.print("Processed seq %s" % seqs[i])
-            err = np.array(kitti_eval_pyimpl.calc_kitti_seq_errors(
-                    gt_poses[0], np.linalg.inv(poses[0].numpy().astype(np.float64))))
+            err = kitti_eval_pyimpl.calc_kitti_seq_errors(gt_poses[0],
+                                                          np.linalg.inv(poses[0].numpy().astype(np.float64)))
+            err = err[0]
+            err = np.array(err)
             logger.print("Errors trans & rot")
             logger.print("%.6f" % np.average(err[:, 0]))
             logger.print("%.6f" % (np.average(err[:, 1]) * 180 / np.pi))
+
+            error_calc.accumulate_error(seqs[i], poses_np)
+
+        logger.print("Ave Trans Errors: ")
+        logger.print(np.average(np.array(error_calc.errors)[:, 0]))
+        logger.print("Ave Rot Errors: ")
+        logger.print(np.average(np.array(error_calc.errors)[:, 1]))
+
+    def imu_predict_euroc(self):
+        output_dir = os.path.join(par.results_coll_dir, "imu_predict_kitti")
+        seqs = ['MH_05', 'V1_03', 'V2_02']
+        error_calc = EurocErrorCalc(seqs)
+
+        for i in range(0, len(seqs)):
+            logger.initialize(os.path.join(output_dir, seqs[i]), use_tensorboard=False)
+
+            timestamps, gt_poses, gt_vels, poses, states, covars, precomp_covars = \
+                self.predict_test_case([seqs[i]], None, "cpu", False)
+
+            poses_np = np.linalg.inv(poses[0].numpy().astype(np.float64))
+            np.save(logger.ensure_file_dir_exists(os.path.join(output_dir, seqs[i], "est.npy")), poses_np)
+
+            # plot_ekf_data(os.path.join(output_dir, seqs[i]),
+            #               timestamps[0], gt_poses[0], gt_vels[0], poses[0], states[0])
+
+            err = error_calc.accumulate_error(seqs[i], poses_np)
+            logger.print("Processed seq %s" % seqs[i])
+            logger.print("Errors trans & rot")
+            logger.print("%.6f" % err)
+
+        logger.print("Ave Trans Errors: ")
+        logger.print(np.average(np.array(error_calc.errors)))
 
     def test_ekf_predict_cuda_graph(self):
         timestamps, gt_poses, gt_vels, poses, states, covars, precomp_covars = \
@@ -209,11 +248,11 @@ class Test_EKF(unittest.TestCase):
                                                       gyro_measurements[:, i],
                                                       accel_measurements[:, i])
             imu_data = torch.tensor(imu_data, dtype=torch.float32).to(device)
-            state, covar = ekf.predict(imu_data, imu_noise, states[-1], covars[-1])
+            pred_states, pred_covars = ekf.predict(imu_data, imu_noise, states[-1], covars[-1])
 
-            precomp_covars.append(covar)
+            precomp_covars.append(pred_covars[-1])
 
-            pose, state, covar = ekf.composition(poses[-1], state, covar)
+            pose, state, covar = ekf.composition(poses[-1], pred_states[-1], pred_covars[-1])
 
             states.append(state)
             covars.append(covar)
@@ -536,5 +575,6 @@ if __name__ == '__main__':
     # Test_EKF().test_ekf_predict_cuda_graph()
     # Test_EKF().test_ekf_cuda_graph()
     # Test_EKF().test_ekf_K06_with_artificial_biases_plotted()
-    # Test_EKF().imu_predict_kitti()
-    unittest.main(verbosity=10)
+    Test_EKF().imu_predict_kitti()
+    # Test_EKF().imu_predict_euroc()
+    # unittest.main(verbosity=10)

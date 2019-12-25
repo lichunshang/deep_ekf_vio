@@ -28,6 +28,8 @@ def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
 
 
 class IMUKalmanFilter(nn.Module):
+    STATE_VECTOR_DIM = 18
+
     def __init__(self):
         super(IMUKalmanFilter, self).__init__()
 
@@ -101,6 +103,9 @@ class IMUKalmanFilter(nn.Module):
         U = torch.diag(torch.tensor([1.] * 3 + [0.] * 6 + [1.] * 9, device=imu_meas.device)).repeat(num_batches, 1, 1)
         pred_covar = torch.matmul(torch.matmul(U, prev_covar), U.transpose(-2, -1))
 
+        pred_states = []
+        pred_covars = []
+
         # Note C and r always gonna be identity and at each time k
         g_k, _, _, v_k, bw_k, ba_k = IMUKalmanFilter.decode_state_b(prev_state)
         for tau in range(0, imu_meas.size(1) - 1):
@@ -120,14 +125,22 @@ class IMUKalmanFilter(nn.Module):
                                       v_k, bw_k, ba_k, pred_covar,
                                       gyro_meas, accel_meas, imu_noise_covar)
 
-        pred_state = IMUKalmanFilter.encode_state_b(g_k,
-                                                    C_accum,
-                                                    v_k * t_accum - 0.5 * g_k * t_accum * t_accum + r_accum,
-                                                    torch.matmul(C_accum.transpose(-2, -1),
-                                                                 v_k - g_k * t_accum + v_accum),
-                                                    bw_k, ba_k)
+            pred_covars.append(pred_covar)
+            pred_states.append(IMUKalmanFilter.encode_state_b(g_k,
+                                                              C_accum,
+                                                              v_k * t_accum - 0.5 * g_k * t_accum * t_accum + r_accum,
+                                                              torch.matmul(C_accum.transpose(-2, -1),
+                                                                           v_k - g_k * t_accum + v_accum),
+                                                              bw_k, ba_k))
 
-        return pred_state, pred_covar
+        # pred_state = IMUKalmanFilter.encode_state_b(g_k,
+        #                                             C_accum,
+        #                                             v_k * t_accum - 0.5 * g_k * t_accum * t_accum + r_accum,
+        #                                             torch.matmul(C_accum.transpose(-2, -1),
+        #                                                          v_k - g_k * t_accum + v_accum),
+        #                                             bw_k, ba_k)
+
+        return pred_states, pred_covars
 
     def meas_residual_and_jacobi(self, C_pred, r_pred, vis_meas, T_imu_cam):
         C_cal = T_imu_cam[:, 0:3, 0:3]
@@ -213,9 +226,9 @@ class IMUKalmanFilter(nn.Module):
         states_over_timesteps = [prev_state]
         covars_over_timesteps = [prev_covar]
         for k in range(0, num_timesteps):
-            pred_state, pred_covar = self.predict(imu_data[:, k], imu_noise_covar,
-                                                  states_over_timesteps[-1], covars_over_timesteps[-1])
-            est_state, est_covar = self.update(pred_state, pred_covar,
+            pred_states, pred_covars = self.predict(imu_data[:, k], imu_noise_covar,
+                                                    states_over_timesteps[-1], covars_over_timesteps[-1])
+            est_state, est_covar = self.update(pred_states[-1], pred_covars[-1],
                                                vis_meas[:, k], vis_meas_covar[:, k], T_imu_cam)
             new_pose, new_state, new_covar = self.composition(poses_over_timesteps[-1], est_state, est_covar)
 
@@ -255,6 +268,15 @@ class IMUKalmanFilter(nn.Module):
         g, C, r, v, bw, ba = IMUKalmanFilter.decode_state_b(state_vector)
         return g.view(3, 1), C.view(3, 3), r.view(3, 1), v.view(3, 1), bw.view(3, 1), ba.view(3, 1)
 
+    @staticmethod
+    def state_to_so3(state_vector):
+        g, C, r, v, bw, ba = IMUKalmanFilter.decode_state_b(state_vector)
+        phi = torch_se3.log_SO3_b(C)
+        return torch.cat((g.view(-1, 3),
+                          phi.view(-1, 3), r.view(-1, 3),
+                          v.view(-1, 3),
+                          bw.view(-1, 3), ba.view(-1, 3),), -1)
+
 
 class DeepVO(nn.Module):
     def __init__(self, imsize1, imsize2, batchNorm):
@@ -271,12 +293,17 @@ class DeepVO(nn.Module):
         self.conv5_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[7])
         self.conv6 = conv(self.batchNorm, 512, 1024, kernel_size=3, stride=2, dropout=par.conv_dropout[8])
         # Compute the shape based on diff image size
-        __tmp = Variable(torch.zeros(1, 6, imsize1, imsize2))
-        __tmp = self.encode_image(__tmp)
+        tmp = Variable(torch.zeros(1, 6, imsize1, imsize2))
+        tmp = self.cnn(tmp)
 
         # RNN
+        if par.hybrid_recurrency:
+            lstm_input_size = IMUKalmanFilter.STATE_VECTOR_DIM ** 2 + IMUKalmanFilter.STATE_VECTOR_DIM
+        else:
+            lstm_input_size = 0
+
         self.rnn = nn.LSTM(
-                input_size=int(np.prod(__tmp.size())),
+                input_size=int(np.prod(tmp.size())) + lstm_input_size,
                 hidden_size=par.rnn_hidden_size,
                 num_layers=par.rnn_num_layers,
                 dropout=par.rnn_dropout_between,
@@ -314,16 +341,7 @@ class DeepVO(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def forward(self, x, lstm_init_state=None):
-        # x: (batch, seq_len, channel, width, height)
-        # stack_image
-        x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
-        batch_size = x.size(0)
-        seq_len = x.size(1)
-        # CNN
-        x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
-        x = self.encode_image(x)
-        x = x.view(batch_size, seq_len, -1)
+    def forward_one_ts(self, feature_vector, lstm_init_state=None):
 
         # lstm_init_state has the dimension of (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
         if lstm_init_state is not None:
@@ -334,7 +352,7 @@ class DeepVO(nn.Module):
         # RNN
         # lstm_state is (hidden state, cell state,)
         # each hidden/cell state has the shape (lstm layers, batch size, lstm hidden size)
-        out, lstm_state = self.rnn(x, lstm_init_state)
+        out, lstm_state = self.rnn(feature_vector.unsqueeze(1), lstm_init_state)
         out = self.rnn_drop_out(out)
         out = self.linear(out)
 
@@ -342,9 +360,24 @@ class DeepVO(nn.Module):
         lstm_state = torch.stack(lstm_state, dim=0)
         lstm_state = lstm_state.permute(2, 0, 1, 3)
 
-        return out, lstm_state
+        return out.squeeze(1), lstm_state
 
-    def encode_image(self, x):
+    def encode_image(self, images):
+        # images: (batch, seq_len, channel, width, height)
+        x = images
+
+        # stack_image
+        x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
+        batch_size = x.size(0)
+        seq_len = x.size(1)
+        # CNN
+        x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
+        x = self.cnn(x)
+        x = x.view(batch_size, seq_len, -1)
+
+        return x
+
+    def cnn(self, x):
         out_conv2 = self.conv2(self.conv1(x))
         out_conv3 = self.conv3_1(self.conv3(out_conv2))
         out_conv4 = self.conv4_1(self.conv4(out_conv3))
@@ -396,40 +429,73 @@ class E2EVIO(nn.Module):
         return torch.diag(imu_noise_covar_diag)
 
     def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam):
-        vis_meas_and_covar, lstm_states = self.vo_module.forward(images, lstm_init_state=prev_lstm_states)
+        assert par.enable_ekf
 
-        vis_meas = vis_meas_and_covar[:, :, 0:6]
-
-        vis_meas_covar_scale = torch.ones(6, device=vis_meas.device)
+        vis_meas_covar_scale = torch.ones(6, device=images.device)
         vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * par.k1
-
-        if par.vis_meas_covar_use_fixed:
-            vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar, dtype=torch.float32, device=vis_meas.device)
-            vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
-            vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
-        else:
-            vis_meas_covar_diag = par.vis_meas_covar_init_guess * \
-                                  10 ** (par.vis_meas_covar_beta *
-                                         torch.tanh(par.vis_meas_covar_gamma * vis_meas_and_covar[:, :, 6:12]))
-
-        vis_meas_covar_diag_scaled = vis_meas_covar_diag / vis_meas_covar_scale.view(1, 1, 6)
-
-        if not par.enable_ekf:
-            return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, None, None, None
-
         imu_noise_covar = self.get_imu_noise_covar()
 
         if prev_covar is None:
-            init_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
-                                    par.init_covar_diag_eps).repeat(vis_meas.shape[0], 1, 1)
-        else:
-            init_covar = prev_covar
+            prev_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
+                                    par.init_covar_diag_eps).repeat(images.shape[0], 1, 1)
 
-        # vis model outputs positions first
+        encoded_images = self.vo_module.encode_image(images)
 
-        poses, ekf_states, ekf_covars = self.ekf_module.forward(imu_data, imu_noise_covar,
-                                                                prev_pose, prev_state, init_covar,
-                                                                torch.unsqueeze(vis_meas, -1),
-                                                                torch.diag_embed(vis_meas_covar_diag_scaled),
-                                                                T_imu_cam)
-        return vis_meas, torch.diag_embed(vis_meas_covar_diag), lstm_states, poses, ekf_states, ekf_covars
+        num_timesteps = images.size(1) - 1  # equals to imu_data.size(1) - 1
+
+        poses_over_timesteps = [prev_pose]
+        states_over_timesteps = [prev_state]
+        covars_over_timesteps = [prev_covar]
+        vis_meas_over_timesteps = []
+        vis_meas_covar_over_timesteps = []
+        lstm_states = prev_lstm_states
+        for k in range(0, num_timesteps):
+            # ekf predict
+            pred_states, pred_covars = self.ekf_module.predict(imu_data[:, k], imu_noise_covar,
+                                                               states_over_timesteps[-1], covars_over_timesteps[-1])
+
+            if par.hybrid_recurrency:
+                # concatenate the predicted states and covar with the encoded images to feed into LSTM
+                last_pred_state_so3 = IMUKalmanFilter.state_to_so3(pred_states[-1])
+                last_pred_covar_flattened = pred_covars[-1].view(-1, IMUKalmanFilter.STATE_VECTOR_DIM ** 2)
+                feature_vector = torch.cat([last_pred_state_so3, last_pred_covar_flattened, encoded_images[:, k]], -1)
+            else:
+                feature_vector = encoded_images[:, k]
+
+            # get vis measurement
+            vis_meas_and_covar, lstm_states = self.vo_module.forward_one_ts(feature_vector, lstm_states)
+            vis_meas = vis_meas_and_covar[:, 0:6]
+
+            # process vis meas covar
+            if par.vis_meas_covar_use_fixed:
+                vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar,
+                                                   dtype=torch.float32, device=vis_meas.device)
+                vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
+                vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
+            else:
+                vis_meas_covar_diag = par.vis_meas_covar_init_guess * \
+                                      10 ** (par.vis_meas_covar_beta *
+                                             torch.tanh(par.vis_meas_covar_gamma * vis_meas_and_covar[:, 6:12]))
+            vis_meas_covar_scaled = torch.diag_embed(vis_meas_covar_diag / vis_meas_covar_scale.view(1, 6))
+            vis_meas_covar = torch.diag_embed(vis_meas_covar_diag)
+
+            # ekf correct
+            est_state, est_covar = self.ekf_module.update(pred_states[-1], pred_covars[-1],
+                                                          vis_meas.unsqueeze(-1),
+                                                          vis_meas_covar_scaled,
+                                                          T_imu_cam)
+            new_pose, new_state, new_covar = self.ekf_module.composition(poses_over_timesteps[-1],
+                                                                         est_state, est_covar)
+
+            poses_over_timesteps.append(new_pose)
+            states_over_timesteps.append(new_state)
+            covars_over_timesteps.append(new_covar)
+            vis_meas_over_timesteps.append(vis_meas)
+            vis_meas_covar_over_timesteps.append(vis_meas_covar)
+
+        return torch.stack(vis_meas_over_timesteps, 1), \
+               torch.stack(vis_meas_covar_over_timesteps, 1), \
+               lstm_states, \
+               torch.stack(poses_over_timesteps, 1), \
+               torch.stack(states_over_timesteps, 1), \
+               torch.stack(covars_over_timesteps, 1)

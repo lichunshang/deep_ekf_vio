@@ -3,7 +3,7 @@
 FROM nvidia/cuda:10.1-cudnn7-runtime-ubuntu16.04
 
 RUN apt-get update
-RUN apt-get install python3 python3-pip git -y
+RUN apt-get install python3 python3-pip git tzdata -y
 
 # Install python packages within container
 ENV PYTHON_PACKAGES="\

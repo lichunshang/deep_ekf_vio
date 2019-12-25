@@ -77,22 +77,22 @@ gid=$(id -g)
 if [[ -z "${eval}" ]]; then
 set -x
 docker run -u ${uid}:${gid} \
-           -v /home/cs4li/Dev/deep_ekf_vio:/home/cs4li/Dev/deep_ekf_vio \
-           -v /home/cs4li/Dev/KITTI:/home/cs4li/Dev/KITTI \
-           -v /home/cs4li/Dev/EUROC:/home/cs4li/Dev/EUROC \
-           -e NVIDIA_VISIBLE_DEVICES=${gpu} \
-           --shm-size 128g --rm ${image} \
+           -v /scratch/cs4li/deep_ekf_vio:/home/cs4li/Dev/deep_ekf_vio \
+           -v /scratch/cs4li/KITTI:/home/cs4li/Dev/KITTI \
+           -v /scratch/cs4li/EUROC:/home/cs4li/Dev/EUROC \
+           -e NVIDIA_VISIBLE_DEVICES=${gpu_ids} -e TZ=America/Toronto \
+           --shm-size 128g --runtime=nvidia --rm ${image} \
            python3 /home/cs4li/Dev/deep_ekf_vio/main.py \
-           --description ${descrip} --gpu_id ${gpu_ids_seen_by_container}
+           --description "${descrip}" --gpu_id ${gpu_ids_seen_by_container}
 set +x
 else
 set -x
 docker run -u ${uid}:${gid} \
-           -v /home/cs4li/Dev/deep_ekf_vio:/home/cs4li/Dev/deep_ekf_vio \
-           -v /home/cs4li/Dev/KITTI:/home/cs4li/Dev/KITTI \
-           -v /home/cs4li/Dev/EUROC:/home/cs4li/Dev/EUROC \
-           -e NVIDIA_VISIBLE_DEVICES=${gpu} \
-           --shm-size 128g --rm ${image} \
+           -v /scratch/cs4li/deep_ekf_vio:/home/cs4li/Dev/deep_ekf_vio \
+           -v /scratch/cs4li/KITTI:/home/cs4li/Dev/KITTI \
+           -v /scratch/cs4li/EUROC:/home/cs4li/Dev/EUROC \
+           -e NVIDIA_VISIBLE_DEVICES=${gpu_ids} -e TZ=America/Toronto \
+           --shm-size 128g --runtime=nvidia --rm ${image} \
            python3 /home/cs4li/Dev/deep_ekf_vio/results/${eval}/main.py \
            --gpu_id 0 --run_eval_only
 set +x
