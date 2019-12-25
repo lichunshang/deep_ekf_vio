@@ -12,7 +12,7 @@ while getopts ":he:i:g:d:" opt; do
             image=$OPTARG
             ;;
         g)
-#            echo "-g triggered"
+#            echo "-g triggered"cat /usr/local/cuda/version.txt
             gpu_ids=$OPTARG
             ;;
         d)
@@ -77,9 +77,9 @@ gid=$(id -g)
 if [[ -z "${eval}" ]]; then
 set -x
 docker run -u ${uid}:${gid} \
-           -v /scratch/cs4li/deep_ekf_vio:/home/cs4li/Dev/deep_ekf_vio \
-           -v /scratch/cs4li/KITTI:/home/cs4li/Dev/KITTI \
-           -v /scratch/cs4li/EUROC:/home/cs4li/Dev/EUROC \
+           -v /scratch/hpc_nas/input/cs4li/deep_ekf_vio:/home/cs4li/Dev/deep_ekf_vio \
+           -v /scratch/hpc_nas/input/cs4li/KITTI:/home/cs4li/Dev/KITTI \
+           -v /scratch/hpc_nas/input/cs4li/EUROC:/home/cs4li/Dev/EUROC \
            -e NVIDIA_VISIBLE_DEVICES=${gpu_ids} -e TZ=America/Toronto \
            --shm-size 128g --runtime=nvidia --rm ${image} \
            python3 /home/cs4li/Dev/deep_ekf_vio/main.py \
@@ -88,9 +88,9 @@ set +x
 else
 set -x
 docker run -u ${uid}:${gid} \
-           -v /scratch/cs4li/deep_ekf_vio:/home/cs4li/Dev/deep_ekf_vio \
-           -v /scratch/cs4li/KITTI:/home/cs4li/Dev/KITTI \
-           -v /scratch/cs4li/EUROC:/home/cs4li/Dev/EUROC \
+           -v /scratch/hpc_nas/input/cs4li/deep_ekf_vio:/home/cs4li/Dev/deep_ekf_vio \
+           -v /scratch/hpc_nas/input/cs4li/KITTI:/home/cs4li/Dev/KITTI \
+           -v /scratch/hpc_nas/input/cs4li/EUROC:/home/cs4li/Dev/EUROC \
            -e NVIDIA_VISIBLE_DEVICES=${gpu_ids} -e TZ=America/Toronto \
            --shm-size 128g --runtime=nvidia --rm ${image} \
            python3 /home/cs4li/Dev/deep_ekf_vio/results/${eval}/main.py \
