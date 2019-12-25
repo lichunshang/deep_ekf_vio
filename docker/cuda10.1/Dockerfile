@@ -18,6 +18,7 @@ ENV PYTHON_PACKAGES="\
     prettytable \
     evo \
 "
+RUN pip3 install cython
 RUN pip3 install --no-cache-dir $PYTHON_PACKAGES
 
 RUN mkdir -p /home/cs4li/Dev/deep_ekf_vio
