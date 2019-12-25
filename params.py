@@ -50,7 +50,7 @@ class Parameters(object):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting
-            0: 0.5,
+            0: 0.9,
             # 80: 0.01,
             # 160: 0.1,
             # 240: 0.9
@@ -83,7 +83,7 @@ class Parameters(object):
         self.epochs = 400
         self.batch_size = 16
         self.pin_mem = True
-        self.cache_image = True
+        self.cache_image = False
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
@@ -136,8 +136,14 @@ class KITTIParams(Parameters):
     def __init__(self):
         Parameters.__init__(self)
 
-        self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
-        self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
+        self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
+        self.eval_seq = "K01"
+
+        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        self.valid_seqs = [self.eval_seq]
+
+        # self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
+        # self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
         # self.train_seqs = ['K08']
         # self.valid_seqs = ['K07']
 
@@ -177,8 +183,14 @@ class EUROCParams(Parameters):
     def __init__(self):
         Parameters.__init__(self)
 
-        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
-        self.valid_seqs = ['MH_05', "V1_03", "V2_02"]
+        self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05', "V1_01", "V1_02", "V1_03", "V2_01", "V2_02"]
+        self.eval_seq = "MH_01"
+
+        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        self.valid_seqs = [self.eval_seq]
+
+        # self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
+        # self.valid_seqs = ['MH_05', "V1_03", "V2_02"]
 
         self.img_w = 235
         self.img_h = 150
@@ -211,5 +223,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-# par = KITTIParams()
-par = EUROCParams()
+par = KITTIParams()
+# par = EUROCParams()
