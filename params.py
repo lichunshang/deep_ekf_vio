@@ -126,7 +126,8 @@ class Parameters(object):
             for available_seq in sorted(available_seqs):
                 if regex.match(available_seq):
                     ret_seqs.append(available_seq)
-            assert (len(ret_seqs) > start_cnt)
+            if not (len(ret_seqs) > start_cnt):
+                print("WARN!!! len(ret_seqs) > start_cnt")
         return ret_seqs
 
     def dataset(self):

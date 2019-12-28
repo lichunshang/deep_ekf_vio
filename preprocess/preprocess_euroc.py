@@ -221,19 +221,30 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     imu_still_idx_start = imu_timestamps.index(cam_timestamps[max(cam_still_range[0], cam_imu_aligned_start_idx)])
     imu_still_idx_end = imu_timestamps.index(cam_timestamps[cam_still_range[1]])
 
-    gyro_bias_from_still = np.mean(imu_data[imu_still_idx_start:imu_still_idx_end, [wx, wy, wz]], axis=0)
+    # gyro_bias_from_still = np.mean(imu_data[imu_still_idx_start:imu_still_idx_end, [wx, wy, wz]], axis=0)
     gravity_from_still = np.mean(imu_data[imu_still_idx_start:imu_still_idx_end, [ax, ay, az]], axis=0)
+    init_gyro_bias = np.mean(gt_data[imu_still_idx_start:imu_still_idx_end, [bwx, bwy, bwz]], axis=0)
+    init_accel_bias = np.mean(gt_data[imu_still_idx_start:imu_still_idx_end, [bax, bay, baz]], axis=0)
+    init_gravity = gravity_from_still - init_accel_bias
 
     print("still estimated g_b0:", gravity_from_still)
     print("still estimated g_b0 norm: ", np.linalg.norm(gravity_from_still))
+    print("init_gravity:", init_gravity)
+    print("init_gravity norm:", np.linalg.norm(init_gravity))
+    print("gyro_bias:", init_gyro_bias)
+    print("accel_bias:", init_accel_bias)
+
+    init_gravity = init_gravity / np.linalg.norm(init_gravity) * 9.80665
+    print("init_gravity corr:", init_gravity)
+    print("init_gravity norm corr:", np.linalg.norm(init_gravity))
 
     # for training /validation
     logger.print("Processing data for training...")
     every_N_frames = 10
-    rounded_length = len(imu_timestamps_gt_aligned) // every_N_frames * every_N_frames
-    gravity_from_gt = find_initial_gravity(imu_timestamps_gt_aligned[0:rounded_length],
-                                           imu_data_gt_aligned[0:rounded_length],
-                                           gt_timestamps[0:rounded_length], gt_data[0:rounded_length], 10)
+    # rounded_length = len(imu_timestamps_gt_aligned) // every_N_frames * every_N_frames
+    # gravity_from_gt = find_initial_gravity(imu_timestamps_gt_aligned[0:rounded_length],
+    #                                        imu_data_gt_aligned[0:rounded_length],
+    #                                        gt_timestamps[0:rounded_length], gt_data[0:rounded_length], 10)
 
     cam_gt_aligned_start_idx = -1
     for i in range(0, len(cam_timestamps)):
@@ -249,19 +260,19 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
             break
     assert cam_gt_aligned_end_idx >= 0
 
-    gt_cam_aligned_start_idx = imu_timestamps_gt_aligned.index(cam_timestamps[cam_gt_aligned_start_idx])
-    gt_cam_aligned_end_idx = imu_timestamps_gt_aligned.index(cam_timestamps[cam_gt_aligned_end_idx])
-
-    logger.print("Camera index [%d -> %d]" % (cam_gt_aligned_start_idx, cam_gt_aligned_end_idx))
-    data_frames = package_euroc_data(seq_dir, cam_timestamps[cam_gt_aligned_start_idx:cam_gt_aligned_end_idx + 1],
-                                     imu_timestamps_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
-                                     imu_data_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
-                                     gt_timestamps[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
-                                     gt_data[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1])
-
-    SequenceData.save_as_pd(data_frames, gravity_from_gt, gyro_bias_from_still, T_cam_imu, output_dir)
-    copyfile(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"),
-             os.path.join(output_dir, "groundtruth.csv"))
+    # gt_cam_aligned_start_idx = imu_timestamps_gt_aligned.index(cam_timestamps[cam_gt_aligned_start_idx])
+    # gt_cam_aligned_end_idx = imu_timestamps_gt_aligned.index(cam_timestamps[cam_gt_aligned_end_idx])
+    #
+    # logger.print("Camera index [%d -> %d]" % (cam_gt_aligned_start_idx, cam_gt_aligned_end_idx))
+    # data_frames = package_euroc_data(seq_dir, cam_timestamps[cam_gt_aligned_start_idx:cam_gt_aligned_end_idx + 1],
+    #                                  imu_timestamps_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
+    #                                  imu_data_gt_aligned[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
+    #                                  gt_timestamps[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1],
+    #                                  gt_data[gt_cam_aligned_start_idx:gt_cam_aligned_end_idx + 1])
+    #
+    # SequenceData.save_as_pd(data_frames, gravity_from_gt, gyro_bias_from_still, T_cam_imu, output_dir)
+    # copyfile(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"),
+    #          os.path.join(output_dir, "groundtruth.csv"))
 
     # for evaluation
     logger.print("Processing data for evaluation...")
@@ -273,13 +284,13 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     zeros_gt[: qw] = 1
 
     logger.print("Camera index [%d -> %d]" % (cam_still_range[1], cam_imu_aligned_end_idx))
-    eval_output_dir = output_dir + "_eval"
+    eval_output_dir = output_dir
     data_frames = package_euroc_data(seq_dir, cam_timestamps[cam_still_range[1]:cam_imu_aligned_end_idx + 1],
                                      imu_timestamps_cam_aligned,
                                      imu_data_cam_aligned,
                                      imu_timestamps_cam_aligned,
                                      zeros_gt)
     logger.make_dir_if_not_exist(eval_output_dir)
-    SequenceData.save_as_pd(data_frames, gravity_from_still, gyro_bias_from_still, T_cam_imu, eval_output_dir)
+    SequenceData.save_as_pd(data_frames, init_gravity, init_gyro_bias, T_cam_imu, eval_output_dir, ba_0=init_accel_bias)
     copyfile(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"),
              os.path.join(eval_output_dir, "groundtruth.csv"))

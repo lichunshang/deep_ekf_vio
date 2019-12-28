@@ -43,6 +43,6 @@ do
 #    echo $CAM_STILL_END
 
     echo "Preprocessing converted seq_data using python script..."
-    python3 $SCRIPTDIR/../exec.py preprocess_euroc $EUROC_DATASET_DIR/$SEQ_DIR $OUTPUT_DIR/$SEQ_NAME $CAM_STILL_START $CAM_STILL_END
+    python3 $SCRIPTDIR/../exec.py preprocess_euroc $EUROC_DATASET_DIR/$SEQ_DIR/mav0 $OUTPUT_DIR/$SEQ_NAME $CAM_STILL_START $CAM_STILL_END
     echo
 done

@@ -15,7 +15,7 @@ from params import par
 
 class Subsequence(object):
 
-    def __init__(self, frames, g_i, bw_0, T_cam_imu, length, seq, type, idx, idx_next):
+    def __init__(self, frames, g_i, bw_0, ba_0, T_cam_imu, length, seq, type, idx, idx_next):
         assert (length == len(frames))
         assert (length == len(frames))
         self.gt_poses = np.array([f.T_i_vk for f in frames])
@@ -27,6 +27,7 @@ class Subsequence(object):
 
         self.g_i = g_i
         self.bw_0 = bw_0
+        self.ba_0 = ba_0
         self.T_cam_imu = T_cam_imu
         self.length = length
         self.type = type
@@ -60,11 +61,15 @@ class SequenceData(object):
         self.df = pd.read_pickle(self.pd_path)
 
         self.constants_path = os.path.join(par.data_dir, seq, "constants.npy")
-        self.constants = np.load(self.constants_path).item()
+        self.constants = np.load(self.constants_path, allow_pickle=True).item()
 
         self.g_i = self.constants["g_i"]
         self.T_cam_imu = self.constants["T_cam_imu"]
         self.bw_0 = self.constants["bw_0"]
+        if "ba_0" in self.constants:
+            self.ba_0 = self.constants["ba_0"]
+        else:
+            self.ba_0 = np.zeros_like(self.bw_0)
 
     def get_poses(self):
         return np.array(list(self.df.loc[:, "T_i_vk"].values))
@@ -101,7 +106,7 @@ class SequenceData(object):
         return frames
 
     @staticmethod
-    def save_as_pd(data_frames, g_i, bw_0, T_cam_imu, output_dir):
+    def save_as_pd(data_frames, g_i, bw_0, T_cam_imu, output_dir, ba_0=np.zeros(3)):
         start_time = time.time()
         data = {"image_path": [f.image_path for f in data_frames],
                 "timestamp": [f.timestamp for f in data_frames],
@@ -118,7 +123,8 @@ class SequenceData(object):
         constants = {
             "g_i": g_i,
             "T_cam_imu": T_cam_imu,
-            "bw_0": bw_0
+            "bw_0": bw_0,
+            "ba_0": ba_0
         }
 
         np.save(os.path.join(output_dir, "constants.npy"), constants)
@@ -162,7 +168,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             sub_seqs_vanilla = []
             for i in range(st, len(frames), jump):
                 if i + seq_len <= len(frames):  # this will discard a few frames at the end
-                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.bw_0, seq_data.T_cam_imu,
+                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.bw_0, seq_data.ba_0, seq_data.T_cam_imu,
                                          length=seq_len, seq=seq, type="vanilla", idx=i, idx_next=i + jump)
                     sub_seqs_vanilla.append(subseq)
             subseqs_buffer += sub_seqs_vanilla
@@ -312,6 +318,7 @@ class SubseqDataset(Dataset):
 
         init_g = torch.tensor(subseq.gt_poses[0, 0:3, 0:3].transpose().dot(subseq.g_i), dtype=torch.float32)
         bw_0 = torch.tensor(subseq.bw_0, dtype=torch.float32)
+        ba_0 = torch.tensor(subseq.ba_0, dtype=torch.float32)
 
         if par.cal_override_enable:
             T_imu_cam = torch.tensor(par.T_imu_cam_override, dtype=torch.float32)
@@ -323,7 +330,7 @@ class SubseqDataset(Dataset):
                                                         torch.zeros(3),  # r
                                                         gt_velocities[0],  # v
                                                         bw_0,  # bw
-                                                        torch.zeros(3))  # ba
+                                                        ba_0)  # ba
 
         if self.no_image:
             return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
