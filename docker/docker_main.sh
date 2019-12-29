@@ -83,6 +83,7 @@ docker run -u ${uid}:${gid} \
            -v ${deep_vio_dir}:/home/cs4li/Dev/deep_ekf_vio \
            -v /scratch/hpc_nas/input/cs4li/deep_ekf_vio/results:/home/cs4li/Dev/deep_ekf_vio/results \
            -v /scratch/hpc_nas/input/cs4li/deep_ekf_vio/data:/home/cs4li/Dev/deep_ekf_vio/data \
+           -v /scratch/hpc_nas/input/cs4li/deep_ekf_vio/pretrained:/home/cs4li/Dev/deep_ekf_vio/pretrained \
            -v /scratch/hpc_nas/input/cs4li/KITTI:/home/cs4li/Dev/KITTI \
            -v /scratch/hpc_nas/input/cs4li/EUROC:/home/cs4li/Dev/EUROC \
            -e NVIDIA_VISIBLE_DEVICES=${gpu_ids} -e TZ=America/Toronto \
@@ -96,6 +97,7 @@ docker run -u ${uid}:${gid} \
            -v ${deep_vio_dir}:/home/cs4li/Dev/deep_ekf_vio \
            -v /scratch/hpc_nas/input/cs4li/deep_ekf_vio/results:/home/cs4li/Dev/deep_ekf_vio/results \
            -v /scratch/hpc_nas/input/cs4li/deep_ekf_vio/data:/home/cs4li/Dev/deep_ekf_vio/data \
+           -v /scratch/hpc_nas/input/cs4li/deep_ekf_vio/pretrained:/home/cs4li/Dev/deep_ekf_vio/pretrained \
            -v /scratch/hpc_nas/input/cs4li/KITTI:/home/cs4li/Dev/KITTI \
            -v /scratch/hpc_nas/input/cs4li/EUROC:/home/cs4li/Dev/EUROC \
            -e NVIDIA_VISIBLE_DEVICES=${gpu_ids} -e TZ=America/Toronto \
