@@ -44,7 +44,7 @@ class _OnlineDatasetEvaluator(object):
         seqs = sorted(list(self.dataloaders.keys()))
         for seq in seqs:
             predicted_abs_poses, _, _ = gen_trajectory_rel_iter(self.model, self.dataloaders[seq], True)
-            seq_err = self.error_calc.accumulate_error(seq, predicted_abs_poses)
+            seq_err = self.error_calc.accumulate_error(seq, np.array(predicted_abs_poses))
             logger.print("%s: %.5f" % (seq, seq_err), end=" ")
         logger.print()
         ave_err = self.error_calc.get_average_error()
