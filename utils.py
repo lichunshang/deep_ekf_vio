@@ -2,12 +2,13 @@ import matplotlib.pyplot as plt
 import os
 import log
 
+
 class Plotter(object):
     def __init__(self, output_dir):
         self.output_dir = output_dir
         self.counter = 0
 
-    def plot(self, plots, xlabel, ylabel, title, labels=None, equal_axes=False, filename=None):
+    def plot(self, plots, xlabel, ylabel, title, labels=None, equal_axes=False, filename=None, callback=None):
         if not labels:
             labels_txt = [None] * len(plots)
         else:
@@ -31,5 +32,9 @@ class Plotter(object):
         plt.grid()
         if filename is None:
             filename = "%02d_%s.png" % (self.counter, "_".join(title.lower().split()))
+
+        if callback is not None:
+            callback(plt.gcf(), plt.gca())
+
         plt.savefig(log.Logger.ensure_file_dir_exists(os.path.join(self.output_dir, filename)))
         self.counter += 1
