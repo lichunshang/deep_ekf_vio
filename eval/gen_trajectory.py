@@ -18,11 +18,17 @@ def gen_trajectory_rel_iter(model, dataloader, prop_lstm_states, initial_pose=np
     for i, data in enumerate(dataloader):
         print('%d/%d (%.2f%%)' % (i, len(dataloader), i * 100 / len(dataloader)), end="\r")
 
-        images = data[1].cuda()
+        # images = data[1].cuda()
+        meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
 
         lstm_states = lstm_states if prop_lstm_states else None
-        vis_meas, vis_meas_covar, lstm_states, _, _, _ = model.forward(images, None, lstm_states, None, None, None,
-                                                                       None)
+        # we only care about the results from the VO front ends here
+        vis_meas, vis_meas_covar, lstm_states, _, _, _ = model.forward(images.cuda(),
+                                                                       imu_data.cuda(),
+                                                                       lstm_states,
+                                                                       gt_poses[:, 0].inverse().cuda(),
+                                                                       prev_state.cuda(), None,
+                                                                       T_imu_cam.cuda())
 
         lstm_states = lstm_states.detach()
         vis_meas = vis_meas.detach().cpu().numpy()
