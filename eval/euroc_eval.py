@@ -29,9 +29,9 @@ def calc_euroc_seq_errors(est_traj, gt_traj):
     ape_metric.process_data((gt_traj_synced, est_traj_aligned,))
     ape_stat = ape_metric.get_statistic(metrics.StatisticsType.rmse)
 
-    ape_metric = metrics.RPE(pose_relation)
-    ape_metric.process_data((gt_traj_synced, est_traj_aligned,))
-    ape_stat = ape_metric.get_statistic(metrics.StatisticsType.rmse)
+    # ape_metric = metrics.RPE(pose_relation)
+    # ape_metric.process_data((gt_traj_synced, est_traj_aligned,))
+    # ape_stat = ape_metric.get_statistic(metrics.StatisticsType.rmse)
 
     # fig = plt.figure()
     # traj_by_label = {
