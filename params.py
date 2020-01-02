@@ -50,7 +50,7 @@ class Parameters(object):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting
-            0: 0.9,
+            0: 0.5,
             # 80: 0.01,
             # 160: 0.1,
             # 240: 0.9
@@ -81,7 +81,7 @@ class Parameters(object):
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
-        self.epochs = 400
+        self.epochs = 800
         self.batch_size = 16
         self.pin_mem = True
         self.cache_image = True
@@ -208,7 +208,7 @@ class EUROCParams(Parameters):
                                               1e1, 1e1, 1e1])  # ba
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag = np.array([1e-3,  # w
+        self.imu_noise_covar_diag = np.array([1e-4,  # w
                                               1e-5,  # bw
                                               1e-1,  # a
                                               1e-2])  # ba
@@ -225,5 +225,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-par = KITTIParams()
-# par = EUROCParams()
+# par = KITTIParams()
+par = EUROCParams()
