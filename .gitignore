@@ -18,5 +18,5 @@ test_data
 datainfo
 *.gch
 eval/kitti_eval/cpp/evaluate_odometry
-data
+data*
 data_old
