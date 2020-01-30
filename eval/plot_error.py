@@ -65,7 +65,6 @@ def plot_errors(working_dir):
 
         for j in range(0, 6):
             err = np.abs(error_vis_meas[:, j])
-            covar = covar_vis_meas[:, j, j] / par.k4 ** 2
             if j in [0, 1, 2]: covar = covar / par.k1
             covar_sig = np.sqrt(covar)
             plt.clf()
