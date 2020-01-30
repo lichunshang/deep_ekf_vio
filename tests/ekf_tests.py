@@ -1,5 +1,5 @@
 import unittest
-from data_loader import SequenceData
+from data_loader import *
 from model import IMUKalmanFilter
 import torch_se3
 import torch
@@ -13,6 +13,7 @@ import time
 from eval import kitti_eval_pyimpl
 from eval import plot_ekf_data
 from eval import EurocErrorCalc, KittiErrorCalc
+import copy
 
 
 class Test_EKF(unittest.TestCase):
@@ -133,7 +134,8 @@ class Test_EKF(unittest.TestCase):
 
     def imu_predict_kitti(self):
         output_dir = os.path.join(par.results_coll_dir, "imu_predict_kitti")
-        seqs = ["K01", "K04", "K06", "K07", "K08", "K09", "K10"]
+        seqs = ["K01"]
+        # seqs = ["K01", "K04", "K06", "K07", "K08", "K09", "K10"]
         error_calc = KittiErrorCalc(seqs)
 
         for i in range(0, len(seqs)):
@@ -141,6 +143,9 @@ class Test_EKF(unittest.TestCase):
 
             timestamps, gt_poses, gt_vels, poses, states, covars, precomp_covars = \
                 self.predict_test_case([seqs[i]], None, "cpu", False)
+
+            plot_ekf_data(os.path.join(output_dir, seqs[i]),
+                          timestamps[0], gt_poses[0], gt_vels[0], poses[0], states[0])
 
             poses_np = np.linalg.inv(poses[0].numpy().astype(np.float64))
             np.save(logger.ensure_file_dir_exists(os.path.join(output_dir, seqs[i], "est.npy")), poses_np)
@@ -201,6 +206,7 @@ class Test_EKF(unittest.TestCase):
 
     def predict_test_case(self, seqs, seqs_range, device, req_grad):
 
+        # Subsequence(frames, g_i, bw_0, ba_0, T_cam_imu, length, seq, type, idx, idx_next)
         seqs_data = [SequenceData(seq) for seq in seqs]
         if seqs_range is None:
             data_frames = [d.df for d in seqs_data]
@@ -209,13 +215,31 @@ class Test_EKF(unittest.TestCase):
         data_frames_lengths = [len(d) for d in data_frames]
         assert (all(data_frames_lengths[0] == l for l in data_frames_lengths))
 
-        timestamps = np.array([list(df.loc[:, "timestamp"].values) for df in data_frames])
-        gt_poses = np.array([list(df.loc[:, "T_i_vk"].values) for df in data_frames])
-        gt_vels = np.array([list(df.loc[:, "v_vk_i_vk"].values) for df in data_frames])
+        subseq = Subsequence(seqs_data[0].as_frames(), np.array([0, 0, 9.808679801065017]), np.zeros(3), np.zeros(3), np.eye(4),
+                             data_frames_lengths[0], "", "", 0, 0)
 
-        imu_timestamps = np.array([df.loc[:, "imu_timestamps"].values for df in data_frames])
-        gyro_measurements = np.array([df.loc[:, "gyro_measurements"].values for df in data_frames])
-        accel_measurements = np.array([df.loc[:, "accel_measurements"].values for df in data_frames])
+        # timestamps = np.array([list(df.loc[:, "timestamp"].values) for df in data_frames])
+        # gt_poses = np.array([list(df.loc[:, "T_i_vk"].values) for df in data_frames])
+        # gt_vels = np.array([list(df.loc[:, "v_vk_i_vk"].values) for df in data_frames])
+        #
+        # imu_timestamps = np.array([df.loc[:, "imu_timestamps"].values for df in data_frames])
+        # gyro_measurements = np.array([df.loc[:, "gyro_measurements"].values for df in data_frames])
+        # accel_measurements = np.array([df.loc[:, "accel_measurements"].values for df in data_frames])
+        subseq_flipped = copy.deepcopy(subseq)
+        H = np.eye(3)
+        H[1, 1] = -1
+        flip_imu_subseq(subseq_flipped, H)  # must be before the gt is flipped
+        subseq_flipped.gt_poses = \
+            np.array([se3.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())), H.dot(T[0:3, 3]))
+                      for T in subseq.gt_poses])
+
+        timestamps = np.array([seqs_data[0].get_timestamps()])
+        gt_poses = np.array([subseq_flipped.gt_poses])
+        gt_vels = np.array([subseq_flipped.gt_velocities])
+
+        imu_timestamps = np.array([subseq_flipped.imu_timestamps])
+        gyro_measurements = np.array([subseq_flipped.gyro_measurements])
+        accel_measurements = np.array([subseq_flipped.accel_measurements])
 
         ekf = IMUKalmanFilter()
 

@@ -55,7 +55,7 @@ class Parameters(object):
             # 160: 0.1,
             # 240: 0.9
         }
-        self.k4 = 100  # error scale for covar loss
+        self.k4 = 100  # error scale for covar loss numerical stability
 
         # VO Model parameters
         self.fix_vo_weights = False
@@ -72,7 +72,7 @@ class Parameters(object):
         self.gaussian_pdf_loss = True
 
         # EKF parameters
-        self.enable_ekf = True
+        self.enable_ekf = False
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
@@ -84,7 +84,7 @@ class Parameters(object):
         self.epochs = 400
         self.batch_size = 16
         self.pin_mem = True
-        self.cache_image = True
+        self.cache_image = False
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
@@ -103,11 +103,11 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
-            "enable": False,
+            "enable": True,
             "lr_flip": True,
-            "ud_flip": True,
+            "ud_flip": False,
             "lrud_flip": False,
-            "reverse": False,
+            "reverse": True,
         })
 
         # Pretrain, Resume training

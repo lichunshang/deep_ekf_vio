@@ -24,6 +24,7 @@ class Subsequence(object):
         self.imu_timestamps = [f.imu_timestamps for f in frames]
         self.accel_measurements = [f.accel_measurements for f in frames]
         self.gyro_measurements = [f.gyro_measurements for f in frames]
+        self.imu_poses = [f.imu_poses for f in frames]
 
         self.g_i = g_i
         self.bw_0 = bw_0
@@ -146,6 +147,53 @@ def convert_subseqs_list_to_panda(subseqs):
     return pd.DataFrame(data, columns=data.keys())
 
 
+# subseq is pass by reference
+def flip_imu_subseq(subseq, H):
+    for i in range(0, len(subseq.gt_poses)):
+        assert (len(subseq.accel_measurements[i]) == len(subseq.gyro_measurements[i]) == len(
+                subseq.imu_timestamps[i]) == len(subseq.imu_poses[i]))
+        C = subseq.gt_poses[i][:3, :3]
+        v_i = C.dot(subseq.gt_velocities[i])
+        v_i_flipped = H.dot(v_i)
+        subseq.gt_velocities[i] = C.transpose().dot(v_i_flipped)
+        for j in range(0, len(subseq.accel_measurements[i])):
+            C = subseq.imu_poses[i][j][:3, :3]
+            a_i = C.dot(subseq.accel_measurements[i][j])
+            w_i = C.dot(subseq.gyro_measurements[i][j])
+
+            a_i_flipped = H.dot(a_i)  # flip y
+            w_i_flipped = -H.dot(w_i)  # flip z and x
+            # w_i_flipped = np.array([w_i[0], w_i[1], -w_i[2]])
+
+            subseq.accel_measurements[i][j] = C.transpose().dot(a_i_flipped)
+            subseq.gyro_measurements[i][j] = C.transpose().dot(w_i_flipped)
+
+
+def flip_imu_reverse(subseq):
+    for i in range(0, len(subseq.gt_poses)):
+        assert (len(subseq.accel_measurements[i]) == len(subseq.gyro_measurements[i]) == len(
+                subseq.imu_timestamps[i]) == len(subseq.imu_poses[i]))
+        C = subseq.gt_poses[i][:3, :3]
+        v_i = C.dot(subseq.gt_velocities[i])
+        v_i_flipped = -v_i
+        subseq.gt_velocities[i] = v_i_flipped
+        for j in range(0, len(subseq.accel_measurements[i])):
+            C = subseq.imu_poses[i][j][:3, :3]
+            a_i = C.dot(subseq.accel_measurements[i][j])
+            w_i = C.dot(subseq.gyro_measurements[i][j])
+
+            a_i_real = a_i - subseq.g_i
+
+            a_i_real_flipped = -a_i_real
+            w_i_flipped = -w_i
+
+            a_i_flipped = a_i_real_flipped + subseq.g_i
+
+            subseq.accel_measurements[i][j] = C.transpose().dot(a_i_flipped)
+            subseq.gyro_measurements[i][j] = C.transpose().dot(w_i_flipped)
+            subseq.imu_timestamps[i][j] = -subseq.imu_timestamps[i][j]
+
+
 def get_subseqs(sequences, seq_len, overlap, sample_times, training):
     subseq_list = []
 
@@ -168,18 +216,19 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             sub_seqs_vanilla = []
             for i in range(st, len(frames), jump):
                 if i + seq_len <= len(frames):  # this will discard a few frames at the end
-                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.bw_0, seq_data.ba_0, seq_data.T_cam_imu,
+                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.bw_0, seq_data.ba_0,
+                                         seq_data.T_cam_imu,
                                          length=seq_len, seq=seq, type="vanilla", idx=i, idx_next=i + jump)
                     sub_seqs_vanilla.append(subseq)
             subseqs_buffer += sub_seqs_vanilla
 
             if training and par.data_aug_transforms.enable:
-                assert not par.enable_ekf, "Data aug transforms not compatible with EKF"
                 if par.data_aug_transforms.lr_flip:
                     subseq_flipped_buffer = []
                     H = np.diag([1, -1, 1])  # reflection matrix, flip y, across the xz plane
                     for subseq in sub_seqs_vanilla:
                         subseq_flipped = copy.deepcopy(subseq)
+                        flip_imu_subseq(subseq_flipped, H)  # must be before the gt is flipped
                         subseq_flipped.gt_poses = \
                             np.array([se3.T_from_Ct(H.dot(T[0:3, 0:3].dot(H.transpose())), H.dot(T[0:3, 3]))
                                       for T in subseq.gt_poses])
@@ -189,6 +238,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
 
                 if par.data_aug_transforms.ud_flip:
                     assert par.dataset() == "EUROC", "up down flips only supported for EUROC"
+                    assert not par.enable_ekf, "Data aug transforms not compatible with EKF"
                     subseq_flipped_buffer = []
                     H = np.diag([-1, 1, 1])  # reflection matrix, flip x, across the yz plane, only for EUROC
                     for subseq in sub_seqs_vanilla:
@@ -202,6 +252,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
 
                 if par.data_aug_transforms.lrud_flip:
                     assert par.dataset() == "EUROC", "left right up down flips only supported for EUROC"
+                    assert not par.enable_ekf, "Data aug transforms not compatible with EKF"
                     subseq_flipped_buffer = []
                     H = np.diag([-1, -1, 1])  # reflection matrix, flip x, across the yz plane, only for EUROC
                     for subseq in sub_seqs_vanilla:
@@ -218,6 +269,7 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
                     subseqs_rev_buffer = []
                     for subseq in subseqs_buffer:
                         subseq_rev = copy.deepcopy(subseq)
+                        flip_imu_reverse(subseq_rev)  # must be before the gt is flipped
                         subseq_rev.image_paths = list(reversed(subseq.image_paths))
                         subseq_rev.gt_poses = np.flip(subseq.gt_poses, axis=0).copy()
                         subseq_rev.type = subseq.type + "_reversed"
