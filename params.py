@@ -103,11 +103,11 @@ class Parameters(object):
             }
         })
         self.data_aug_transforms = AttrDict({
-            "enable": False,
+            "enable": True,
             "lr_flip": True,
-            "ud_flip": True,
+            "ud_flip": False,
             "lrud_flip": False,
-            "reverse": False,
+            "reverse": True,
         })
 
         # Pretrain, Resume training

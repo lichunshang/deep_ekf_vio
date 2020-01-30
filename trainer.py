@@ -78,7 +78,7 @@ class _TrainAssistant(object):
 
     def update_lstm_state(self, t_x_meta, lstm_states):
         # lstm_states has the dimension of (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
-        _, seq_list, type_list, _, id_next_list = SubseqDataset.decode_batch_meta_info(t_x_meta)
+        _, seq_list, type_list, _, id_next_list, invalid_imu_list = SubseqDataset.decode_batch_meta_info(t_x_meta)
         assert (len(seq_list) == lstm_states.size(0) and len(seq_list) == lstm_states.size(0))
         num_batches = len(seq_list)
 
@@ -87,7 +87,7 @@ class _TrainAssistant(object):
             self.lstm_state_cache[key] = lstm_states[i, :, :, :]
 
     def retrieve_lstm_state(self, t_x_meta):
-        _, seq_list, type_list, id_list, id_next_list = SubseqDataset.decode_batch_meta_info(t_x_meta)
+        _, seq_list, type_list, id_list, id_next_list, invalid_imu_list = SubseqDataset.decode_batch_meta_info(t_x_meta)
         num_batches = len(seq_list)
 
         lstm_states = []
@@ -109,6 +109,8 @@ class _TrainAssistant(object):
     def get_loss(self, data):
         meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
 
+        _, _, _, _, _, invalid_imu_list = SubseqDataset.decode_batch_meta_info(meta_data)
+
         prev_lstm_states = None
         if par.stateful_training:
             prev_lstm_states = self.retrieve_lstm_state(meta_data)
@@ -124,7 +126,10 @@ class _TrainAssistant(object):
 
         if par.enable_ekf:
             # note that the estimated poses are already inversed
-            loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
+            s = np.array(invalid_imu_list)
+            loss, loss_abs, loss_vis_meas = self.ekf_loss(poses[~s], gt_poses[~s].cuda(), ekf_states[~s], gt_rel_poses[~s].cuda(), vis_meas[~s], vis_meas_covar[~s])
+            vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
+            loss = vis_meas_loss_invalid_imu + loss_vis_meas + 4 * loss_abs
         else:
             loss = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses.cuda())
 
@@ -274,7 +279,7 @@ class _TrainAssistant(object):
             add_scalar("imu_noise_diag/ba_y", imu_noise_covar[10], iterations)
             add_scalar("imu_noise_diag/ba_z", imu_noise_covar[11], iterations)
             add_scalar("params/k3", k3, iterations)
-        return loss
+        return loss, loss_abs, loss_vis_meas
 
     def step(self, data, optimizer):
         optimizer.zero_grad()
