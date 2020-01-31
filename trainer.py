@@ -127,8 +127,15 @@ class _TrainAssistant(object):
         if par.enable_ekf:
             # note that the estimated poses are already inversed
             s = np.array(invalid_imu_list)
-            loss, loss_abs, loss_vis_meas = self.ekf_loss(poses[~s], gt_poses[~s].cuda(), ekf_states[~s], gt_rel_poses[~s].cuda(), vis_meas[~s], vis_meas_covar[~s])
-            vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
+            loss_abs = 0
+            loss_vis_meas = 0
+            vis_meas_loss_invalid_imu = 0
+            if not np.all(s):
+                _, loss_abs, loss_vis_meas = self.ekf_loss(poses[~s], gt_poses[~s].cuda(), ekf_states[~s],
+                                                              gt_rel_poses[~s].cuda(), vis_meas[~s], vis_meas_covar[~s])
+            if np.any(s):
+                vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
+
             loss = vis_meas_loss_invalid_imu + loss_vis_meas + 4 * loss_abs
         else:
             loss = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses.cuda())
