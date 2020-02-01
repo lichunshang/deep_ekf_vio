@@ -168,13 +168,14 @@ def get_subseqs(sequences, seq_len, overlap, sample_times, training):
             sub_seqs_vanilla = []
             for i in range(st, len(frames), jump):
                 if i + seq_len <= len(frames):  # this will discard a few frames at the end
-                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.bw_0, seq_data.ba_0, seq_data.T_cam_imu,
+                    subseq = Subsequence(frames[i:i + seq_len], seq_data.g_i, seq_data.bw_0, seq_data.ba_0,
+                                         seq_data.T_cam_imu,
                                          length=seq_len, seq=seq, type="vanilla", idx=i, idx_next=i + jump)
                     sub_seqs_vanilla.append(subseq)
             subseqs_buffer += sub_seqs_vanilla
 
             if training and par.data_aug_transforms.enable:
-                assert not par.enable_ekf, "Data aug transforms not compatible with EKF"
+                # assert not par.enable_ekf, "Data aug transforms not compatible with EKF"
                 if par.data_aug_transforms.lr_flip:
                     subseq_flipped_buffer = []
                     H = np.diag([1, -1, 1])  # reflection matrix, flip y, across the xz plane
@@ -365,7 +366,12 @@ class SubseqDataset(Dataset):
             images.append(image)
         images = torch.stack(images, 0)
 
-        return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \
+        if "flipped" in subseq.type or "reversed" in subseq.type:
+            invalid_imu = True
+        else:
+            invalid_imu = False
+
+        return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next, invalid_imu), \
                images, imu_data, init_state, T_imu_cam, gt_poses, gt_rel_poses
 
     @staticmethod
@@ -375,14 +381,16 @@ class SubseqDataset(Dataset):
         type_list = batch_meta_info[2]
         id_list = batch_meta_info[3]
         id_next_list = batch_meta_info[4]
+        invalid_imu_list = batch_meta_info[5]
 
         # check batch dimension is consistent
         assert (len(seq_list) == len(seq_len_list))
         assert (len(seq_list) == len(type_list))
         assert (len(seq_list) == len(id_list))
         assert (len(seq_list) == len(id_next_list))
+        assert (len(seq_list) == len(invalid_imu_list))
 
-        return seq_len_list, seq_list, type_list, id_list, id_next_list
+        return seq_len_list, seq_list, type_list, id_list, id_next_list, invalid_imu_list
 
     @staticmethod
     def decode_imu_data_b(imu_data):

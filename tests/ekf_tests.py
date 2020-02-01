@@ -133,7 +133,7 @@ class Test_EKF(unittest.TestCase):
 
     def imu_predict_kitti(self):
         output_dir = os.path.join(par.results_coll_dir, "imu_predict_kitti")
-        seqs = ["K04", "K06", "K07", "K10"]
+        seqs = ["K01", "K04", "K06", "K07", "K08", "K09", "K10"]
         error_calc = KittiErrorCalc(seqs)
 
         for i in range(0, len(seqs)):

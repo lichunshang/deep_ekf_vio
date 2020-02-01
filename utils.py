@@ -17,11 +17,12 @@ class Plotter(object):
 
         plt.clf()
         for i in range(0, len(plots)):
-            plt.plot(*plots[i], label=labels_txt[i])
+            plt.plot(*plots[i], label=labels_txt[i], linewidth=1)
 
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
-        plt.title(title)
+        if title:
+            plt.title(title)
 
         if equal_axes:
             plt.axis("equal")
@@ -31,10 +32,10 @@ class Plotter(object):
 
         plt.grid()
         if filename is None:
-            filename = "%02d_%s.png" % (self.counter, "_".join(title.lower().split()))
+            filename = "%02d_%s.svg" % (self.counter, "_".join(title.lower().split()))
 
         if callback is not None:
             callback(plt.gcf(), plt.gca())
 
-        plt.savefig(log.Logger.ensure_file_dir_exists(os.path.join(self.output_dir, filename)))
+        plt.savefig(log.Logger.ensure_file_dir_exists(os.path.join(self.output_dir, filename)),  format='svg', bbox_inches='tight', pad_inches=0)
         self.counter += 1
