@@ -50,12 +50,12 @@ class Parameters(object):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting
-            0: 0.9,
+            0: 0.5,
             # 80: 0.01,
             # 160: 0.1,
             # 240: 0.9
         }
-        self.k4 = 100  # error scale for covar loss
+        self.k4 = 1.0  # error scale for covar loss
 
         # VO Model parameters
         self.fix_vo_weights = False
@@ -69,7 +69,7 @@ class Parameters(object):
         self.clip = None
         self.batch_norm = True
         self.stateful_training = True
-        self.gaussian_pdf_loss = True
+        self.gaussian_pdf_loss = False
 
         # EKF parameters
         self.enable_ekf = True
@@ -139,7 +139,7 @@ class KITTIParams(Parameters):
         Parameters.__init__(self)
 
         self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
-        self.eval_seq = "K01"
+        self.eval_seq = "K07"
 
         self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
         self.valid_seqs = [self.eval_seq]
