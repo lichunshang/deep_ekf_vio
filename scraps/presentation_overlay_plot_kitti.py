@@ -12,10 +12,10 @@ def pfind(*path):
     return p[0]
 
 
-seq = "K07"
+seq = "K08"
 base_dir = "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results"
-gt_poses = np.load(os.path.join(pfind(base_dir, "KITTI", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
-vanilla_poses = np.load(os.path.join(pfind(base_dir, "KITTI", seq + "_train"), "saved_model.eval.traj/est_poses", seq + ".npy"))
+gt_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
+vanilla_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/est_poses", seq + ".npy"))
 vision_only_poses = np.load(
         os.path.join(pfind(base_dir, "KITTI_vision_only_aug", seq), "saved_model.eval.traj/est_poses", seq + ".npy"))
 msf_fusion_poses = np.load(os.path.join(base_dir, "KITTI_msf", seq, "est_shifted.npy"))
@@ -54,7 +54,8 @@ plotter.plot(([imu_only_poses[:, 0, 3], imu_only_poses[:, 1, 3]],
               [vanilla_poses[:, 0, 3], vanilla_poses[:, 1, 3]],
               ),
              "x [m]", "y [m]", None,
-             labels=["imu",  "vision", "orb+msf", "gt", "proposed"],
+             labels=["IMU",  "vision", "ORB+MSF", "ground truth", "proposed"],
+             colors=["turquoise", "gold", "green", "blue", "red"],
              equal_axes=True, filename=seq+".svg", callback=plot_callback)
 
 # plotter.plot(([gt_poses[:, 0, 3], gt_poses[:, 1, 3]],

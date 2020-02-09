@@ -8,6 +8,8 @@ https://github.com/lichunshang/deep_ekf_vio/blob/master/docs/report.pdf includin
 This repository started out as a fork to https://github.com/ChiWeiHsiao/DeepVO-pytorch, however it has been changed
 extensively.
 
+Note code is still in the process of being cleaned up...
+
 ## Dependencies:
 Look at `docker/cuda10.1/Dockerfile` for list of dependencies
 
@@ -16,7 +18,7 @@ Help:
 `python main.py -h`
 
 Preprocessing:
-`preprocess_kitti_seqs.sh`
+`preprocess_kitti_seqs.sh` (need MATLAB with geographic lib)
 `preprocess_euroc_seqs.sh`
 
 Training:
@@ -29,13 +31,3 @@ Evaluation:
 
 ## System Architecture:
 ![Alt text](docs/e2evio_system.png)
-
-## KITTI Examples:
-Sequence 06
-![Alt text](docs/K06.png)
-Sequence 10
-![Alt text](docs/K10.png)
-
-## EUROC Examples:
-MH_05
-![Alt text](docs/MH_05.png)

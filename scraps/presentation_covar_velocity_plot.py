@@ -14,19 +14,43 @@ def pfind(*path):
 
 seq = "K07"
 base_dir = "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results"
-# gt_poses = np.load(os.path.join(pfind(base_dir, "KITTI", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
-# vanilla_poses = np.load(os.path.join(pfind(base_dir, "KITTI", seq + "_train"), "saved_model.eval.traj/est_poses", seq + ".npy"))
-gt_velocities = np.load(os.path.join(pfind(base_dir, "KITTI", seq + "_train"), "saved_model.eval.traj/ekf_states/gt_velocities", seq + ".npy"))
-est_velocities = np.load(os.path.join(pfind(base_dir, "KITTI", seq + "_train"), "saved_model.eval.traj/ekf_states/states", seq + ".npy"))[:,15:18]
-# vis_meas = np.load("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_vision_only_aug/K07_train_20200123-23-39-58/saved_model.eval.traj/vis_meas/meas/K07.npy")
-vis_meas = np.load("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_vision_only_aug/K07_train_20200123-23-39-58/saved_model.eval.traj/vis_meas/meas/K07.npy")
-covars = np.load(os.path.join(pfind(base_dir, "KITTI", seq + "_train"), "saved_model.eval.traj/ekf_states/vis_meas_covar", seq + ".npy"))
+gt_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
+vanilla_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/est_poses", seq + ".npy"))
+timestmaps = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/timestamps", seq+".npy"))
+gt_velocities = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/ekf_states/gt_velocities", seq + ".npy"))
+est_velocities = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/ekf_states/states", seq + ".npy"))[:,15:18]
+vis_meas = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/vis_meas/meas", seq + ".npy"))
+covars = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/vis_meas/covar", seq + ".npy"))
+# covars = np.load("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_nogloss/K07_train_20200130-22-45-48/saved_model.eval.traj/vis_meas/covar/K07.npy")
 
-fig, axs = plt.subplots(2)
-axs[0].plot(gt_velocities[:, 0])
-axs[0].plot(est_velocities[:, 0])
-axs[0].plot(vis_meas[:, 3] / 0.1)
+fig, ax1 = plt.subplots(1)
+dt = np.ediff1d(timestmaps)
+
+l1 = ax1.plot(timestmaps, gt_velocities[:, 0], color="b", label="gt vel", linewidth=1)
+# ax1.plot(timestmaps, vis_meas[:, 3] / dt, color="g", label="est vel")
+l2 = ax1.plot(timestmaps, est_velocities[:, 0], color="r", label="est vel", linestyle='--', linewidth=1)
+# ax1.plot(np.sqrt(covars[:, 3, 3], color="k")
+# ax1[0].set_ylim(ymin=0)
+ax1.set_ylabel("velocity [m/s]")
+ax1.set_xlabel("time [s]")
+
+ax2 = ax1.twinx()
+l3 = ax2.plot(timestmaps[1:], covars[:, 3, 3], color="g", label="cov x", linewidth=1)
+ax2.set_ylabel("variance [m^2]")
+ax1.legend(l1 + l2 + l3, ["gt $v_x$", "est $v_x$", "var($\\tilde{r}_x$)"], loc='upper left')
+sz = fig.get_size_inches()
+sz[1] /= 4
+ax1.grid()
+fig.set_size_inches(sz)
+# ax2.set_ylim(ymin=0)
+
+# ax1[1].plot(timestmaps, gt_poses[:,0, 3], label="")
+# ax1[1].plot(timestmaps, vanilla_poses[:,0, 3])
+# ax1[1].plot(timestmaps, gt_poses[:,1, 3])
+# ax1[1].plot(timestmaps, vanilla_poses[:,1, 3])
+
 
 # plt.plot(est_velocities[:, 1])
 # plt.plot(est_velocities[:, 2])
-plt.show()
+# plt.show()
+plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/vel.svg",  format='svg', bbox_inches='tight', pad_inches=0)

@@ -8,7 +8,7 @@ class Plotter(object):
         self.output_dir = output_dir
         self.counter = 0
 
-    def plot(self, plots, xlabel, ylabel, title, labels=None, equal_axes=False, filename=None, callback=None):
+    def plot(self, plots, xlabel, ylabel, title, labels=None, equal_axes=False, filename=None, callback=None, colors=None):
         if not labels:
             labels_txt = [None] * len(plots)
         else:
@@ -17,7 +17,12 @@ class Plotter(object):
 
         plt.clf()
         for i in range(0, len(plots)):
-            plt.plot(*plots[i], label=labels_txt[i], linewidth=1)
+            args = {
+                "label": labels_txt[i]
+            }
+            if colors:
+                args["color"] = colors[i]
+            plt.plot(*plots[i], linewidth=1, **args)
 
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
