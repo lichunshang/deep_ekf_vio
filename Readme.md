@@ -18,7 +18,7 @@ Change parameters "/home/cs4li/Dev/deep_ekf_vio" to the appropriate directory in
 Help:
 `python main.py -h`
 
-### KITTI Folder Layout:
+#### KITTI Folder Layout:
 ```
 path_to_KITTI_dir/
     - dataset/
@@ -34,7 +34,7 @@ path_to_KITTI_dir/
             - ...
 ```
 
-EUROC Folder Layout:
+#### EUROC Folder Layout:
 ```
 path_to_EUROC_dir/
     - MH_01/
@@ -46,19 +46,19 @@ path_to_EUROC_dir/
         - ...
 ```
 
-###Preprocessing:
+#### Preprocessing:
 Change parameters "/home/cs4li/Dev/deep_ekf_vio" to the appropriate directory the shell scripts
 
 `preprocess_kitti_seqs.sh` (need MATLAB with geographic lib installed)
 
 `preprocess_euroc_seqs.sh`
 
-###Training:
+#### Training:
 Get the pretrain flownet weights from [here](https://drive.google.com/drive/folders/16eo3p9dO_vmssxRoZCmWkTpNjKRzJzn5).
 
 `python3 main.py --description <experiment_desciprtion> --gpu_id 0`
 
-###Evaluation:
+#### Evaluation:
 `python3 results_directory/main.py  --gpu_id 0 --run_eval_only`
 
 
