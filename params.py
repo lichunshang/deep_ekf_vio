@@ -47,16 +47,6 @@ class Parameters(object):
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
 
-        self.k1 = 100  # rel loss angle multiplier
-        self.k2 = 500.  # abs loss angle multiplier
-        self.k3 = {  # (1-k3)*abs + k3*rel weighting
-            0: 0.5,
-            # 80: 0.01,
-            # 160: 0.1,
-            # 240: 0.9
-        }
-        self.k4 = 1.0  # error scale for covar loss
-
         # VO Model parameters
         self.fix_vo_weights = False
 
@@ -69,7 +59,6 @@ class Parameters(object):
         self.clip = None
         self.batch_norm = True
         self.stateful_training = True
-        self.gaussian_pdf_loss = False
 
         # EKF parameters
         self.enable_ekf = True
@@ -102,14 +91,6 @@ class Parameters(object):
                 "hue": 0.05
             }
         })
-        self.data_aug_transforms = AttrDict({
-            "enable": True,
-            "lr_flip": True,
-            "ud_flip": False,
-            "lrud_flip": False,
-            "reverse": True,
-        })
-
         # Pretrain, Resume training
         self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/flownets_bn_EPE2.459.pth.tar')
         # Choice:
@@ -176,6 +157,26 @@ class KITTIParams(Parameters):
         self.vis_meas_covar_beta = 3
         self.vis_meas_covar_gamma = 1
 
+        # -----------------------------------------
+        self.k1 = 100  # rel loss angle multiplier
+        self.k2 = 500.  # abs loss angle multiplier
+        self.k3 = {  # (1-k3)*abs + k3*rel weighting, not actually used
+            0: 0.5,
+        }
+        # error scale for covar loss, not really used,
+        # but must be 1.0 for self.gaussian_pdf_loss = False
+        self.k4 = 1.0
+
+        self.gaussian_pdf_loss = False
+
+        self.data_aug_transforms = AttrDict({
+            "enable": True,
+            "lr_flip": True,
+            "ud_flip": False,
+            "lrud_flip": False,
+            "reverse": True,
+        })
+
     def dataset(self):
         return "KITTI"
 
@@ -220,6 +221,23 @@ class EUROCParams(Parameters):
         self.vis_meas_covar_init_guess = 1e1
         self.vis_meas_covar_beta = 3
         self.vis_meas_covar_gamma = 1
+
+        self.k1 = 100  # rel loss angle multiplier
+        self.k2 = 500.  # abs loss angle multiplier
+        self.k3 = {  # (1-k3)*abs + k3*rel weighting
+            0: 0.5,
+        }
+        self.k4 = 100.  # error scale for covar loss
+
+        self.gaussian_pdf_loss = True
+
+        self.data_aug_transforms = AttrDict({
+            "enable": False,
+            "lr_flip": True,
+            "ud_flip": False,
+            "lrud_flip": False,
+            "reverse": True,
+        })
 
     def dataset(self):
         return "EUROC"

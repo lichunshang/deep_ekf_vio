@@ -429,10 +429,8 @@ class E2EVIO(nn.Module):
         return torch.diag(imu_noise_covar_diag)
 
     def forward(self, images, imu_data, prev_lstm_states, prev_pose, prev_state, prev_covar, T_imu_cam):
-        # assert par.enable_ekf
-
         vis_meas_covar_scale = torch.ones(6, device=images.device)
-        vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * 1.0
+        vis_meas_covar_scale[0:3] = vis_meas_covar_scale[0:3] * par.k4
         imu_noise_covar = self.get_imu_noise_covar()
 
         if prev_covar is None:

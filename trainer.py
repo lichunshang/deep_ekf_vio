@@ -124,7 +124,7 @@ class _TrainAssistant(object):
                                prev_state.cuda(), None,
                                T_imu_cam.cuda())
 
-        if par.enable_ekf:
+        if par.enable_ekf and not par.gaussian_pdf_loss:
             # note that the estimated poses are already inversed
             s = np.array(invalid_imu_list)
             loss_abs = 0
@@ -137,6 +137,8 @@ class _TrainAssistant(object):
                 vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
 
             loss = vis_meas_loss_invalid_imu + loss_vis_meas + 4 * loss_abs
+        elif par.enable_ekf:
+            loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
             loss = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses.cuda())
 
