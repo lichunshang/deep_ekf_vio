@@ -7,12 +7,13 @@ import glob
 
 
 def pfind(*path):
+    print(path)
     p = glob.glob(os.path.join(*path) + "*")
     assert len(p) == 1
     return p[0]
 
 
-seq = "K08"
+seq = "K01"
 base_dir = "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results"
 gt_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
 vanilla_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/est_poses", seq + ".npy"))

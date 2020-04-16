@@ -81,7 +81,7 @@ plt.xticks(range(0, len(ticks) * tick_space, tick_space), ticks)
 plt.xlim(-tick_space, len(ticks)*tick_space)
 plt.ylim(0, 45)
 sz = plt.gcf().get_size_inches()
-sz[1] /= 4
+sz[1] /= 2
 plt.gcf().set_size_inches(sz)
 
 plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/vinet.svg",  format='svg', bbox_inches='tight', pad_inches=0)
