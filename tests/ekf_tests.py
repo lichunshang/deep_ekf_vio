@@ -276,8 +276,9 @@ class Test_EKF(unittest.TestCase):
 
         C_pred = torch_se3.exp_SO3(torch.tensor([0.1, 3, -0.3])).to(device).view(1, 3, 3)
         r_pred = torch.tensor([-1.05, 20, -1.]).view(3, 1).to(device).view(1, 3, 1)
+        lambd_pred = 3.2
         vis_meas = torch.tensor([4., -6., 8., -7., 5., -9.]).to(device).view(1, 6, 1)
-        residual, H = ekf.meas_residual_and_jacobi(C_pred, r_pred, vis_meas, T_imu_cam)
+        residual, H = ekf.meas_residual_and_jacobi(C_pred, r_pred, lambd_pred, vis_meas, T_imu_cam)
 
         e = 1e-6
         p = torch.eye(3, 3).view(1, 3, 3) * e
@@ -287,19 +288,32 @@ class Test_EKF(unittest.TestCase):
         for i in range(0, 3):
             pb = p[:, :, i:i + 1]
             residual_minus_pb, _ = ekf.meas_residual_and_jacobi(torch.matmul(C_pred, torch_se3.exp_SO3_b(-pb)),
-                                                                r_pred, vis_meas, T_imu_cam)
+                                                                r_pred, lambd_pred, vis_meas, T_imu_cam)
             residual_plus_pb, _ = ekf.meas_residual_and_jacobi(torch.matmul(C_pred, torch_se3.exp_SO3_b(pb)),
-                                                               r_pred, vis_meas, T_imu_cam)
+                                                               r_pred, lambd_pred, vis_meas, T_imu_cam)
             H_C_numerical[:, :, i] = (residual_plus_pb - residual_minus_pb).view(6) / (2 * e)
 
         for i in range(0, 3):
             pb = p[:, :, i:i + 1]
-            residual_minus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred - pb, vis_meas, T_imu_cam)
-            residual_plus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred + pb, vis_meas, T_imu_cam)
+            residual_minus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred - pb, lambd_pred, vis_meas, T_imu_cam)
+            residual_plus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred + pb, lambd_pred, vis_meas, T_imu_cam)
             H_r_numerical[:, :, i] = (residual_plus_pb - residual_minus_pb).view(6) / (2 * e)
+
+        residual_minus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred, lambd_pred - e, vis_meas, T_imu_cam)
+        residual_plus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred, lambd_pred + e, vis_meas, T_imu_cam)
+        H_lambd_numerical = (residual_plus_pb - residual_minus_pb).view(1, 6, 1) / (2 * e)
+
+
+        # print(H_r_numerical)
+        # print(H[:, :, 6:9])
+        # print(residual_plus_pb)
+        # print(H)
+        # print(H_lambd_numerical)
+        # print(H[:, :, 18:19])
 
         self.assertTrue(torch.allclose(H_C_numerical, H[:, :, 3:6], atol=1e-7))
         self.assertTrue(torch.allclose(H_r_numerical, H[:, :, 6:9], atol=1e-7))
+        self.assertTrue(torch.allclose(H_lambd_numerical, H[:, :, 18:19], atol=1e-7))
 
         torch.set_default_tensor_type('torch.FloatTensor')
 
@@ -312,10 +326,12 @@ class Test_EKF(unittest.TestCase):
         T_imu_cam = T_imu_cam.to(device).view(1, 4, 4)
         ekf = IMUKalmanFilter()
 
+        lambd_pred = 1.2
         C_pred = torch_se3.exp_SO3(torch.tensor([0.1, 3, -0.3])).to(device).view(1, 3, 3)
         r_pred = torch.tensor([-1.05, 20, -1.]).view(3, 1).to(device).view(1, 3, 1)
         vis_meas = torch.tensor([0.1, 3, -0.3, -1.05, 20, -1.]).to(device).view(1, 6, 1)
-        residual, H = ekf.meas_residual_and_jacobi(C_pred, r_pred, vis_meas, T_imu_cam)
+        residual, H = ekf.meas_residual_and_jacobi(C_pred, r_pred, lambd_pred, vis_meas, T_imu_cam)
+
 
         e = 1e-6
         p = torch.eye(3, 3).view(1, 3, 3) * e
@@ -325,19 +341,24 @@ class Test_EKF(unittest.TestCase):
         for i in range(0, 3):
             pb = p[:, :, i:i + 1]
             residual_minus_pb, _ = ekf.meas_residual_and_jacobi(torch.matmul(C_pred, torch_se3.exp_SO3_b(-pb)),
-                                                                r_pred, vis_meas, T_imu_cam)
+                                                                r_pred, lambd_pred, vis_meas, T_imu_cam)
             residual_plus_pb, _ = ekf.meas_residual_and_jacobi(torch.matmul(C_pred, torch_se3.exp_SO3_b(pb)),
-                                                               r_pred, vis_meas, T_imu_cam)
+                                                               r_pred, lambd_pred, vis_meas, T_imu_cam)
             H_C_numerical[:, :, i] = (residual_plus_pb - residual_minus_pb).view(6) / (2 * e)
 
         for i in range(0, 3):
             pb = p[:, :, i:i + 1]
-            residual_minus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred - pb, vis_meas, T_imu_cam)
-            residual_plus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred + pb, vis_meas, T_imu_cam)
+            residual_minus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred - pb, lambd_pred, vis_meas, T_imu_cam)
+            residual_plus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred + pb, lambd_pred, vis_meas, T_imu_cam)
             H_r_numerical[:, :, i] = (residual_plus_pb - residual_minus_pb).view(6) / (2 * e)
+
+        residual_minus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred, lambd_pred - e, vis_meas, T_imu_cam)
+        residual_plus_pb, _ = ekf.meas_residual_and_jacobi(C_pred, r_pred, lambd_pred + e, vis_meas, T_imu_cam)
+        H_lambd_numerical = (residual_plus_pb - residual_minus_pb).view(1, 6, 1) / (2 * e)
 
         self.assertTrue(torch.allclose(H_C_numerical, H[:, :, 3:6], atol=1e-7))
         self.assertTrue(torch.allclose(H_r_numerical, H[:, :, 6:9], atol=1e-7))
+        self.assertTrue(torch.allclose(H_lambd_numerical, H[:, :, 18:19], atol=1e-7))
 
         torch.set_default_tensor_type('torch.FloatTensor')
 
@@ -569,12 +590,12 @@ class Test_EKF(unittest.TestCase):
 if __name__ == '__main__':
     # Test_EKF().test_predict_plotted()
     # Test_EKF().test_process_model_F_G_Q_covar()
-    # Test_EKF().test_meas_jacobian_numerically_small_error()
-    # Test_EKF().test_meas_jacobian_numerically()
+    Test_EKF().test_meas_jacobian_numerically_small_error()
+    Test_EKF().test_meas_jacobian_numerically()
     # Test_EKF().test_ekf_all_plotted()
     # Test_EKF().test_ekf_predict_cuda_graph()
     # Test_EKF().test_ekf_cuda_graph()
     # Test_EKF().test_ekf_K06_with_artificial_biases_plotted()
-    Test_EKF().imu_predict_kitti()
+    # Test_EKF().imu_predict_kitti()
     # Test_EKF().imu_predict_euroc()
     # unittest.main(verbosity=10)

@@ -141,7 +141,9 @@ class KITTIParams(Parameters):
                                               0, 0, 0, 0, 0, 0,  # C, r
                                               1e-2, 1e-2, 1e-2,  # v
                                               1e-8, 1e-8, 1e-8,  # bw
-                                              1e-1, 1e-1, 1e-1])  # ba
+                                              1e-1, 1e-1, 1e-1,  # ba
+                                              5e0,  # lambd
+                                              ])
         self.init_covar_diag_eps = 1e-12
         #
         self.imu_noise_covar_diag = np.array([1e-7,  # w

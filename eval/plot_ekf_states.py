@@ -25,16 +25,18 @@ def plot_ekf_data(output_dir, timestamps, gt_poses, gt_vels, est_poses, est_stat
     est_gravities = []
     est_ba = []
     est_bw = []
+    est_lambd = []
 
     for i in range(0, len(est_poses)):
         pose = np.linalg.inv(est_poses[i])
-        g, C, r, v, bw, ba = IMUKalmanFilter.decode_state(torch.tensor(est_states[i]))
+        g, C, r, v, bw, ba, lambd = IMUKalmanFilter.decode_state(torch.tensor(est_states[i]))
         est_positions.append(pose[0:3, 3])
         est_rots.append(log_SO3(pose[0:3, 0:3]))
         est_vels.append(np.array(v))
         est_gravities.append(np.array(g))
         est_bw.append(np.array(bw))
         est_ba.append(np.array(ba))
+        est_lambd.append(lambd)
 
     est_positions = np.squeeze(est_positions)
     est_vels = np.squeeze(est_vels)
@@ -42,6 +44,7 @@ def plot_ekf_data(output_dir, timestamps, gt_poses, gt_vels, est_poses, est_stat
     est_gravities = np.squeeze(est_gravities)
     est_bw = np.squeeze(est_bw)
     est_ba = np.squeeze(est_ba)
+    est_lambd = np.squeeze(est_lambd)
 
     gt_rots = np.array([log_SO3(p[:3, :3]) for p in gt_poses])
     gt_gravities = np.array([gt_poses[i, 0:3, 0:3].transpose().dot([0, 0, g_const])
@@ -100,6 +103,8 @@ def plot_ekf_data(output_dir, timestamps, gt_poses, gt_vels, est_poses, est_stat
     plotter.plot(([timestamps, est_ba[:, 0]],), "t [s]", "a [m/s^2]", "Accel Bias X")
     plotter.plot(([timestamps, est_ba[:, 1]],), "t [s]", "a [m/s^2]", "Accel Bias Y")
     plotter.plot(([timestamps, est_ba[:, 2]],), "t [s]", "a [m/s^2]", "Accel Bias Z")
+
+    plotter.plot(([timestamps, est_lambd],), "t [s]", "lambd []", "Scale Factor lambda")
 
 
 def plot_ekf_states(working_dir):

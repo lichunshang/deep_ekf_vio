@@ -69,7 +69,7 @@ def kitti_eval_simple(working_dir, seqs):
     for i, seq in enumerate(seqs):
         est_poses = np.load(os.path.join(pose_est_dir, "%s.npy" % seq))
         gt_poses = np.load(os.path.join(pose_gt_dir, "%s.npy" % seq))
-        err = kitti_eval_pyimpl.calc_kitti_seq_errors(gt_poses, est_poses)
+        err = kitti_eval_pyimpl.calc_kitti_seq_errors(gt_poses, est_poses)[0]
         errs += err
         err = np.array(err)
 
