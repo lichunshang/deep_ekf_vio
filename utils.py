@@ -42,5 +42,5 @@ class Plotter(object):
         if callback is not None:
             callback(plt.gcf(), plt.gca())
 
-        plt.savefig(log.Logger.ensure_file_dir_exists(os.path.join(self.output_dir, filename)),  format='svg', bbox_inches='tight', pad_inches=0)
+        plt.savefig(log.Logger.ensure_file_dir_exists(os.path.join(self.output_dir, filename)),  format=filename[-3:], bbox_inches='tight', pad_inches=0)
         self.counter += 1

@@ -17,4 +17,5 @@ ax.set_ylim(-1.5, 1.5)
 plt.legend(loc=2)
 
 
-plt.show()
+# plt.show()
+plt.savefig("/home/cs4li/Desktop/tanh.pdf",  format='pdf', pad_inches=0)

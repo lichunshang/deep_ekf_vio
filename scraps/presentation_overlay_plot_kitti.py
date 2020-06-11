@@ -13,7 +13,7 @@ def pfind(*path):
     return p[0]
 
 
-seq = "K01"
+seq = "K07"
 base_dir = "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results"
 gt_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
 vanilla_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/est_poses", seq + ".npy"))
@@ -67,22 +67,29 @@ plotter.plot(([imu_only_poses[:, 0, 3], imu_only_poses[:, 1, 3]],
 #              equal_axes=True, filename=seq+"_one")
 
 # IMU only errors
-# plt.clf()
-# toplot_error = np.matmul(np.linalg.inv(imu_only_poses), gt_poses)
-# toplot_position_error = np.linalg.norm(toplot_error[:, 0:3, 3], axis=1)
-# toplot_orientation_error = np.linalg.norm(np.array([se3.log_SO3(e[0:3, 0:3]) for e in toplot_error]), axis=1)
-# time = np.linspace(0, len(gt_poses) / 10, len(gt_poses))
-#
-# ax1 = plt.axes()
-# ax2 = ax1.twinx()
-# ax1.set_xlabel("time [s]")
-# ax1.set_ylabel("position error norm [m]", color="red")
-# ax1.plot(time, toplot_position_error, color="red")
-# ax1.tick_params(axis='y', labelcolor="red")
-#
-# ax2.set_ylabel("orientation error norm [deg]", color="blue")
-# ax2.plot(time, toplot_orientation_error * 180 / np.pi, color="blue")
-# ax2.tick_params(axis='y', labelcolor="blue")
-#
+plt.clf()
+toplot_error = np.matmul(np.linalg.inv(imu_only_poses), gt_poses)
+toplot_position_error = np.linalg.norm(toplot_error[:, 0:3, 3], axis=1)
+toplot_orientation_error = np.linalg.norm(np.array([se3.log_SO3(e[0:3, 0:3]) for e in toplot_error]), axis=1)
+time = np.linspace(0, len(gt_poses) / 10, len(gt_poses))
+
+toplot_error_vanilla = np.matmul(np.linalg.inv(vanilla_poses), gt_poses)
+toplot_position_error_vanilla = np.linalg.norm(toplot_error_vanilla[:, 0:3, 3], axis=1)
+toplot_orientation_error_vanilla = np.linalg.norm(np.array([se3.log_SO3(e[0:3, 0:3]) for e in toplot_error_vanilla]), axis=1)
+
+ax1 = plt.axes()
+ax2 = ax1.twinx()
+ax1.set_xlabel("time [s]")
+ax1.set_ylabel("position error norm [m]", color="red")
+ax1.plot(time, toplot_position_error, color="red")
+# ax1.plot(time, toplot_position_error_vanilla, color="red", )
+ax1.tick_params(axis='y', labelcolor="red")
+
+ax2.set_ylabel("orientation error norm [deg]", color="blue")
+ax2.plot(time, toplot_orientation_error * 180 / np.pi, color="blue")
+# ax2.plot(time, toplot_orientation_error_vanilla * 180 / np.pi, color="green")
+ax2.tick_params(axis='y', labelcolor="blue")
+
 # plt.title("KITTI Sequence 07 IMU Only Errors")
 # plt.show()
+plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/IMU_only_err.pdf",  format='pdf', bbox_inches='tight', pad_inches=0)

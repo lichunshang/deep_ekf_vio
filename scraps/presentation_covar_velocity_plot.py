@@ -13,7 +13,7 @@ def pfind(*path):
     return p[0]
 
 
-seq = "K01"
+seq = "K06"
 seq_data = SequenceData(seq)
 base_dir = "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results"
 gt_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
@@ -41,7 +41,7 @@ l3 = ax2.plot(timestmaps[1:], covars[:, 3, 3], color="g", label="cov x", linewid
 ax2.set_ylabel("variance [m^2]")
 ax1.legend(l1 + l2 + l3, ["gt $v_x$", "est $v_x$", "var($\\tilde{r}_x$)"], loc='upper left')
 sz = fig.get_size_inches()
-# sz[1] /= 2
+sz[1] /= 1.5
 ax1.grid()
 fig.set_size_inches(sz)
 # ax2.set_ylim(ymin=0)
@@ -55,7 +55,7 @@ fig.set_size_inches(sz)
 # plt.plot(est_velocities[:, 1])
 # plt.plot(est_velocities[:, 2])
 # plt.show()
-plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/vel_x.svg",  format='svg', bbox_inches='tight', pad_inches=0)
+plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/vel_x.pdf",  format='pdf', bbox_inches='tight', pad_inches=0)
 
 # Figure 2
 fig, ax1 = plt.subplots(1)
@@ -63,19 +63,34 @@ dt = np.ediff1d(timestmaps)
 
 # l1 = ax1.plot(timestmaps, gt_velocities[:, 1], color="b", label="gt vel", linewidth=1)
 z_rot_vel = np.array([seq_data.df.loc[i, "gyro_measurements"][0, 2] for i in range(0, len(seq_data.df) - 1)])
-l2 = ax1.plot(timestmaps[:-1], np.abs(z_rot_vel), color="r", label="est vel", linestyle='--', linewidth=1)
+l2 = ax1.plot(timestmaps[:-1], np.abs(z_rot_vel), color="b", label="gt ywa rate", linewidth=1)
 ax1.set_ylabel("angular velocity abs [rad/s]")
 ax1.set_xlabel("time [s]")
 
 ax2 = ax1.twinx()
 l3 = ax2.plot(timestmaps[1:], covars[:, 4, 4], color="g", label="cov y", linewidth=1)
 ax2.set_ylabel("variance [m^2]")
-ax1.legend(l2 + l3, ["gt $w_z$", "var($\\tilde{r}_y$)"], loc='upper left')
+ax1.legend(l2 + l3, ["gt $\omega_z$", "var($\\tilde{r}_y$)"], loc='upper left')
 sz = fig.get_size_inches()
-# sz[1] /= 2
+sz[1] /= 1.5
 ax1.grid()
 fig.set_size_inches(sz)
 # ax2.set_ylim(ymin=0)
 
 # plt.show()
-plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/vel_y.svg",  format='svg', bbox_inches='tight', pad_inches=0)
+plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/vel_y.pdf",  format='pdf', bbox_inches='tight', pad_inches=0)
+
+plt.figure(3)
+plt.plot(timestmaps, gt_velocities[:, 0], color="b", label="gt vel", linewidth=1)
+plt.plot(timestmaps, est_velocities[:, 0], color="r", label="est vel", linestyle='--', linewidth=1)
+plt.plot(timestmaps[1:], vis_meas[:, 3] / dt, color="g", label="est vel")
+plt.ylabel("velocity [m/s]")
+plt.xlabel("time [s]")
+
+
+plt.legend(["gt $v_x$", "est $v_x$", "$\\tilde{r}_x / \Delta t$"], loc='upper left')
+sz = plt.gcf().get_size_inches()
+sz[1] /= 1.5
+plt.grid()
+plt.gcf().set_size_inches(sz)
+plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/vel_x_vis_meas.pdf",  format='pdf', bbox_inches='tight', pad_inches=0)
