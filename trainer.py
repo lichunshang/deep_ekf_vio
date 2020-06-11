@@ -138,7 +138,7 @@ class _TrainAssistant(object):
 
             loss = vis_meas_loss_invalid_imu + loss_vis_meas + 4 * loss_abs
         elif par.enable_ekf:
-            loss = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
+            loss, _, _ = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
             loss = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses.cuda())
 
