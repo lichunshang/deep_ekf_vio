@@ -271,6 +271,7 @@ class SubseqDataset(Dataset):
         self.load_image_func = lambda p: self.pre_runtime_transformer(Image.open(p))
 
         if par.cache_image:
+            print(self.subseqs)
             total_images = self.subseqs[0].length * len(subseqs)
             counter = 0
             start_t = time.time()
@@ -311,7 +312,7 @@ class SubseqDataset(Dataset):
             imu_dat_padded[len(imu_dat_concat):, 0] = imu_dat_concat[-1, 0] if len(imu_dat_concat) > 0 else 0
 
             imu_data.append(imu_dat_padded)
-
+        # gt_rel_poses = np.array(gt_rel_poses)
         gt_rel_poses = torch.tensor(gt_rel_poses, dtype=torch.float32)
         gt_poses = torch.tensor(subseq.gt_poses, dtype=torch.float32)
         gt_velocities = torch.tensor(subseq.gt_velocities, dtype=torch.float32)
