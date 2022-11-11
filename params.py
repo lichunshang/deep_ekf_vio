@@ -35,7 +35,7 @@ class Parameters(object):
         self.n_gpu = 1
 
         # Path Parameters
-        self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
+        self.project_dir = "/media/data/teamAI/quyen/deep_vio/deep_ekf_vio/"
         self.data_dir = os.path.join(self.project_dir, "data")
         self.results_coll_dir = os.path.join(self.project_dir, "results")
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
@@ -71,7 +71,8 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 400
-        self.batch_size = 16
+        # self.batch_size = 16
+        self.batch_size = 8
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -243,5 +244,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-par = KITTIParams()
-# par = EUROCParams()
+# par = KITTIParams()
+par = EUROCParams()
