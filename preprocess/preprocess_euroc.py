@@ -151,7 +151,8 @@ def preprocess_euroc(seq_dir, output_dir, cam_still_range):
     left_cam_csv = open(os.path.join(seq_dir, 'cam0', 'data.csv'), 'r')
     imu_csv = open(os.path.join(seq_dir, 'imu0', "data.csv"), 'r')
     gt_csv = open(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"), "r")
-    cam_sensor_yaml_config = yaml.load(open(os.path.join(seq_dir, "cam0", "sensor.yaml")))
+    # cam_sensor_yaml_config = yaml.load(open(os.path.join(seq_dir, "cam0", "sensor.yaml")))
+    cam_sensor_yaml_config = yaml.full_load(open(os.path.join(seq_dir, "cam0", "sensor.yaml")))
     T_cam_imu = np.linalg.inv(np.array(cam_sensor_yaml_config["T_BS"]["data"]).reshape(4, 4))
     cam_timestamps = []
     imu_timestamps = []

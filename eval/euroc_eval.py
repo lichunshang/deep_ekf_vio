@@ -24,6 +24,8 @@ def calc_euroc_seq_errors(est_traj, gt_traj):
     gt_traj_synced, est_traj_synced = sync.associate_trajectories(gt_traj, est_traj, max_diff=0.01)
     est_traj_aligned = trajectory.align_trajectory(est_traj_synced, gt_traj_synced,
                                                    correct_scale=False, correct_only_scale=False)
+    # est_traj_aligned = est_traj_synced.align(gt_traj_synced,
+    #                                                correct_scale=False, correct_only_scale=False)
     pose_relation = metrics.PoseRelation.translation_part
     ape_metric = metrics.APE(pose_relation)
     ape_metric.process_data((gt_traj_synced, est_traj_aligned,))
@@ -61,7 +63,13 @@ class EurocErrorCalc(object):
         est_traj = trajectory.PoseTrajectory3D(poses_se3=est, timestamps=self.raw_timestamps[seq][:len(est)])
         ape_metric, ape_stat = calc_euroc_seq_errors(est_traj, self.gt_traj[seq])
         self.errors.append(ape_stat)
-
+        #suuuuuuua
+        print("accumlate error")
+        print(self.errors)
+        print(ape_stat)
+        print("ape metrics")
+        print(ape_metric)
+        #suaaaaaaa
         return ape_stat
 
     def get_average_error(self):
