@@ -7,6 +7,7 @@ import time
 from params import par
 from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
+from backmodel.tnet import TNet
 
 
 def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
@@ -278,10 +279,12 @@ class IMUKalmanFilter(nn.Module):
                           bw.view(-1, 3), ba.view(-1, 3),), -1)
 
 
-class DeepVO(nn.Module):
+class DeepVO(TNet):
     def __init__(self, imsize1, imsize2, batchNorm):
         super(DeepVO, self).__init__()
+        self.tnet = TNet(pretrained_path=par.pretrained_backbone)
         # CNN
+
         self.batchNorm = batchNorm
         self.conv1 = conv(self.batchNorm, 6, 64, kernel_size=7, stride=2, dropout=par.conv_dropout[0])
         self.conv2 = conv(self.batchNorm, 64, 128, kernel_size=5, stride=2, dropout=par.conv_dropout[1])
@@ -292,9 +295,11 @@ class DeepVO(nn.Module):
         self.conv5 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=2, dropout=par.conv_dropout[6])
         self.conv5_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[7])
         self.conv6 = conv(self.batchNorm, 512, 1024, kernel_size=3, stride=2, dropout=par.conv_dropout[8])
+
         # Compute the shape based on diff image size
-        tmp = Variable(torch.zeros(1, 6, imsize1, imsize2))
-        tmp = self.cnn(tmp)
+        tmp = Variable(torch.zeros(1, 3, imsize1, imsize2))
+        tmp = self.tnet(tmp)
+        # tmp = Variable(torch.zeros(1,))
 
         # RNN
         if par.hybrid_recurrency and par.enable_ekf:
@@ -362,19 +367,18 @@ class DeepVO(nn.Module):
 
         return out.squeeze(1), lstm_state
 
-    def encode_image(self, images):
-        # images: (batch, seq_len, channel, width, height)
-        x = images
+    def encode_image(self, x):
+        # x: (batch, seq_len, channel, width, height)
 
         # stack_image
-        x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
+        # x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
         batch_size = x.size(0)
         seq_len = x.size(1)
         # CNN
         x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
-        x = self.cnn(x)
+        # x = self.cnn(x)
+        x = self.tnet(x)
         x = x.view(batch_size, seq_len, -1)
-
         return x
 
     def cnn(self, x):

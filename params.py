@@ -35,14 +35,14 @@ class Parameters(object):
         self.n_gpu = 1
 
         # Path Parameters
-        self.project_dir = "/home/cs4li/Dev/deep_ekf_vio/"
+        self.project_dir = "/mnt/data/teamAI/duy/deep_ekf_vio"
         self.data_dir = os.path.join(self.project_dir, "data")
         self.results_coll_dir = os.path.join(self.project_dir, "results")
         self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.seq_len = 32
+        self.seq_len = 8
         self.sample_times = 3
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
@@ -70,11 +70,11 @@ class Parameters(object):
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
-        self.epochs = 400
-        self.batch_size = 16
+        self.epochs = 200
+        self.batch_size = 8
         self.pin_mem = True
         self.cache_image = True
-        self.optimizer = torch.optim.Adam
+        self.optimizer = torch.optim.Adadelta
         self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
             "init_covar_diag_sqrt": 1e-1,
@@ -93,10 +93,23 @@ class Parameters(object):
         })
         # Pretrain, Resume training
         self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/flownets_bn_EPE2.459.pth.tar')
+        self.pretrained_backbone = os.path.join(self.project_dir, './pretrained/efficient-net-b0.pth' )
         # Choice:
         # None
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
         # './pretrained/flownets_EPE1.951.pth.tar'
+
+
+        #Added
+        self.num_t_encoder_layers = 3
+        self.num_t_decoder_layers = 3
+        self.num_rot_encoder_layers = 2
+        self.num_rot_decoder_layers = 2
+        self.hidden_dim = 256
+        self.reduction = ["reduction_4", "reduction_3"]
+        self.dim_feedforward = 256
+        self.learn_embedding_with_pose_token = False
+
 
     def wc(self, seqs):
         available_seqs = [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
@@ -110,6 +123,7 @@ class Parameters(object):
             if not (len(ret_seqs) > start_cnt):
                 print("WARN!!! len(ret_seqs) > start_cnt")
         return ret_seqs
+    
 
     def dataset(self):
         raise NotImplementedError("Dataset no specified")
@@ -190,6 +204,7 @@ class EUROCParams(Parameters):
         self.eval_seq = "MH_01"
 
         self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        # self.train_seqs = ['V1_03']
         self.valid_seqs = [self.eval_seq]
 
         # self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
@@ -243,5 +258,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-par = KITTIParams()
-# par = EUROCParams()
+# par = KITTIParams()
+par = EUROCParams()

@@ -37,9 +37,7 @@ for i=1:size(poses, 3)
 %     poses(:,:,i) = T_cam_imu * poses(:,:,i) * inv(T_cam_imu);
     p = poses(:,:,i)';
     p = p(1:12);
-    fprintf(file, '%.6e %.6e %.6e %.6e %.6e %.6e %.6e %.6e %.6e %.6e %.6e %.6e\n', ...
-        p(1), p(2), p(3), p(4), p(5), p(6), p(7), p(8), p(9), p(10), p(11), p(12));
-    
+   
     posmodes(i) = oxts{i}(end - 2);
     velmodes(i) = oxts{i}(end - 1);
     rotmodes(i) = oxts{i}(end);
@@ -48,55 +46,3 @@ end
 fprintf('posmodes: min=%.5f max=%.5f ave=%.5f\n', min(posmodes), max(posmodes), mean(posmodes));
 fprintf('velmodes: min=%.5f max=%.5f ave=%.5f\n', min(velmodes), max(velmodes), mean(velmodes));
 fprintf('rotmodes: min=%.5f max=%.5f ave=%.5f\n', min(rotmodes), max(rotmodes), mean(rotmodes));
-
-% Save the figures
-figure('visible','off'); clf;
-hold on;
-plot(squeeze(poses(1, 4, :)), squeeze(poses(2, 4, :)));
-xlabel('x'); ylabel('y');
-title('XY');
-axis equal;
-grid minor;
-saveas(gcf, strcat(base_dir, '/oxts/XY.png'))
-
-figure('visible','off'); clf;
-hold on;
-plot(squeeze(poses(1, 4, :)), squeeze(poses(3, 4, :)));
-xlabel('x'); ylabel('z');
-title('XZ');
-axis equal;
-grid minor;
-saveas(gcf, strcat(base_dir, '/oxts/XZ.png'))
-
-figure('visible','off'); clf;
-hold on;
-plot(squeeze(poses(2, 4, :)), squeeze(poses(3, 4, :)));
-xlabel('y'); ylabel('z');
-title('YZ');
-axis equal;
-grid minor;
-saveas(gcf, strcat(base_dir, '/oxts/YZ.png'))
-
-figure('visible','off'); clf;
-hold on;
-plot(posmodes);
-xlabel('frames []'); ylabel('mode');
-title('Posmode');
-grid minor;
-saveas(gcf, strcat(base_dir, '/oxts/posmodes.png'))
-
-figure('visible','off'); clf;
-hold on;
-plot(velmodes);
-xlabel('frames []'); ylabel('mode');
-title('Velmode');
-grid minor;
-saveas(gcf, strcat(base_dir, '/oxts/velmodes.png'))
-
-figure('visible','off'); clf;
-hold on;
-plot(rotmodes);
-xlabel('frames []'); ylabel('mode');
-title('Rotmode');
-grid minor;
-saveas(gcf, strcat(base_dir, '/oxts/rotmodes.png'))

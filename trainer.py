@@ -310,12 +310,13 @@ class _TrainAssistant(object):
         raise ValueError("Invalid Schedule")
 
 
-def train(resume_model_path, resume_optimizer_path, train_description):
+def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     logger.initialize(working_dir=par.results_dir, use_tensorboard=True)
     logger.print("================ TRAIN ================")
 
     if not train_description:
-        train_description = input("Enter a description of this training run: ")
+        train_description = "1"
+        # train_description = input("Enter a description of this training run: ")
     logger.print("Train description: ", train_description)
     logger.tensorboard.add_text("description", train_description)
 
@@ -434,8 +435,8 @@ def train(resume_model_path, resume_optimizer_path, train_description):
         logger.print('Epoch {}\ntrain loss mean: {}, std: {}\nvalid loss mean: {}, std: {}\n'.
                      format(epoch + 1, loss_mean, np.std(t_loss_list), loss_mean_valid, np.std(v_loss_list)))
 
-        err_eval = online_evaluator.evaluate()
-        logger.tensorboard.add_scalar("epoch/eval_loss", err_eval, epoch)
+        # err_eval = online_evaluator.evaluate()
+        # logger.tensorboard.add_scalar("epoch/eval_loss", err_eval, epoch)
 
         # Save model
         if (epoch + 1) % 5 == 0:
@@ -446,9 +447,9 @@ def train(resume_model_path, resume_optimizer_path, train_description):
         if loss_mean < min_loss_t:
             min_loss_t = loss_mean
             logger.log_training_state("train", epoch + 1, e2e_vio_model.state_dict())
-        if err_eval < min_err_eval:
-            min_err_eval = err_eval
-            logger.log_training_state("eval", epoch + 1, e2e_vio_model.state_dict())
+        # if err_eval < min_err_eval:
+        #     min_err_eval = err_eval
+        #     logger.log_training_state("eval", epoch + 1, e2e_vio_model.state_dict())
 
         logger.print("Latest saves:",
                      " ".join(["%s: %s" % (k, v) for k, v in logger.log_training_state_latest_epoch.items()]))

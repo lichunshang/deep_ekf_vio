@@ -4,7 +4,7 @@ trap "exit" SIGINT SIGTERM
 
 SCRIPT=$(readlink -f "$0")
 SCRIPTDIR=$(dirname "$SCRIPT")
-EUROC_DATASET_DIR='/home/cs4li/Dev/EUROC/'
+EUROC_DATASET_DIR='/mnt/data/teamAI/quyen/deep_vio/deep_ekf_vio/data'
 OUTPUT_DIR="$SCRIPTDIR/../data"
 
 echo "SCRIPT DIR: $SCRIPTDIR"

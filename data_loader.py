@@ -312,10 +312,10 @@ class SubseqDataset(Dataset):
 
             imu_data.append(imu_dat_padded)
 
-        gt_rel_poses = torch.tensor(gt_rel_poses, dtype=torch.float32)
+        gt_rel_poses = torch.tensor(np.array(gt_rel_poses), dtype=torch.float32)
         gt_poses = torch.tensor(subseq.gt_poses, dtype=torch.float32)
         gt_velocities = torch.tensor(subseq.gt_velocities, dtype=torch.float32)
-        imu_data = torch.tensor(imu_data, dtype=torch.float32)
+        imu_data = torch.tensor(np.array(imu_data), dtype=torch.float32)
 
         init_g = torch.tensor(subseq.gt_poses[0, 0:3, 0:3].transpose().dot(subseq.g_i), dtype=torch.float32)
         bw_0 = torch.tensor(subseq.bw_0, dtype=torch.float32)
