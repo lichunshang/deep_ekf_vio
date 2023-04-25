@@ -95,7 +95,7 @@ def find_timestamps_in_between(timestamp, timestamps_to_search):
 
 def check_time_discontinuities(raw_seq_dir):
     oxts_dir = os.path.join(raw_seq_dir, "oxts")
-    cam_timestamps = read_timestamps(os.path.join(os.path.join(raw_seq_dir, "image_03"), "timestamps.txt"))
+    cam_timestamps = read_timestamps(os.path.join(os.path.join(raw_seq_dir, "image_02"), "timestamps.txt"))
     imu_timestamps = read_timestamps(os.path.join(oxts_dir, "timestamps.txt"))
 
     for i in range(1, len(imu_timestamps)):
@@ -120,11 +120,11 @@ def preprocess_kitti_raw(raw_seq_dir, output_dir, cam_subset_range, plot_figures
     logger.print("Camera images: %d => %d" % (cam_subset_range[0], cam_subset_range[1]))
 
     oxts_dir = os.path.join(raw_seq_dir, "oxts")
-    image_dir = os.path.join(raw_seq_dir, "image_03")
+    image_dir = os.path.join(raw_seq_dir, "image_02")
     gps_poses = np.loadtxt(os.path.join(oxts_dir, "poses.txt"))
     gps_poses = np.array([np.vstack([np.reshape(p, [3, 4]), [0, 0, 0, 1]]) for p in gps_poses])
-    T_velo_imu = np.loadtxt(os.path.join(raw_seq_dir, "calib_imu_to_velo.txt"))
-    T_cam_velo = np.loadtxt(os.path.join(raw_seq_dir, 'calib_velo_to_cam.txt'))
+    T_velo_imu = np.loadtxt(os.path.join(raw_seq_dir, "../imu2velo.txt"))
+    T_cam_velo = np.loadtxt(os.path.join(raw_seq_dir, '../velo2cam.txt'))
     T_cam_imu = T_cam_velo.dot(T_velo_imu)
 
     # imu timestamps

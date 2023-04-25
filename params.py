@@ -67,11 +67,11 @@ class Parameters(object):
 
         self.train_init_covar = False
         self.train_imu_noise_covar = False
-        self.vis_meas_covar_use_fixed = False
+        self.vis_meas_covar_use_fixed = True
 
         # Training parameters
-        self.epochs = 200
-        self.batch_size = 8
+        self.epochs = 100
+        self.batch_size = 16
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adadelta
@@ -92,8 +92,9 @@ class Parameters(object):
             }
         })
         # Pretrain, Resume training
-        self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/flownets_bn_EPE2.459.pth.tar')
-        self.pretrained_backbone = os.path.join(self.project_dir, './pretrained/efficient-net-b0.pth' )
+        # self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/ems_transposenet_7scenes_pretrained.pth')
+        self.pretrained_flownet = None
+        self.pretrained_backbone = os.path.join(self.project_dir, './pretrained/efficientnet-b0.pth' )
         # Choice:
         # None
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
@@ -109,6 +110,7 @@ class Parameters(object):
         self.reduction = ["reduction_4", "reduction_3"]
         self.dim_feedforward = 256
         self.learn_embedding_with_pose_token = False
+        self.use_lstm = False
 
 
     def wc(self, seqs):
@@ -201,10 +203,10 @@ class EUROCParams(Parameters):
         Parameters.__init__(self)
 
         self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05', "V1_01", "V1_02", "V1_03", "V2_01", "V2_02"]
-        self.eval_seq = "MH_01"
+        self.eval_seq = "MH_02"
 
-        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        # self.train_seqs = ['V1_03']
+        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        self.train_seqs = ['V1_02']
         self.valid_seqs = [self.eval_seq]
 
         # self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]

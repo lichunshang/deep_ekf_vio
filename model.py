@@ -285,36 +285,37 @@ class DeepVO(TNet):
         self.tnet = TNet(pretrained_path=par.pretrained_backbone)
         # CNN
 
-        self.batchNorm = batchNorm
-        self.conv1 = conv(self.batchNorm, 6, 64, kernel_size=7, stride=2, dropout=par.conv_dropout[0])
-        self.conv2 = conv(self.batchNorm, 64, 128, kernel_size=5, stride=2, dropout=par.conv_dropout[1])
-        self.conv3 = conv(self.batchNorm, 128, 256, kernel_size=5, stride=2, dropout=par.conv_dropout[2])
-        self.conv3_1 = conv(self.batchNorm, 256, 256, kernel_size=3, stride=1, dropout=par.conv_dropout[3])
-        self.conv4 = conv(self.batchNorm, 256, 512, kernel_size=3, stride=2, dropout=par.conv_dropout[4])
-        self.conv4_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[5])
-        self.conv5 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=2, dropout=par.conv_dropout[6])
-        self.conv5_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[7])
-        self.conv6 = conv(self.batchNorm, 512, 1024, kernel_size=3, stride=2, dropout=par.conv_dropout[8])
+        # self.batchNorm = batchNorm
+        # self.conv1 = conv(self.batchNorm, 6, 64, kernel_size=7, stride=2, dropout=par.conv_dropout[0])
+        # self.conv2 = conv(self.batchNorm, 64, 128, kernel_size=5, stride=2, dropout=par.conv_dropout[1])
+        # self.conv3 = conv(self.batchNorm, 128, 256, kernel_size=5, stride=2, dropout=par.conv_dropout[2])
+        # self.conv3_1 = conv(self.batchNorm, 256, 256, kernel_size=3, stride=1, dropout=par.conv_dropout[3])
+        # self.conv4 = conv(self.batchNorm, 256, 512, kernel_size=3, stride=2, dropout=par.conv_dropout[4])
+        # self.conv4_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[5])
+        # self.conv5 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=2, dropout=par.conv_dropout[6])
+        # self.conv5_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[7])
+        # self.conv6 = conv(self.batchNorm, 512, 1024, kernel_size=3, stride=2, dropout=par.conv_dropout[8])
 
-        # Compute the shape based on diff image size
-        tmp = Variable(torch.zeros(1, 3, imsize1, imsize2))
-        tmp = self.tnet(tmp)
-        # tmp = Variable(torch.zeros(1,))
+        if par.use_lstm:
+            # Compute the shape based on diff image size
+            tmp = Variable(torch.zeros(1, 3, imsize1, imsize2))
+            tmp = self.tnet(tmp)
+            # tmp = Variable(torch.zeros(1,))
 
-        # RNN
-        if par.hybrid_recurrency and par.enable_ekf:
-            lstm_input_size = IMUKalmanFilter.STATE_VECTOR_DIM ** 2 + IMUKalmanFilter.STATE_VECTOR_DIM
-        else:
-            lstm_input_size = 0
+            # RNN
+            if par.hybrid_recurrency and par.enable_ekf:
+                lstm_input_size = IMUKalmanFilter.STATE_VECTOR_DIM ** 2 + IMUKalmanFilter.STATE_VECTOR_DIM
+            else:
+                lstm_input_size = 0
 
-        self.rnn = nn.LSTM(
-                input_size=int(np.prod(tmp.size())) + lstm_input_size,
-                hidden_size=par.rnn_hidden_size,
-                num_layers=par.rnn_num_layers,
-                dropout=par.rnn_dropout_between,
-                batch_first=True)
-        self.rnn_drop_out = nn.Dropout(par.rnn_dropout_out)
-        self.linear = nn.Linear(in_features=par.rnn_hidden_size, out_features=12)
+            self.rnn = nn.LSTM(
+                    input_size=int(np.prod(tmp.size())) + lstm_input_size,
+                    hidden_size=par.rnn_hidden_size,
+                    num_layers=par.rnn_num_layers,
+                    dropout=par.rnn_dropout_between,
+                    batch_first=True)
+            self.rnn_drop_out = nn.Dropout(par.rnn_dropout_out)
+            self.linear = nn.Linear(in_features=par.rnn_hidden_size, out_features=12)
 
         # Initilization
         for m in self.modules():
@@ -378,16 +379,8 @@ class DeepVO(TNet):
         x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
         # x = self.cnn(x)
         x = self.tnet(x)
-        x = x.view(batch_size, seq_len, -1)
+        x = x.reshape(batch_size, seq_len, -1)
         return x
-
-    def cnn(self, x):
-        out_conv2 = self.conv2(self.conv1(x))
-        out_conv3 = self.conv3_1(self.conv3(out_conv2))
-        out_conv4 = self.conv4_1(self.conv4(out_conv3))
-        out_conv5 = self.conv5_1(self.conv5(out_conv4))
-        out_conv6 = self.conv6(out_conv5)
-        return out_conv6
 
     def weight_parameters(self):
         return [param for name, param in self.named_parameters() if 'weight' in name]
@@ -442,7 +435,6 @@ class E2EVIO(nn.Module):
                                     par.init_covar_diag_eps).repeat(images.shape[0], 1, 1)
 
         encoded_images = self.vo_module.encode_image(images)
-
         num_timesteps = images.size(1) - 1  # equals to imu_data.size(1) - 1
 
         poses_over_timesteps = [prev_pose]
@@ -459,15 +451,21 @@ class E2EVIO(nn.Module):
             if par.hybrid_recurrency and par.enable_ekf:
                 # concatenate the predicted states and covar with the encoded images to feed into LSTM
                 last_pred_state_so3 = IMUKalmanFilter.state_to_so3(pred_states[-1])
+                # print("last_pred_state_so3:", last_pred_state_so3.shape)
                 last_pred_covar_flattened = pred_covars[-1].view(-1, IMUKalmanFilter.STATE_VECTOR_DIM ** 2)
+                # print("last_pred_covar_flattened: ", last_pred_covar_flattened.shape)
                 feature_vector = torch.cat([last_pred_state_so3, last_pred_covar_flattened, encoded_images[:, k]], -1)
             else:
                 feature_vector = encoded_images[:, k]
 
             # get vis measurement
-            vis_meas_and_covar, lstm_states = self.vo_module.forward_one_ts(feature_vector, lstm_states)
-            vis_meas = vis_meas_and_covar[:, 0:6]
-
+            if par.use_lstm:
+                vis_meas_and_covar, lstm_states = self.vo_module.forward_one_ts(feature_vector, lstm_states)
+                vis_meas = vis_meas_and_covar[:, 0:6]
+            else:
+                vis_meas = feature_vector
+                print("feature vector: ",feature_vector.shape)
+                vis_meas_and_covar = torch.cat((vis_meas, torch.ones(vis_meas.shape[0],9).cuda()), dim=1)
             # process vis meas covar
             if par.vis_meas_covar_use_fixed:
                 vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar,

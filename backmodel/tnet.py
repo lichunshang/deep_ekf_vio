@@ -41,7 +41,7 @@ class PoseRegressor(nn.Module):
         return self.fc_o(x)
 
 class TNet(nn.Module):
-    def __init__(self, pretrained_path='pretrained/efficient-net-b0.pth'):
+    def __init__(self, pretrained_path='pretrained/efficientnet-b0.pth'):
         super().__init__()
         
         config = {
@@ -61,42 +61,41 @@ class TNet(nn.Module):
         self.backbone = build_backbone(config)
 
         self.transformer_t = Transformer(config_t)
-        self.transformer_rot = Transformer(config_rot)
+        # self.transformer_rot = Transformer(config_rot)
         decoder_dim = self.transformer_t.d_model
         self.input_proj_t = nn.Conv2d(self.backbone.num_channels[0], decoder_dim, kernel_size=1)
-        self.input_proj_rot = nn.Conv2d(self.backbone.num_channels[1], decoder_dim, kernel_size=1)
-        self.query_embed_t = nn.Embedding(10, decoder_dim)
-        self.query_embed_rot = nn.Embedding(10, decoder_dim)
+        # self.input_proj_rot = nn.Conv2d(self.backbone.num_channels[1], decoder_dim, kernel_size=1)
+        self.query_embed_t = nn.Embedding(1, decoder_dim)
+        # self.query_embed_rot = nn.Embedding(10, decoder_dim)
         self.regressor_head_t = PoseRegressor(decoder_dim, 3)
-        self.regressor_head_rot = PoseRegressor(decoder_dim, 3)
+        # self.regressor_head_rot = PoseRegressor(decoder_dim, 3)
 
     def forward_transformers(self, data):
         if isinstance(data, (list, torch.Tensor)):
             data = nested_tensor_from_tensor_list(data)
         features, pos = self.backbone(data)
         src_t, mask_t = features[0].decompose()
-        src_rot, mask_rot = features[1].decompose()
 
         assert mask_t is not None
-        assert mask_rot is not None
+        # assert mask_rot is not None
 
         desc_t = self.transformer_t(self.input_proj_t(src_t), mask_t, self.query_embed_t.weight, pos[0])[0][0]
-        desc_rot = self.transformer_rot(self.input_proj_rot(src_rot), mask_rot, self.query_embed_rot.weight, pos[1])[0][0]
 
-        return {'desc_t': desc_t,
-                'desc_rot':desc_rot}
-    def forward_heads(self, transformer_res):
-        desc_t = transformer_res.get('desc_t')
-        desc_rot = transformer_res.get('desc_rot')
+        return desc_t
+    def forward_heads(self, desc_t):
+        # print('desc_t: ',desc_t.shape)+-
+        # desc_t = transformer_res.get('desc_t')
+        # desc_rot = transformer_res.get('desc_rot')
         x_t = self.regressor_head_t(desc_t)
-        x_rot = self.regressor_head_rot(desc_rot)
-        output = torch.cat((x_t,x_rot), dim=1)
-        return output
+        # x_rot = self.regressor_head_rot(desc_rot)
+        # output = torch.cat((x_t,x_rot), dim=1)
+        return x_t
     
     def forward(self, data):
-        transformer_res = self.forward_transformers(data)
-        head_res = self.forward_heads(transformer_res)
-        return head_res
+        res = self.forward_transformers(data)
+        if not par.use_lstm:
+            res = self.forward_heads(res)
+        return res
 
 if __name__ =='__main__':
     config = {

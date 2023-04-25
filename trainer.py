@@ -382,6 +382,7 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
         state_dict_update = {key: state_dict_update[key] for key in state_dict_update
                              if key not in par.exclude_resume_weights}
         state_dict = e2e_vio_model.state_dict()
+        state_dict_update = {k: v for k, v in state_dict_update.items() if k in state_dict}
         state_dict.update(state_dict_update)
         e2e_vio_model.load_state_dict(state_dict)
         logger.print('Load model from: %s' % resume_model_path)
