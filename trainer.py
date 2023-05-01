@@ -328,7 +328,7 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     convert_subseqs_list_to_panda(train_subseqs).to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
     train_dataset = SubseqDataset(train_subseqs, (par.img_h, par.img_w), par.img_means,
                                   par.img_stds, par.minus_point_5)
-    train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
+    train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
     logger.print('Number of samples in training dataset: %d' % len(train_subseqs))
 

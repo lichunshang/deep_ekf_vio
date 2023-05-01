@@ -67,11 +67,11 @@ class Parameters(object):
 
         self.train_init_covar = False
         self.train_imu_noise_covar = False
-        self.vis_meas_covar_use_fixed = True
+        self.vis_meas_covar_use_fixed = False
 
         # Training parameters
         self.epochs = 100
-        self.batch_size = 16
+        self.batch_size = 8
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adadelta
@@ -110,7 +110,7 @@ class Parameters(object):
         self.reduction = ["reduction_4", "reduction_3"]
         self.dim_feedforward = 256
         self.learn_embedding_with_pose_token = False
-        self.use_lstm = False
+        self.use_lstm = True
 
 
     def wc(self, seqs):
@@ -203,7 +203,7 @@ class EUROCParams(Parameters):
         Parameters.__init__(self)
 
         self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05', "V1_01", "V1_02", "V1_03", "V2_01", "V2_02"]
-        self.eval_seq = "MH_02"
+        self.eval_seq = "V2_01"
 
         # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
         self.train_seqs = ['V1_02']
@@ -212,8 +212,8 @@ class EUROCParams(Parameters):
         # self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
         # self.valid_seqs = ['MH_05', "V1_03", "V2_02"]
 
-        self.img_w = 235
-        self.img_h = 150
+        self.img_w = 256
+        self.img_h = 160
         self.img_means = (0,)
         self.img_stds = (1,)
         self.minus_point_5 = True

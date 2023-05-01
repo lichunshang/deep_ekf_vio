@@ -8,6 +8,7 @@ from params import par
 from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
 from backmodel.tnet import TNet
+from backmodel.cain import CAIN
 
 
 def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
@@ -174,7 +175,6 @@ class IMUKalmanFilter(nn.Module):
 
         H = -H  # this is required for EKF, since the way we derived the Jacobian are for batch methods
         H_transpose = H.transpose(-2, -1)
-
         S = mm(mm(H, pred_covar), H_transpose) + vis_meas_covar
         K = mm(mm(pred_covar, H_transpose), S.inverse())
 
@@ -282,7 +282,8 @@ class IMUKalmanFilter(nn.Module):
 class DeepVO(TNet):
     def __init__(self, imsize1, imsize2, batchNorm):
         super(DeepVO, self).__init__()
-        self.tnet = TNet(pretrained_path=par.pretrained_backbone)
+        # self.tnet = TNet(pretrained_path=par.pretrained_backbone)
+        self.cain = CAIN()
         # CNN
 
         # self.batchNorm = batchNorm
@@ -298,10 +299,9 @@ class DeepVO(TNet):
 
         if par.use_lstm:
             # Compute the shape based on diff image size
-            tmp = Variable(torch.zeros(1, 3, imsize1, imsize2))
-            tmp = self.tnet(tmp)
-            # tmp = Variable(torch.zeros(1,))
-
+            tmp1 = Variable(torch.zeros(1, 3, imsize1, imsize2))
+            tmp2 = Variable(torch.zeros(1, 3, imsize1, imsize2))
+            tmp = self.cain(tmp1,tmp2)
             # RNN
             if par.hybrid_recurrency and par.enable_ekf:
                 lstm_input_size = IMUKalmanFilter.STATE_VECTOR_DIM ** 2 + IMUKalmanFilter.STATE_VECTOR_DIM
@@ -358,6 +358,8 @@ class DeepVO(TNet):
         # RNN
         # lstm_state is (hidden state, cell state,)
         # each hidden/cell state has the shape (lstm layers, batch size, lstm hidden size)
+        # print('feature_vector:', feature_vector.shape)
+        # print('lstm_init_state:', lstm_init_state.shape)
         out, lstm_state = self.rnn(feature_vector.unsqueeze(1), lstm_init_state)
         out = self.rnn_drop_out(out)
         out = self.linear(out)
@@ -372,13 +374,13 @@ class DeepVO(TNet):
         # x: (batch, seq_len, channel, width, height)
 
         # stack_image
-        # x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
+        x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
         batch_size = x.size(0)
         seq_len = x.size(1)
         # CNN
         x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
         # x = self.cnn(x)
-        x = self.tnet(x)
+        x = self.cain(x[:,0:3,:],x[:,3:6,:])
         x = x.reshape(batch_size, seq_len, -1)
         return x
 
@@ -457,21 +459,19 @@ class E2EVIO(nn.Module):
                 feature_vector = torch.cat([last_pred_state_so3, last_pred_covar_flattened, encoded_images[:, k]], -1)
             else:
                 feature_vector = encoded_images[:, k]
-
             # get vis measurement
             if par.use_lstm:
                 vis_meas_and_covar, lstm_states = self.vo_module.forward_one_ts(feature_vector, lstm_states)
                 vis_meas = vis_meas_and_covar[:, 0:6]
             else:
                 vis_meas = feature_vector
-                print("feature vector: ",feature_vector.shape)
-                vis_meas_and_covar = torch.cat((vis_meas, torch.ones(vis_meas.shape[0],9).cuda()), dim=1)
+                # vis_meas_and_covar = torch.cat((vis_meas, torch.ones(vis_meas.shape[0],6).cuda()), dim=1)
             # process vis meas covar
             if par.vis_meas_covar_use_fixed:
                 vis_meas_covar_diag = torch.tensor(par.vis_meas_fixed_covar,
                                                    dtype=torch.float32, device=vis_meas.device)
                 vis_meas_covar_diag = vis_meas_covar_diag * vis_meas_covar_scale
-                vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], vis_meas.shape[1], 1)
+                vis_meas_covar_diag = vis_meas_covar_diag.repeat(vis_meas.shape[0], 1)
             else:
                 vis_meas_covar_diag = par.vis_meas_covar_init_guess * \
                                       10 ** (par.vis_meas_covar_beta *
