@@ -73,53 +73,18 @@ class _TrainAssistant(object):
         self.num_train_iterations = 0
         self.num_val_iterations = 0
         self.clip = par.clip
-        self.lstm_state_cache = {}
         self.epoch = 0
-
-    def update_lstm_state(self, t_x_meta, lstm_states):
-        # lstm_states has the dimension of (# batch, 2 (hidden/cell), lstm layers, lstm hidden size)
-        _, seq_list, type_list, _, id_next_list, invalid_imu_list = SubseqDataset.decode_batch_meta_info(t_x_meta)
-        assert (len(seq_list) == lstm_states.size(0) and len(seq_list) == lstm_states.size(0))
-        num_batches = len(seq_list)
-
-        for i in range(0, num_batches):
-            key = "%s_%s_%d" % (seq_list[i], type_list[i], id_next_list[i])
-            self.lstm_state_cache[key] = lstm_states[i, :, :, :]
-
-    def retrieve_lstm_state(self, t_x_meta):
-        _, seq_list, type_list, id_list, id_next_list, invalid_imu_list = SubseqDataset.decode_batch_meta_info(t_x_meta)
-        num_batches = len(seq_list)
-
-        lstm_states = []
-
-        for i in range(0, num_batches):
-            key = "%s_%s_%d" % (seq_list[i], type_list[i], id_list[i])
-            if key in self.lstm_state_cache:
-                tmp = self.lstm_state_cache[key]
-            else:
-                # This assert only checks "vanilla" sequences for now
-                assert (not (self.epoch > 0 and id_list[i] >= par.seq_len - 1 and id_next_list[i] > id_list[i]))
-                num_layers = par.rnn_num_layers
-                hidden_size = par.rnn_hidden_size
-                tmp = torch.zeros(2, num_layers, hidden_size)
-            lstm_states.append(tmp)
-
-        return torch.stack(lstm_states, dim=0)
+        self.criterion = torch.nn.L1Loss()
 
     def get_loss(self, data):
         meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
 
         _, _, _, _, _, invalid_imu_list = SubseqDataset.decode_batch_meta_info(meta_data)
 
-        prev_lstm_states = None
-        if par.stateful_training:
-            prev_lstm_states = self.retrieve_lstm_state(meta_data)
-            prev_lstm_states = prev_lstm_states.cuda()
 
-        vis_meas, vis_meas_covar, lstm_states, poses, ekf_states, ekf_covars = \
+        vis_meas, vis_meas_covar, poses, ekf_states, ekf_covars = \
             self.model.forward(images.cuda(),
                                imu_data.cuda(),
-                               prev_lstm_states,
                                gt_poses[:, 0].inverse().cuda(),
                                prev_state.cuda(), None,
                                T_imu_cam.cuda())
@@ -142,9 +107,6 @@ class _TrainAssistant(object):
         else:
             loss = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses.cuda())
 
-        if par.stateful_training:
-            lstm_states = lstm_states.detach().cpu()
-            self.update_lstm_state(meta_data, lstm_states)
 
         if self.model.training:
             self.num_train_iterations += 1
@@ -155,8 +117,11 @@ class _TrainAssistant(object):
 
     def vis_meas_loss(self, predicted_rel_poses, vis_meas_covar, gt_rel_poses):
         # Weighted MSE Loss
-        angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
-        trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        # angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
+        # trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+
+        trans_loss = self.criterion(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        angle_loss = self.criterion(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
 
         if par.gaussian_pdf_loss:
             Q_det = torch.prod(torch.diagonal(vis_meas_covar, dim1=-2, dim2=-1), -1)
@@ -168,7 +133,7 @@ class _TrainAssistant(object):
             err_weighted_by_covar = torch.matmul(torch.matmul(err.transpose(-2, -1), vis_meas_covar.inverse()), err)
             loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
         else:
-            loss = (par.k1 * angle_loss + trans_loss)
+            loss = (par.k1 * angle_loss + 10*trans_loss)
 
         # log the loss
         tag_name = "train" if self.model.training else "val"

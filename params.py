@@ -43,7 +43,7 @@ class Parameters(object):
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
         self.seq_len = 8
-        self.sample_times = 3
+        self.sample_times = 1
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
 
@@ -71,10 +71,10 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 100
-        self.batch_size = 8
+        self.batch_size = 16
         self.pin_mem = True
         self.cache_image = True
-        self.optimizer = torch.optim.Adadelta
+        self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
             "init_covar_diag_sqrt": 1e-1,
@@ -138,7 +138,8 @@ class KITTIParams(Parameters):
         self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
         self.eval_seq = "K07"
 
-        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        self.train_seqs = ['K10']
         self.valid_seqs = [self.eval_seq]
 
         # self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
@@ -146,7 +147,7 @@ class KITTIParams(Parameters):
         # self.train_seqs = ['K08']
         # self.valid_seqs = ['K07']
 
-        self.img_w = 320
+        self.img_w = 312
         self.img_h = 96
         self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
@@ -260,5 +261,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-# par = KITTIParams()
-par = EUROCParams()
+par = KITTIParams()
+# par = EUROCParams()
