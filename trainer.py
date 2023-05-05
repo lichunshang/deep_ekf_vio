@@ -133,7 +133,7 @@ class _TrainAssistant(object):
             err_weighted_by_covar = torch.matmul(torch.matmul(err.transpose(-2, -1), vis_meas_covar.inverse()), err)
             loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
         else:
-            loss = (par.k1 * angle_loss + 10*trans_loss)
+            loss = (par.k1 * angle_loss + trans_loss)
 
         # log the loss
         tag_name = "train" if self.model.training else "val"

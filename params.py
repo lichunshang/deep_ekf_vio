@@ -71,7 +71,7 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 100
-        self.batch_size = 16
+        self.batch_size = 8
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -136,7 +136,7 @@ class KITTIParams(Parameters):
         Parameters.__init__(self)
 
         self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
-        self.eval_seq = "K07"
+        self.eval_seq = "K09"
 
         # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
         self.train_seqs = ['K10']
