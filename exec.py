@@ -23,8 +23,7 @@ if top_level_arg_parsed.script == "gen_trajectory":
                             action='store_true')
     arg_parsed = arg_parser.parse_args(args=args)
 
-    eval.gen_trajectory(os.path.abspath(arg_parsed.model_file_path), arg_parsed.sequences, arg_parsed.seq_len,
-                        not arg_parsed.no_prop_lstm_states)
+    eval.gen_trajectory(os.path.abspath(arg_parsed.model_file_path), arg_parsed.sequences, arg_parsed.seq_len)
 
 elif top_level_arg_parsed.script == "plot_trajectory":
     arg_parser = argparse.ArgumentParser(description='Plot trajectory')

@@ -279,7 +279,7 @@ class IMUKalmanFilter(nn.Module):
                           bw.view(-1, 3), ba.view(-1, 3),), -1)
 
 
-class DeepVO(TNet):
+class DeepVO(nn.Module):
     def __init__(self, imsize1, imsize2, batchNorm):
         super(DeepVO, self).__init__()
         # self.tnet = TNet(pretrained_path=par.pretrained_backbone)
