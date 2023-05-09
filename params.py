@@ -71,7 +71,7 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 100
-        self.batch_size = 8
+        self.batch_size = 32
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -94,7 +94,7 @@ class Parameters(object):
         # Pretrain, Resume training
         # self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/ems_transposenet_7scenes_pretrained.pth')
         self.pretrained_flownet = None
-        self.pretrained_backbone = os.path.join(self.project_dir, './pretrained/efficientnet-b0.pth' )
+        # self.pretrained_backbone = os.path.join(self.project_dir, './pretrained/efficientnet-b0.pth' )
         # Choice:
         # None
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
@@ -136,10 +136,10 @@ class KITTIParams(Parameters):
         Parameters.__init__(self)
 
         self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
-        self.eval_seq = "K09"
+        self.eval_seq = "K10"
 
         # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        self.train_seqs = ['K10']
+        self.train_seqs = ['K09']
         self.valid_seqs = [self.eval_seq]
 
         # self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
@@ -204,17 +204,19 @@ class EUROCParams(Parameters):
         Parameters.__init__(self)
 
         self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05', "V1_01", "V1_02", "V1_03", "V2_01", "V2_02"]
-        self.eval_seq = "V2_01"
+        self.eval_seq = "V1_02"
 
-        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        self.train_seqs = ['V1_02']
+        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        # self.train_seqs = ['V2_01']
         self.valid_seqs = [self.eval_seq]
 
         # self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
         # self.valid_seqs = ['MH_05', "V1_03", "V2_02"]
 
-        self.img_w = 256
-        self.img_h = 160
+        # self.img_w = 256
+        # self.img_h = 160
+        self.img_w = 312
+        self.img_h = 96
         self.img_means = (0,)
         self.img_stds = (1,)
         self.minus_point_5 = True
@@ -261,5 +263,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-par = KITTIParams()
-# par = EUROCParams()
+# par = KITTIParams()
+par = EUROCParams()

@@ -38,8 +38,8 @@ class ConvNorm(nn.Module):
             self.norm = nn.BatchNorm2d(out_feat)
 
     def forward(self, x):
-        out = self.reflection_pad(x)
-        out = self.conv(out)
+        # out = self.reflection_pad(x)
+        out = self.conv(x)
         if self.norm:
             out = self.norm(out)
         return out

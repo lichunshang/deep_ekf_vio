@@ -122,6 +122,7 @@ class _TrainAssistant(object):
 
         trans_loss = self.criterion(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
         angle_loss = self.criterion(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
+        # covar_loss = torch.mean(vis_meas_covar)
 
         if par.gaussian_pdf_loss:
             Q_det = torch.prod(torch.diagonal(vis_meas_covar, dim1=-2, dim2=-1), -1)
@@ -134,6 +135,7 @@ class _TrainAssistant(object):
             loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
         else:
             loss = (par.k1 * angle_loss + trans_loss)
+            # loss = ( angle_loss + par.k1 *trans_loss)
 
         # log the loss
         tag_name = "train" if self.model.training else "val"

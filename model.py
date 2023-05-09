@@ -9,7 +9,9 @@ from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
 from backmodel.tnet import TNet
 from backmodel.cain import CAIN
-
+from backmodel.newnet import NewNet
+from torchvision.models import resnet18, ResNet18_Weights
+from torchvision.models.optical_flow import raft_large, Raft_Large_Weights
 
 def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
     if batchNorm:
@@ -283,25 +285,12 @@ class DeepVO(nn.Module):
     def __init__(self, imsize1, imsize2, batchNorm):
         super(DeepVO, self).__init__()
         # self.tnet = TNet(pretrained_path=par.pretrained_backbone)
-        self.cain = CAIN()
-        # CNN
-
-        # self.batchNorm = batchNorm
-        # self.conv1 = conv(self.batchNorm, 6, 64, kernel_size=7, stride=2, dropout=par.conv_dropout[0])
-        # self.conv2 = conv(self.batchNorm, 64, 128, kernel_size=5, stride=2, dropout=par.conv_dropout[1])
-        # self.conv3 = conv(self.batchNorm, 128, 256, kernel_size=5, stride=2, dropout=par.conv_dropout[2])
-        # self.conv3_1 = conv(self.batchNorm, 256, 256, kernel_size=3, stride=1, dropout=par.conv_dropout[3])
-        # self.conv4 = conv(self.batchNorm, 256, 512, kernel_size=3, stride=2, dropout=par.conv_dropout[4])
-        # self.conv4_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[5])
-        # self.conv5 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=2, dropout=par.conv_dropout[6])
-        # self.conv5_1 = conv(self.batchNorm, 512, 512, kernel_size=3, stride=1, dropout=par.conv_dropout[7])
-        # self.conv6 = conv(self.batchNorm, 512, 1024, kernel_size=3, stride=2, dropout=par.conv_dropout[8])
-
-        # Compute the shape based on diff image size
-        tmp1 = Variable(torch.zeros(1, 3, imsize1, imsize2))
-        tmp2 = Variable(torch.zeros(1, 3, imsize1, imsize2))
-        tmp = self.cain(tmp1,tmp2)
-            # RNN
+        # self.cain = CAIN()
+        # extractor = resnet18(weights=ResNet18_Weights.DEFAULT)
+        extractor = raft_large(weights=Raft_Large_Weights.DEFAULT).cuda()
+        # for param in extractor.parameters():
+        #     param.requires_grad = False
+        self.newnet = NewNet(feature_extractor=extractor)
 
     def encode_image(self, x):
         # x: (batch, seq_len, channel, width, height)
@@ -312,8 +301,7 @@ class DeepVO(nn.Module):
         seq_len = x.size(1)
         # CNN
         x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
-        # x = self.cnn(x)
-        x = self.cain(x[:,0:3,:],x[:,3:6,:])
+        x = self.newnet(x[:,0:3,:],x[:,3:6,:])
         x = x.reshape(batch_size, seq_len, -1)
         return x
 
