@@ -33,7 +33,7 @@ if not arg_parsed.run_eval_only:
 
 for tag in ["valid", "train", "checkpoint", "eval"]:
     seq_results_dir = gen_trajectory(os.path.join(results_dir, "saved_model.%s" % tag),
-                                     par.valid_seqs + par.train_seqs, 2, True)
+                                     par.valid_seqs + par.train_seqs, 2)
     plot_trajectory(seq_results_dir)
     calc_error(seq_results_dir)
     plot_errors(seq_results_dir)

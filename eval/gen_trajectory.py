@@ -23,7 +23,7 @@ def gen_trajectory_rel_iter(model, dataloader, initial_pose=np.eye(4, 4)):
 
         # lstm_states = lstm_states if prop_lstm_states else None
         # we only care about the results from the VO front ends here
-        vis_meas, vis_meas_covar, lstm_states, _, _, _ = model.forward(images.cuda(),
+        vis_meas, vis_meas_covar,  _, _, _ = model.forward(images.cuda(),
                                                                        imu_data.cuda(),
                                                                        gt_poses[:, 0].inverse().cuda(),
                                                                        prev_state.cuda(), None,

@@ -74,6 +74,7 @@ class _TrainAssistant(object):
         self.num_val_iterations = 0
         self.clip = par.clip
         self.epoch = 0
+        # self.criterion = torch.nn.MSELoss()
         self.criterion = torch.nn.L1Loss()
 
     def get_loss(self, data):
@@ -114,13 +115,26 @@ class _TrainAssistant(object):
             self.num_val_iterations += 1
 
         return loss
+    
+    def fit_scale(Ps, Gs):
+        b = Ps.shape[0]
+        t1 = Ps.data[...,:3].detach().reshape(b, -1)
+        t2 = Gs.data[...,:3].detach().reshape(b, -1)
+
+        s = (t1*t2).sum(-1) / ((t2*t2).sum(-1) + 1e-8)
+        return s
 
     def vis_meas_loss(self, predicted_rel_poses, vis_meas_covar, gt_rel_poses):
         # Weighted MSE Loss
         # angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-
-        trans_loss = self.criterion(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        trans_scaled_pred = predicted_rel_poses[:,:,3:6]/(torch.linalg.norm(predicted_rel_poses[:,:,3:6], dim=2,  ord = 2)
+                                                          .view(predicted_rel_poses.shape[0],predicted_rel_poses.shape[1],1))
+        trans_scaled_gt = gt_rel_poses[:,:,3:6]/(torch.linalg.norm(gt_rel_poses[:,:,3:6], dim=2,  ord = 2)
+                                                 .view(gt_rel_poses.shape[0],gt_rel_poses.shape[1],1))
+        
+        # trans_loss = self.criterion(trans_scaled_pred, trans_scaled_gt)
+        trans_loss = self.criterion(predicted_rel_poses[:,:,3:6],gt_rel_poses[:,:,3:6])
         angle_loss = self.criterion(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # covar_loss = torch.mean(vis_meas_covar)
 
@@ -310,6 +324,10 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     # Model
     e2e_vio_model = E2EVIO()
     e2e_vio_model = e2e_vio_model.cuda()
+    # for param in e2e_vio_model.parameters():
+    #     param.requires_grad = False
+    # for param in e2e_vio_model.vo_module.newnet.feature_extractor.parameters():
+    #     param.requires_grad = False
     online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, 50)
 
     # Load FlowNet weights pretrained with FlyingChairs

@@ -35,29 +35,6 @@ def conv(in_planes, out_planes, kernel_size=3, stride=2, padding=1, dilation=1, 
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, padding=padding, stride=stride, dilation=dilation),
             nn.ReLU(inplace=True)
         )
-class Interpolation(nn.Module):
-    def __init__(self, n_resgroups, n_resblocks, n_feats, 
-                 reduction=16, act=nn.LeakyReLU(0.2, True), norm=False):
-        super(Interpolation, self).__init__()
-
-        modules_body = [
-            ResidualGroup(
-                RCAB,
-                n_resblocks=n_resblocks,
-                n_feat=n_feats,
-                kernel_size=3,
-                reduction=reduction, 
-                act=act, 
-                norm=norm)
-            for _ in range(n_resgroups)]
-        self.body = nn.Sequential(*modules_body)
-
-    def forward(self, x):
-        # Build input tensor
-        res = self.body(x)
-        res += x
-
-        return res
 
 class AttentionBlock(nn.Module):
     def __init__(self, in_channels):
@@ -107,18 +84,10 @@ class BasicBlock(nn.Module):
 
         return F.relu(out, inplace=True)
 
-class NewNet(nn.Module):
-    def __init__(self, feature_extractor , droprate=0.5, feat_dim=1024, pretrained=True):
+class Reg(nn.Module):
+    def __init__(self, inputnum=2) -> None:
         super().__init__()
-        self.feature_extractor = feature_extractor
-        for param in self.feature_extractor.parameters():
-            param.requires_grad = False
-        # fe_out_planes = self.feature_extractor.fc.in_features
-        # self.feature_extractor.fc = nn.Linear(fe_out_planes, feat_dim //2)
-        self.droprate=droprate
-
-        self.att = AttentionBlock(feat_dim)
-        inputnum = 2
+        self.inputnum = inputnum
         blocknums = [2,2,3,4,6,7,3]
         outputnums = [32,64,64,128,128,256,256]
 
@@ -134,27 +103,30 @@ class NewNet(nn.Module):
         self.layer4 = self._make_layer(BasicBlock, outputnums[5], blocknums[5], 2, 1, 1) # 5 x 4
         self.layer5 = self._make_layer(BasicBlock, outputnums[6], blocknums[6], 2, 1, 1) # 3 x 2
         fcnum = outputnums[6] * 10
-        relu = nn.LeakyReLU(0.2, True)
-        # self.interpolate = Interpolation(3, 12, feat_dim, act=relu)
         fc1_trans = linear(fcnum, 128)
         fc2_trans = linear(128,32)
-        fc3_trans = nn.Linear(32,12)
+        fc3_trans = nn.Linear(32,3)
 
         fc1_rot = linear(fcnum, 128)
         fc2_rot = linear(128,32)
         fc3_rot = nn.Linear(32,3)
 
-        fc1_covar = linear(fcnum, 128)
-        fc2_covar = linear(128,32)
-        fc3_covar = linear(32,6)
+        fc1_covar_t = linear(fcnum, 128)
+        fc2_covar_t = linear(128,32)
+        fc3_covar_t = linear(32,6)
+
+        # fc1_covar_r = linear(fcnum, 128)
+        # fc2_covar_r = linear(128,32)
+        # fc3_covar_r = linear(32,3)
 
         self.trans = nn.Sequential(fc1_trans, fc2_trans, fc3_trans)
         # for param in self.trans.parameters():
         #     param.requires_grad = False
         self.rot = nn.Sequential(fc1_rot, fc2_rot, fc3_rot)
-        for param in self.rot.parameters():
-            param.requires_grad = False
-        self.covar = nn.Sequential(fc1_covar, fc2_covar,fc3_covar)
+        # for param in self.rot.parameters():
+        #     param.requires_grad = False
+        self.covar_t = nn.Sequential(fc1_covar_t, fc2_covar_t,fc3_covar_t)
+        # self.covar_r = nn.Sequential(fc1_covar_r, fc2_covar_r,fc3_covar_r)
     def _make_layer(self, block, planes, blocks, stride, pad, dilation):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
@@ -168,33 +140,44 @@ class NewNet(nn.Module):
             layers.append(block(self.inplanes, planes,1,None,pad,dilation))
 
         return nn.Sequential(*layers)
-    def forward(self,x1, x2):
-        # x1 = self.feature_extractor(x1)
-        # x2 = self.feature_extractor(x2)
-        # x = torch.cat((x1,x2), dim=1)
-        x = self.feature_extractor(x1,x2)
-        # x = self.headconv(x)
-        # x = self.feature_extractor(x)
-        # x = F.relu(x)
-        # print(x)
-        # x = self.att(x.view(x.shape[0], -1))
-        # x = self.interpolate(x)
-        x = x[-1]
+    def forward(self, x):
         x = self.firstconv(x)
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
         x = self.layer5(x)
-
-        # if self.droprate > 0:
-        #     x = F.dropout(x, p=self.droprate)
         x = x.view(x.shape[0], -1)
         trans = self.trans(x)
         rot = self.rot(x)
-        covar = self.covar(x)
-        out = torch.cat((trans,rot,covar), dim=1)
+        covar_t = self.covar_t(x)
+        # covar_r = self.covar_r(x)
+        # covar = torch.cat((covar_t, covar_r),dim=1)
+        # covar = torch.cat((trans[:,3:6], rot[:, 3:6]),dim=1)
+        out = torch.cat((trans,rot, covar_t), dim=1)
         return out
+
+class NewNet(nn.Module):
+    def __init__(self, feature_extractor, regressor , feat_dim=1024):
+        super().__init__()
+        self.feature_extractor = feature_extractor
+        # for param in self.feature_extractor.parameters():
+        #     param.requires_grad = False
+        # fe_out_planes = self.feature_extractor.fc.in_features
+        # self.feature_extractor.fc = nn.Linear(fe_out_planes, feat_dim //2)
+
+        # self.att = AttentionBlock(feat_dim)
+        self.regressor = regressor
+    
+    def forward(self,x1, x2):
+
+        x = self.feature_extractor(x1,x2)
+        
+        x = x[-1]
+        # x = torch.cat((x1,x2), dim=1)
+        x = self.regressor(x)
+       
+        return x
 
     
 

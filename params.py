@@ -42,7 +42,7 @@ class Parameters(object):
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.seq_len = 8
+        self.seq_len = 5
         self.sample_times = 1
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
@@ -70,8 +70,8 @@ class Parameters(object):
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
-        self.epochs = 100
-        self.batch_size = 32
+        self.epochs = 50
+        self.batch_size = 16
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -100,19 +100,6 @@ class Parameters(object):
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
         # './pretrained/flownets_EPE1.951.pth.tar'
 
-
-        #Added
-        self.num_t_encoder_layers = 3
-        self.num_t_decoder_layers = 3
-        self.num_rot_encoder_layers = 2
-        self.num_rot_decoder_layers = 2
-        self.hidden_dim = 256
-        self.reduction = ["reduction_4", "reduction_3"]
-        self.dim_feedforward = 256
-        self.learn_embedding_with_pose_token = False
-        self.use_lstm = True
-
-
     def wc(self, seqs):
         available_seqs = [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
         ret_seqs = []
@@ -136,16 +123,13 @@ class KITTIParams(Parameters):
         Parameters.__init__(self)
 
         self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
-        self.eval_seq = "K10"
+        self.eval_seq = 'K10'
 
-        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        self.train_seqs = ['K09']
+        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
         self.valid_seqs = [self.eval_seq]
 
-        # self.train_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K05_*', 'K08', 'K09'])
-        # self.valid_seqs = ['K04', 'K06', 'K07', 'K10']
-        # self.train_seqs = ['K08']
-        # self.valid_seqs = ['K07']
+        # self.train_seqs = ['K00_5']
+        # self.valid_seqs = ['K00_6']
 
         self.img_w = 312
         self.img_h = 96
@@ -178,7 +162,7 @@ class KITTIParams(Parameters):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting, not actually used
-            0: 0.5,
+            0: 0.1,
         }
         # error scale for covar loss, not really used,
         # but must be 1.0 for self.gaussian_pdf_loss = False
@@ -187,7 +171,7 @@ class KITTIParams(Parameters):
         self.gaussian_pdf_loss = False
 
         self.data_aug_transforms = AttrDict({
-            "enable": True,
+            "enable": False,
             "lr_flip": True,
             "ud_flip": False,
             "lrud_flip": False,
@@ -245,11 +229,11 @@ class EUROCParams(Parameters):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting
-            0: 0.5,
+            0: 0.1,
         }
-        self.k4 = 100.  # error scale for covar loss
+        self.k4 = 1.  # error scale for covar loss
 
-        self.gaussian_pdf_loss = True
+        self.gaussian_pdf_loss = False
 
         self.data_aug_transforms = AttrDict({
             "enable": False,
