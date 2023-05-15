@@ -9,7 +9,7 @@ from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
 from backmodel.tnet import TNet
 from backmodel.cain import CAIN
-from backmodel.newnet import NewNet, Reg
+from backmodel.newnet import NewNet, Reg, DepthNet
 from torchvision.models import resnet18, ResNet18_Weights
 from torchvision.models.optical_flow import raft_large, Raft_Large_Weights
 

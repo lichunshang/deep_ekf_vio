@@ -13,6 +13,7 @@ from log import logger
 from torch.utils.data import DataLoader
 from eval import EurocErrorCalc, KittiErrorCalc
 from eval.gen_trajectory import gen_trajectory_rel_iter, gen_trajectory_abs_iter
+from new_loss import *
 
 
 class _OnlineDatasetEvaluator(object):

@@ -179,7 +179,12 @@ class NewNet(nn.Module):
        
         return x
 
-    
+class DepthNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        raise NotImplementedError
+    def forward(self, x):
+        raise NotImplementedError
 
 
 if __name__ == '__main__':

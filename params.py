@@ -125,11 +125,11 @@ class KITTIParams(Parameters):
         self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
         self.eval_seq = 'K10'
 
-        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        self.valid_seqs = [self.eval_seq]
+        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        # self.valid_seqs = [self.eval_seq]
 
-        # self.train_seqs = ['K00_5']
-        # self.valid_seqs = ['K00_6']
+        self.train_seqs = ['K00_5']
+        self.valid_seqs = ['K00_6']
 
         self.img_w = 312
         self.img_h = 96
@@ -162,7 +162,7 @@ class KITTIParams(Parameters):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting, not actually used
-            0: 0.1,
+            0: 0.5,
         }
         # error scale for covar loss, not really used,
         # but must be 1.0 for self.gaussian_pdf_loss = False
@@ -247,5 +247,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-# par = KITTIParams()
-par = EUROCParams()
+par = KITTIParams()
+# par = EUROCParams()
