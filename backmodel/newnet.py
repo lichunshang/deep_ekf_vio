@@ -5,7 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from params import par
 import torchvision.models as models
-from torchvision.models import ResNet18_Weights
+from torchvision.models import ResNet18_Weights, resnet18, swin_v2_b, Swin_V2_B_Weights
+from torchvision.models.optical_flow import raft_large, Raft_Large_Weights
 from .common import *
 
 def conv3x3(in_channels, out_channels, stride=1, 
@@ -179,13 +180,62 @@ class NewNet(nn.Module):
        
         return x
 
-class DepthNet(nn.Module):
+class vit(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = swin_v2_b(weights=Swin_V2_B_Weights.DEFAULT)
+        # self.model = resnet18(weights = ResNet18_Weights.DEFAULT)
+        # for param in self.model.parameters():
+        #     param.requires_grad = False
+        # num_ftrs = self.model.fc.in_features
+        # self.model.fc = nn.Linear(num_ftrs, 2048)
+    def forward(self,x):
+        x = self.model(x)
+        return x
+
+
+class RAFT(nn.Module):
     def __init__(self):
         super().__init__()
-        raise NotImplementedError
+        self.model = raft_large(weights=Raft_Large_Weights.DEFAULT)
+        for param in self.model.parameters():
+            param.requires_grad = False
     def forward(self, x):
-        raise NotImplementedError
+        x1 = x[:,0:3,:]
+        x2 = x[:,3:6,:]
+        res = self.model(x1,x2)
+        return res
+    
+class vit_reg(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        # self.extractor = vit()
+        # self.attention = AttentionBlock(in_channels=2000)
+        self.firstconv = conv(2, 3, 3, 1, 1, 1)
+        fcnum = 2000
+        fc1_trans = linear(fcnum, 128)
+        fc2_trans = linear(128,32)
+        fc3_trans = linear(32,3)
 
+        fc1_rot = linear(fcnum, 128)
+        fc2_rot = linear(128,32)
+        fc3_rot = linear(32,3)
+
+        fc1_covar_t = linear(fcnum, 128)
+        fc2_covar_t = linear(128,32)
+        fc3_covar_t = linear(32,6)
+        self.trans = nn.Sequential(fc1_trans, fc2_trans, fc3_trans)
+        self.rot = nn.Sequential(fc1_rot, fc2_rot, fc3_rot)
+        self.covar_t = nn.Sequential(fc1_covar_t, fc2_covar_t,fc3_covar_t)
+    def forward(self,x):
+        # x = self.attention(x)
+        # x = self.firstconv(x)
+        # x = self.extractor(x)
+        trans = self.trans(x)
+        rot = self.rot(x)
+        covar_t = self.covar_t(x)
+        out = torch.cat((trans,rot, covar_t), dim=1)
+        return out
 
 if __name__ == '__main__':
     feature_extractor = models.resnet18(weights=ResNet18_Weights.DEFAULT)

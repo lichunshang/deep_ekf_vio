@@ -71,7 +71,7 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 50
-        self.batch_size = 16
+        self.batch_size = 4
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -131,8 +131,8 @@ class KITTIParams(Parameters):
         self.train_seqs = ['K00_5']
         self.valid_seqs = ['K00_6']
 
-        self.img_w = 312
-        self.img_h = 96
+        self.img_w = 384
+        self.img_h = 128
         self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
