@@ -42,7 +42,7 @@ class Parameters(object):
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.seq_len = 5
+        self.seq_len = 7
         self.sample_times = 1
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
@@ -71,7 +71,7 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 50
-        self.batch_size = 4
+        self.batch_size = 64
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -93,7 +93,7 @@ class Parameters(object):
         })
         # Pretrain, Resume training
         # self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/ems_transposenet_7scenes_pretrained.pth')
-        self.pretrained_flownet = None
+        self.pretrained = None
         # self.pretrained_backbone = os.path.join(self.project_dir, './pretrained/efficientnet-b0.pth' )
         # Choice:
         # None
@@ -125,14 +125,14 @@ class KITTIParams(Parameters):
         self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
         self.eval_seq = 'K10'
 
-        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        # self.valid_seqs = [self.eval_seq]
+        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        self.valid_seqs = [self.eval_seq]
 
-        self.train_seqs = ['K00_5']
-        self.valid_seqs = ['K00_6']
+        # self.train_seqs = ['K00_7']
+        # self.valid_seqs = ['K07']
 
-        self.img_w = 384
-        self.img_h = 128
+        self.img_w = 320
+        self.img_h = 96
         self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
@@ -199,10 +199,10 @@ class EUROCParams(Parameters):
 
         # self.img_w = 256
         # self.img_h = 160
-        self.img_w = 312
+        self.img_w = 320
         self.img_h = 96
         self.img_means = (0,)
-        self.img_stds = (1,)
+        self.img_s.tds = (1,)
         self.minus_point_5 = True
 
         #

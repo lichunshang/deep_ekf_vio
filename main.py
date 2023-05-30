@@ -31,7 +31,7 @@ if not arg_parsed.run_eval_only:
     trainer.train(resume_model_path, resume_optimizer_path, arg_parsed.description)
     logger.print("Training took %.2fs" % (time.time() - start_t))
 
-for tag in ["valid", "train", "checkpoint"]:
+for tag in ["valid", "train", "checkpoint", "eval"]:
     seq_results_dir = gen_trajectory(os.path.join(results_dir, "saved_model.%s" % tag),
                                      par.valid_seqs + par.train_seqs, 5)
     plot_trajectory(seq_results_dir)

@@ -69,7 +69,7 @@ class _OnlineDatasetEvaluator(object):
 
 
 class _TrainAssistant(object):
-    def __init__(self, model, sx=1.0, sq=3.0):
+    def __init__(self, model):
         self.model = model
         self.num_train_iterations = 0
         self.num_val_iterations = 0
@@ -104,7 +104,8 @@ class _TrainAssistant(object):
             if np.any(s):
                 vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
 
-            loss = vis_meas_loss_invalid_imu + loss_vis_meas + 4 * loss_abs
+            # loss = vis_meas_loss_invalid_imu + loss_vis_meas + 4 * loss_abs
+            loss =  vis_meas_loss_invalid_imu + 10* loss_vis_meas + loss_abs
         elif par.enable_ekf:
             loss, _, _ = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
@@ -142,8 +143,8 @@ class _TrainAssistant(object):
             err_weighted_by_covar = torch.matmul(torch.matmul(err.transpose(-2, -1), vis_meas_covar.inverse()), err)
             loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
         else:
-            loss = (par.k1 * angle_loss + trans_loss)
-            # loss = ( angle_loss + par.k1 *trans_loss)
+            # loss = (par.k1 * angle_loss + trans_loss)
+            loss = ( angle_loss + par.k1 * trans_loss)
             # loss = angle_loss + trans_loss
 
         # log the loss
@@ -209,7 +210,7 @@ class _TrainAssistant(object):
 
         k3 = self.schedule(par.k3)
 
-        loss_abs = abs_trans_loss * par.k4 ** 2
+        loss_abs = (par.k2 * abs_angle_loss + abs_trans_loss) * par.k4 ** 2
         # loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
         # loss = k3 * loss_rel + (1 - k3) * loss_abs
         loss_vis_meas = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses)
@@ -325,14 +326,14 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     #     param.requires_grad = False
     # for param in e2e_vio_model.vo_module.regressor.extractor.parameters():
     #     param.requires_grad = False
-    # online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, 50)
+    online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, 50)
 
     # Load FlowNet weights pretrained with FlyingChairs
     # NOTE: the pretrained model assumes image rgb values in range [-0.5, 0.5]
-    if par.pretrained_flownet and not resume_model_path:
-        pretrained_w = torch.load(par.pretrained_flownet)
-        logger.print('Load FlowNet pretrained model')
-        # Use only conv-layer-part of FlowNet as CNN for DeepVO
+    if par.pretrained and not resume_model_path:
+        pretrained_w = torch.load(par.pretrained)
+        logger.print('Load pretrained model')
+
         vo_model_dict = e2e_vio_model.vo_module.state_dict()
         update_dict = {k: v for k, v in pretrained_w['state_dict'].items() if k in vo_model_dict}
         assert (len(update_dict) > 0)
@@ -418,8 +419,8 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
         logger.print('Epoch {}\ntrain loss mean: {}, std: {}\nvalid loss mean: {}, std: {}\n'.
                      format(epoch + 1, loss_mean, np.std(t_loss_list), loss_mean_valid, np.std(v_loss_list)))
 
-        # err_eval = online_evaluator.evaluate()
-        # logger.tensorboard.add_scalar("epoch/eval_loss", err_eval, epoch)
+        err_eval = online_evaluator.evaluate()
+        logger.tensorboard.add_scalar("epoch/eval_loss", err_eval, epoch)
 
         # Save model
         if (epoch + 1) % 5 == 0:
@@ -430,9 +431,9 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
         if loss_mean < min_loss_t:
             min_loss_t = loss_mean
             logger.log_training_state("train", epoch + 1, e2e_vio_model.state_dict())
-        # if err_eval < min_err_eval:
-        #     min_err_eval = err_eval
-        #     logger.log_training_state("eval", epoch + 1, e2e_vio_model.state_dict())
+        if err_eval < min_err_eval:
+            min_err_eval = err_eval
+            logger.log_training_state("eval", epoch + 1, e2e_vio_model.state_dict())
 
         logger.print("Latest saves:",
                      " ".join(["%s: %s" % (k, v) for k, v in logger.log_training_state_latest_epoch.items()]))
