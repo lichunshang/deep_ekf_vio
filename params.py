@@ -38,11 +38,11 @@ class Parameters(object):
         self.project_dir = "/mnt/data/teamAI/duy/deep_ekf_vio"
         self.data_dir = os.path.join(self.project_dir, "data")
         self.results_coll_dir = os.path.join(self.project_dir, "results")
-        self.pose_dir = os.path.join(self.data_dir, 'pose_GT')
+        self.pose_dir = self.data_dir
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.seq_len = 7
+        self.seq_len = 25
         self.sample_times = 1
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
@@ -71,7 +71,7 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 50
-        self.batch_size = 64
+        self.batch_size = 4
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -125,11 +125,12 @@ class KITTIParams(Parameters):
         self.all_seqs = self.wc(['K00_*', 'K01', 'K02_*', 'K04', 'K05_*', 'K06', 'K07', 'K08', 'K09', 'K10'])
         self.eval_seq = 'K10'
 
-        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        self.valid_seqs = [self.eval_seq]
 
-        # self.train_seqs = ['K00_7']
-        # self.valid_seqs = ['K07']
+        # self.valid_seqs = ['K01']
+        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
+
+        self.train_seqs = ['K04']
+        self.valid_seqs = ['K04']
 
         self.img_w = 320
         self.img_h = 96

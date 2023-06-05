@@ -44,7 +44,8 @@ class _OnlineDatasetEvaluator(object):
         start_time = time.time()
         seqs = sorted(list(self.dataloaders.keys()))
         for seq in seqs:
-            predicted_abs_poses, _, _ = gen_trajectory_rel_iter(self.model, self.dataloaders[seq], True)
+            # gt_abs_poses = np.load(os.path.join(par.pose_dir, seq,  "constants.npy"))
+            predicted_abs_poses, _, _ = gen_trajectory_rel_iter(self.model, self.dataloaders[seq])
             seq_err = self.error_calc.accumulate_error(seq, np.array(predicted_abs_poses))
             logger.print("%s: %.5f" % (seq, seq_err), end=" ")
         logger.print()
@@ -104,8 +105,8 @@ class _TrainAssistant(object):
             if np.any(s):
                 vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
 
-            # loss = vis_meas_loss_invalid_imu + loss_vis_meas + 4 * loss_abs
-            loss =  vis_meas_loss_invalid_imu + 10* loss_vis_meas + loss_abs
+            loss = vis_meas_loss_invalid_imu +  loss_vis_meas + 10*  loss_abs
+            # loss =  vis_meas_loss_invalid_imu + 10* loss_vis_meas + loss_abs
         elif par.enable_ekf:
             loss, _, _ = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
@@ -124,9 +125,9 @@ class _TrainAssistant(object):
         # angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
 
-        trans_loss = self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        trans_loss = self.loss_fn(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
                         # self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-        angle_loss = self.loss_fn1(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
+        angle_loss = self.loss_fn(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
                         # self.loss_fn1(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])) \
         # trans_loss = self.loss_fn1(predicted_rel_poses[:,:,3:6],gt_rel_poses[:,:,3:6])
 
@@ -143,8 +144,8 @@ class _TrainAssistant(object):
             err_weighted_by_covar = torch.matmul(torch.matmul(err.transpose(-2, -1), vis_meas_covar.inverse()), err)
             loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
         else:
-            # loss = (par.k1 * angle_loss + trans_loss)
-            loss = ( angle_loss + par.k1 * trans_loss)
+            loss = (par.k1 * angle_loss + trans_loss)
+            # loss = ( angle_loss + par.k1 * trans_loss)
             # loss = angle_loss + trans_loss
 
         # log the loss
@@ -320,10 +321,10 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     # Model
     e2e_vio_model = E2EVIO()
     e2e_vio_model = e2e_vio_model.cuda()
-    # for param in e2e_vio_model.parameters():
+    # for param in e2e_vio_model.vo_module.parameters():
     #     param.requires_grad = False
-    # for param in e2e_vio_model.vo_module.extractor.parameters():
-    #     param.requires_grad = False
+    # for param in e2e_vio_model.vo_module.extractor.model.parameters():
+    #     param.requires_grad = True
     # for param in e2e_vio_model.vo_module.regressor.extractor.parameters():
     #     param.requires_grad = False
     online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, 50)
@@ -363,7 +364,9 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     if resume_model_path:
         state_dict_update = logger.clean_state_dict_key(torch.load(resume_model_path))
         state_dict_update = {key: state_dict_update[key] for key in state_dict_update
-                             if key not in par.exclude_resume_weights}
+                             if key not in par.exclude_resume_weights
+                             and 'vo_module.extractor' not in key
+                             }
         state_dict = e2e_vio_model.state_dict()
         state_dict_update = {k: v for k, v in state_dict_update.items() if k in state_dict}
         state_dict.update(state_dict_update)

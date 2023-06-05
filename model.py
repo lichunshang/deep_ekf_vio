@@ -7,9 +7,9 @@ import time
 from params import par
 from torch.autograd import Variable
 from torch.nn.init import kaiming_normal_, orthogonal_
-from backmodel.newnet import  Reg, RAFT, PoseRegressor
-from torchvision.models import resnet18, ResNet18_Weights
+from backmodel.newnet import  Reg, RAFT
 from torchvision.models.optical_flow import raft_large, Raft_Large_Weights
+from backmodel.resnet import ResNet, BasicBlock
 
 def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
     if batchNorm:
@@ -269,7 +269,8 @@ class DeepVO(nn.Module):
         super(DeepVO, self).__init__()
 
         self.extractor = RAFT()
-        self.regressor = Reg(inputnum=8)
+        # self.extractor = ResNet(BasicBlock, [2, 2, 2, 2])
+        self.regressor = Reg(inputnum=2)
 
     def encode_image(self, x):
         # x: (batch, seq_len, channel, width, height)
@@ -282,11 +283,9 @@ class DeepVO(nn.Module):
         # CNN
         x = x.view(batch_size * seq_len, x.size(2), x.size(3), x.size(4))
         feat = self.extractor(x)[-1]
-        # x = torch.cat([feat,x], dim=1)
-        # feat1 = self.extractor(x[:,:3,:])
-        # feat2 = self.extractor(x[:,3:,:])
-        concat = torch.cat([feat,x[:,:3,:],x[:,3:,:]], dim=1)
-        x = self.regressor(concat)
+        # x = self.extractor(x)
+
+        x = self.regressor(feat)
         # x = self.regressor(torch.cat((feat1,feat2),dim=1))
         x = x.view(batch_size, seq_len, -1)
         return x

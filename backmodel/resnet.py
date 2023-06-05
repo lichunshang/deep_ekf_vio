@@ -173,7 +173,7 @@ class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=1000):
         self.inplanes = 64
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+        self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -182,8 +182,17 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+        self.deconv_with_bias = False
+        self.deconv_layers = self._make_deconv_layer(num_layers=3, num_filters=(256,256,256), num_kernels=(4,4,4))
+        self.final_layer = nn.Conv2d(
+            in_channels=256,
+            out_channels=12,
+            kernel_size=1,
+            stride=1,
+            padding=0
+        )
+        self.final_pooling = nn.AdaptiveAvgPool2d(1)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -210,6 +219,51 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
+   
+    def _make_deconv_layer(self, num_layers, num_filters, num_kernels):
+        assert num_layers == len(num_filters), \
+            'ERROR: num_deconv_layers is different len(num_deconv_filters)'
+        assert num_layers == len(num_kernels), \
+            'ERROR: num_deconv_layers is different len(num_deconv_filters)'
+
+        layers = []
+        for i in range(num_layers):
+            kernel, padding, output_padding = \
+                self._get_deconv_cfg(num_kernels[i], i)
+
+            planes = num_filters[i]
+            layers.append(
+                nn.ConvTranspose2d(
+                    in_channels=self.inplanes,
+                    out_channels=planes,
+                    kernel_size=kernel,
+                    stride=2,
+                    padding=padding,
+                    output_padding=output_padding,
+                    bias=self.deconv_with_bias))
+            layers.append(nn.BatchNorm2d(planes, momentum=0.1))
+            # layers.append(ChannelAttention(planes))
+            # layers.append(SpatialAttention())
+            layers.append(nn.ReLU(inplace=True))
+            self.inplanes = planes
+
+
+        return nn.Sequential(*layers)
+
+    def _get_deconv_cfg(self, deconv_kernel, index):
+        if deconv_kernel == 4:
+            padding = 1
+            output_padding = 0
+        elif deconv_kernel == 3:
+            padding = 1
+            output_padding = 1
+        elif deconv_kernel == 2:
+            padding = 0
+            output_padding = 0
+
+        return deconv_kernel, padding, output_padding
+    
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -221,11 +275,12 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
+        x = self.deconv_layers(x)
+        x = self.final_layer(x)
+        x = self.final_pooling(x)
+        # print(x.shape)
+        return x.squeeze()
 
-        return x
 
 
 def resnet18_cbam(pretrained=False, **kwargs):

@@ -32,6 +32,7 @@ def last_frame_from_segment_length(distances, first_frame, length):
 # written according to KITTI
 def calc_kitti_seq_errors(gt_poses, est_poses):
     assert (len(gt_poses) == len(est_poses))
+
     gt_poses = gt_poses.astype(np.float64)
     est_poses = est_poses.astype(np.float64)
     errors_div_length = []
