@@ -126,11 +126,11 @@ class KITTIParams(Parameters):
         self.eval_seq = 'K10'
 
 
-        # self.valid_seqs = ['K01']
-        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
+        self.valid_seqs = ['K01']
+        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
 
-        self.train_seqs = ['K04']
-        self.valid_seqs = ['K04']
+        # self.train_seqs = ['K07']
+        # self.valid_seqs = ['K04']
 
         self.img_w = 320
         self.img_h = 96

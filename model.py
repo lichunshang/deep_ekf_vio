@@ -286,7 +286,7 @@ class DeepVO(nn.Module):
         # x = self.extractor(x)
 
         x = self.regressor(feat)
-        # x = self.regressor(torch.cat((feat1,feat2),dim=1))
+        # x = self.regressor(torch.cat((feat,x[:,0:3,:]),dim=1))
         x = x.view(batch_size, seq_len, -1)
         return x
 

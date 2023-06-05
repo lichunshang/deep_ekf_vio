@@ -125,9 +125,9 @@ class _TrainAssistant(object):
         # angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
 
-        trans_loss = self.loss_fn(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        trans_loss = self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
                         # self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-        angle_loss = self.loss_fn(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
+        angle_loss = self.loss_fn1(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
                         # self.loss_fn1(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])) \
         # trans_loss = self.loss_fn1(predicted_rel_poses[:,:,3:6],gt_rel_poses[:,:,3:6])
 
@@ -366,6 +366,7 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
         state_dict_update = {key: state_dict_update[key] for key in state_dict_update
                              if key not in par.exclude_resume_weights
                              and 'vo_module.extractor' not in key
+                             and key != 'vo_module.regressor.conv1.weight'
                              }
         state_dict = e2e_vio_model.state_dict()
         state_dict_update = {k: v for k, v in state_dict_update.items() if k in state_dict}

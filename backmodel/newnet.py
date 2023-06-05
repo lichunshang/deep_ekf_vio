@@ -114,7 +114,7 @@ class Reg(nn.Module):
         self.inputnum = inputnum
 
         self.inplanes = 64
-        # self.deconv_with_bias = False
+        self.deconv_with_bias = False
         layers = [2,2,2,2]
         # layers = [3,4,6,3]
 
@@ -127,30 +127,16 @@ class Reg(nn.Module):
         self.layer2 = self._make_layer(BasicBlock, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(BasicBlock, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(BasicBlock, 512, layers[3], stride=2)
-        fcnum = 15360
-        fc1_trans = linear(fcnum, 128)
-        fc2_trans = linear(128,32)
-        fc3_trans = linear(32,3)
 
-        fc1_rot = linear(fcnum, 128)
-        fc2_rot = linear(128,32)
-        fc3_rot = linear(32,3)
-
-        fc1_covar = linear(fcnum, 128)
-        fc2_covar = linear(128,32)
-        fc3_covar = linear(32,6)
-        self.trans = nn.Sequential(fc1_trans, fc2_trans, fc3_trans)
-        self.rot = nn.Sequential(fc1_rot, fc2_rot, fc3_rot)
-        self.covar = nn.Sequential(fc1_covar, fc2_covar,fc3_covar)
-        # self.deconv_layers = self._make_deconv_layer(num_layers=3, num_filters=(256,256,256), num_kernels=(4,4,4))
-        # self.final_layer = nn.Conv2d(
-        #     in_channels=256,
-        #     out_channels=12,
-        #     kernel_size=1,
-        #     stride=1,
-        #     padding=0
-        # )
-        # self.final_pooling = nn.AdaptiveAvgPool2d(1)
+        self.deconv_layers = self._make_deconv_layer(num_layers=3, num_filters=(256,256,256), num_kernels=(4,4,4))
+        self.final_layer = nn.Conv2d(
+            in_channels=256,
+            out_channels=12,
+            kernel_size=1,
+            stride=1,
+            padding=0
+        )
+        self.final_pooling = nn.AdaptiveAvgPool2d(1)
 
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
@@ -222,24 +208,20 @@ class Reg(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = x.view(x.size(0),-1)
-        trans = self.trans(x)
-        rot = self.rot(x)
-        covar = self.covar(x)
-        x = torch.cat((trans,rot,covar), dim=1)
-        return x
-        # x = self.deconv_layers(x)
-        # x = self.final_layer(x)
-        # x = self.final_pooling(x)
-        # return x.squeeze()
+
+        x = self.deconv_layers(x)
+        x = self.final_layer(x)
+        x = self.final_pooling(x)
+        # print(x.shape)
+        return x.squeeze()
 
 class RAFT(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model = raft_large(weights=Raft_Large_Weights.DEFAULT)
-        # self.model = raft_small(weights = Raft_Small_Weights.DEFAULT)
-        for param in self.model.parameters():
-            param.requires_grad = False
+        # self.model = raft_large(weights=Raft_Large_Weights.DEFAULT)
+        self.model = raft_small(weights = Raft_Small_Weights.DEFAULT)
+        # for param in self.model.parameters():
+        #     param.requires_grad = False
     def forward(self, x):
         x1 = x[:,0:3,:]
         x2 = x[:,3:6,:]
