@@ -13,8 +13,8 @@ from log import logger
 from torch.utils.data import DataLoader
 from eval import EurocErrorCalc, KittiErrorCalc
 from eval.gen_trajectory import gen_trajectory_rel_iter, gen_trajectory_abs_iter
-from new_loss import *
-
+import torch.nn.functional as F
+from torch.optim.lr_scheduler import StepLR
 
 class _OnlineDatasetEvaluator(object):
     def __init__(self, model, sequences, eval_length):
@@ -105,8 +105,8 @@ class _TrainAssistant(object):
             if np.any(s):
                 vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
 
-            loss = vis_meas_loss_invalid_imu +  loss_vis_meas + 10*  loss_abs
-            # loss =  vis_meas_loss_invalid_imu + 10* loss_vis_meas + loss_abs
+            # loss = vis_meas_loss_invalid_imu + loss_vis_meas +  loss_abs
+            loss =  vis_meas_loss_invalid_imu +  loss_vis_meas + loss_abs
         elif par.enable_ekf:
             loss, _, _ = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
@@ -126,6 +126,7 @@ class _TrainAssistant(object):
         # trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
 
         trans_loss = self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        # trans_loss = self.sequence_loss(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
                         # self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
         angle_loss = self.loss_fn1(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
                         # self.loss_fn1(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])) \
@@ -211,7 +212,7 @@ class _TrainAssistant(object):
 
         k3 = self.schedule(par.k3)
 
-        loss_abs = (par.k2 * abs_angle_loss + abs_trans_loss) * par.k4 ** 2
+        loss_abs = (par.k2 *  abs_angle_loss + abs_trans_loss) * par.k4 ** 2
         # loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
         # loss = k3 * loss_rel + (1 - k3) * loss_abs
         loss_vis_meas = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses)
@@ -306,7 +307,7 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     convert_subseqs_list_to_panda(train_subseqs).to_pickle(os.path.join(par.results_dir, "train_df.pickle"))
     train_dataset = SubseqDataset(train_subseqs, (par.img_h, par.img_w), par.img_means,
                                   par.img_stds, par.minus_point_5)
-    train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=False, num_workers=par.n_processors,
+    train_dl = DataLoader(train_dataset, batch_size=par.batch_size, shuffle=True, num_workers=par.n_processors,
                           pin_memory=par.pin_mem, drop_last=False)
     logger.print('Number of samples in training dataset: %d' % len(train_subseqs))
 
@@ -360,13 +361,15 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
 
     optimizer = par.optimizer(optimizer_params, **par.optimizer_args)
 
+    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
+
     # Load trained DeepVO model and optimizer
     if resume_model_path:
         state_dict_update = logger.clean_state_dict_key(torch.load(resume_model_path))
         state_dict_update = {key: state_dict_update[key] for key in state_dict_update
                              if key not in par.exclude_resume_weights
                              and 'vo_module.extractor' not in key
-                             and key != 'vo_module.regressor.conv1.weight'
+                            #  and key != 'vo_module.regressor.conv1.weight'
                              }
         state_dict = e2e_vio_model.state_dict()
         state_dict_update = {k: v for k, v in state_dict_update.items() if k in state_dict}
@@ -425,6 +428,8 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
 
         err_eval = online_evaluator.evaluate()
         logger.tensorboard.add_scalar("epoch/eval_loss", err_eval, epoch)
+
+        scheduler.step()
 
         # Save model
         if (epoch + 1) % 5 == 0:

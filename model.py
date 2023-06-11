@@ -3,31 +3,9 @@ import torch.nn as nn
 import numpy as np
 import data_loader
 import torch_se3
-import time
 from params import par
-from torch.autograd import Variable
-from torch.nn.init import kaiming_normal_, orthogonal_
-from backmodel.newnet import  Reg, RAFT
-from torchvision.models.optical_flow import raft_large, Raft_Large_Weights
-from backmodel.resnet import ResNet, BasicBlock
-
-def conv(batchNorm, in_planes, out_planes, kernel_size=3, stride=1, dropout=0):
-    if batchNorm:
-        return nn.Sequential(
-                nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=(kernel_size - 1) // 2,
-                          bias=False),
-                nn.BatchNorm2d(out_planes),
-                nn.LeakyReLU(0.1, inplace=True),
-                nn.Dropout(dropout)  # , inplace=True)
-        )
-    else:
-        return nn.Sequential(
-                nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=(kernel_size - 1) // 2,
-                          bias=True),
-                nn.LeakyReLU(0.1, inplace=True),
-                nn.Dropout(dropout)  # , inplace=True)
-        )
-
+from backmodel.newnet import  Reg, RAFT, PoseRegressor, Res
+from backmodel.convrnn import ConvGRU
 
 class IMUKalmanFilter(nn.Module):
     STATE_VECTOR_DIM = 18
@@ -270,11 +248,11 @@ class DeepVO(nn.Module):
 
         self.extractor = RAFT()
         # self.extractor = ResNet(BasicBlock, [2, 2, 2, 2])
-        self.regressor = Reg(inputnum=2)
+        self.regressor = Res(inputnum=2)
+        # self.regressor = PoseRegressor(inputnum=2)
+
 
     def encode_image(self, x):
-        # x: (batch, seq_len, channel, width, height)
-
         # stack_image
         x = torch.cat((x[:, :-1], x[:, 1:]), dim=2)
         # print(x.shape)
@@ -287,7 +265,7 @@ class DeepVO(nn.Module):
 
         x = self.regressor(feat)
         # x = self.regressor(torch.cat((feat,x[:,0:3,:]),dim=1))
-        x = x.view(batch_size, seq_len, -1)
+        x = x.view(batch_size, seq_len, x.size(1), x.size(2), x.size(3))
         return x
 
     def weight_parameters(self):
@@ -300,8 +278,9 @@ class DeepVO(nn.Module):
 class E2EVIO(nn.Module):
     def __init__(self):
         super(E2EVIO, self).__init__()
-
+        self.regressor = PoseRegressor()
         self.vo_module = DeepVO(par.img_h, par.img_w, par.batch_norm)
+        self.gru_layer = ConvGRU(input_size=256, hidden_size=256, kernel_size=1, num_layers=1)
         self.imu_noise_covar_weights = torch.nn.Linear(1, 4, bias=False)
         if not par.train_imu_noise_covar:
             for p in self.imu_noise_covar_weights.parameters():
@@ -340,8 +319,9 @@ class E2EVIO(nn.Module):
         if prev_covar is None:
             prev_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
                                     par.init_covar_diag_eps).repeat(images.shape[0], 1, 1)
-
         features = self.vo_module.encode_image(images)
+        features = self.gru_layer(features)
+        features = self.regressor(features)
         num_timesteps = images.size(1) - 1  # equals to imu_data.size(1) - 1
 
         poses_over_timesteps = [prev_pose]

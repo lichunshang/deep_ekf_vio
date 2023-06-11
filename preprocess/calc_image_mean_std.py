@@ -28,7 +28,7 @@ def calc_image_mean_std(sequences):
     for i, path in enumerate(image_paths):
         print("Computing mean %d/%d (%.2f%%)" % (i + 1, len(image_paths), (i + 1) * 100 / len(image_paths)), end="\r")
         img = np.array(to_tensor(Image.open(path)))
-
+        print(img.shape)
         if par.minus_point_5:
             img = img - 0.5
 
@@ -59,3 +59,6 @@ def calc_image_mean_std(sequences):
 
     logger.print("Mean: [%f, %f, %f]" % (mean[0], mean[1], mean[2]))
     logger.print("Std: [%f, %f, %f]" % (std[0], std[1], std[2]))
+
+if __name__ =='__main__':
+    calc_image_mean_std(['V2_01'])
