@@ -5,7 +5,7 @@ from params import par
 import preprocess
 
 choices = ["gen_trajectory", "plot_trajectory", "plot_ekf_states", "np_traj_to_kitti", "kitti_eval", "calc_error",
-           "plot_error", "preprocess_kitti_raw", "preprocess_euroc", "check_time_discontinuities",
+           "plot_error", "preprocess_kitti_raw", "preprocess_euroc", "preprocess_tum", "check_time_discontinuities",
            "calc_image_mean_std", "euroc_eval"]
 
 top_level_arg_parser = argparse.ArgumentParser(description='Execute scripts')
@@ -95,6 +95,17 @@ elif top_level_arg_parsed.script == "preprocess_euroc":
                                  "used for inference time evaluation")
     arg_parsed = arg_parser.parse_args(args=args)
     preprocess.preprocess_euroc(arg_parsed.euroc_dir, arg_parsed.output_dir, arg_parsed.cam_still_range)
+
+elif top_level_arg_parsed.script == "preprocess_tum":
+    arg_parser = argparse.ArgumentParser(description='Preprocess TUM Data')
+    arg_parser.add_argument('tum_dir', type=str, help='TUM_dir')
+    arg_parser.add_argument('output_dir', type=str,
+                            help='Output directory, the name of the output dir is also the sequence name')
+    arg_parser.add_argument('cam_still_range', type=int, nargs=2,
+                            help="The portion of the sequence when the drone is not moving, "
+                                 "used for inference time evaluation")
+    arg_parsed = arg_parser.parse_args(args=args)
+    preprocess.preprocess_tum(arg_parsed.tum_dir, arg_parsed.output_dir, arg_parsed.cam_still_range)
 
 elif top_level_arg_parsed.script == "euroc_eval":
     arg_parser = argparse.ArgumentParser(description='Evaluate EUROC')

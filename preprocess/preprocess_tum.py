@@ -5,6 +5,7 @@ import transformations
 from data_loader import SequenceData
 import yaml
 from shutil import copyfile
+from preprocess.sync import *
 
 px = 0  # p_RS_R_x [m]
 py = 1  # p_RS_R_y [m]
@@ -16,12 +17,6 @@ qz = 6  # q_RS_z []
 vx = 7  # v_RS_R_x [m s^-1]
 vy = 8  # v_RS_R_y [m s^-1]
 vz = 9  # v_RS_R_z [m s^-1]
-bwx = 10  # b_w_RS_S_x [rad s^-1]
-bwy = 11  # b_w_RS_S_y [rad s^-1]
-bwz = 12  # b_w_RS_S_z [rad s^-1]
-bax = 13  # b_a_RS_S_x [m s^-2]
-bay = 14  # b_a_RS_S_y [m s^-2]
-baz = 15  # b_a_RS_S_z [m s^-2]
 
 wx = 0  # w_RS_S_x [rad s^-1]
 wy = 1  # w_RS_S_y [rad s^-1]
@@ -143,16 +138,19 @@ def find_initial_gravity(imu_timestamps, imu_data, gt_timestamps, gt_data, every
 
 def preprocess_tum(seq_dir, output_dir, cam_still_range):
     logger.initialize(working_dir=output_dir, use_tensorboard=False)
-    logger.print("================ PREPROCESS EUROC ================")
+    logger.print("================ PREPROCESS TUM ================")
     logger.print("Preprocessing %s" % seq_dir)
     logger.print("Output to: %s" % output_dir)
     logger.print("Camera still range [%d -> %d]" % (cam_still_range[0], cam_still_range[1]))
 
     left_cam_csv = open(os.path.join(seq_dir, 'cam0', 'data.csv'), 'r')
-    imu_csv = open(os.path.join(seq_dir, 'imu0', "data.csv"), 'r')
+    imu_csv = open(os.path.join('/mnt/data/teamAI/duy/data/TUM/dataset-corridor1_512_16/dso/' "gt_imu.csv"), 'r')
     gt_csv = open(os.path.join(seq_dir, "mocap0", "data.csv"), "r")
-    cam_sensor_yaml_config = yaml.load(open(os.path.join(seq_dir, "cam0", "sensor.yaml")))
-    T_cam_imu = np.linalg.inv(np.array(cam_sensor_yaml_config["T_BS"]["data"]).reshape(4, 4))
+    # cam_sensor_yaml_config = yaml.load(open(os.path.join(seq_dir, "cam0", "sensor.yaml")))
+    T_cam_imu = np.linalg.inv(np.array([-0.9995250378696743, 0.029615343885863205, -0.008522328211654736, 0.04727988224914392,\
+                               0.0075019185074052044, -0.03439736061393144, -0.9993800792498829, -0.047443232143367084,\
+                                -0.02989013031643309, -0.998969345370175, 0.03415885127385616, -0.0681999605066297,\
+                                0.0, 0.0, 0.0, 1.0]).reshape(4, 4))
     cam_timestamps = []
     imu_timestamps = []
     imu_data = []
@@ -178,12 +176,10 @@ def preprocess_tum(seq_dir, output_dir, cam_still_range):
     for line in gt_csv:
         line = line.split(",")
         timestamp = int(line[0])
-        data = [float(line[i + 1]) for i in range(0, 16)]
+        data = [float(line[i + 1]) for i in range(0, 7)]
         gt_timestamps.append(timestamp)
         gt_data.append(data)
 
-    cam_timestamps = cam_timestamps
-    imu_timestamps = imu_timestamps
     imu_data = np.array(imu_data)
     gt_timestamps = gt_timestamps
     gt_data = np.array(gt_data)
@@ -199,6 +195,8 @@ def preprocess_tum(seq_dir, output_dir, cam_still_range):
     imu_data_gt_aligned = imu_data[imu_gt_aligned_start_idx:imu_gt_aligned_start_idx + len(gt_timestamps)]
 
     gt_align_time_sync_diff = np.array(gt_timestamps) - np.array(imu_timestamps_gt_aligned)
+    print(np.array(gt_timestamps))
+    print(np.array(imu_timestamps_gt_aligned))
     assert np.all(np.abs(gt_align_time_sync_diff) < 1000), "timestamp out of sync by > 1 us"
 
     # first_cam_timestamp
@@ -283,3 +281,8 @@ def preprocess_tum(seq_dir, output_dir, cam_still_range):
     SequenceData.save_as_pd(data_frames, gravity_from_still, gyro_bias_from_still, T_cam_imu, eval_output_dir)
     copyfile(os.path.join(seq_dir, "state_groundtruth_estimate0", "data.csv"),
              os.path.join(eval_output_dir, "groundtruth.csv"))
+    
+
+
+    if __name__ == '__main':
+        preprocess_tum('/mnt/data/teamAI/duy/data/TUM//mnt/data/teamAI/duy/data/TUM/dataset-corridor1_512_16','/mnt/data/teamAI/duy/deep_ekf_vio/data', [0,40])

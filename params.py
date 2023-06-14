@@ -61,7 +61,7 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = False
+        self.enable_ekf = True 
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
@@ -70,7 +70,7 @@ class Parameters(object):
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
-        self.epochs = 50
+        self.epochs = 25
         self.batch_size = 32
         self.pin_mem = True
         self.cache_image = True
@@ -129,8 +129,8 @@ class KITTIParams(Parameters):
         self.valid_seqs = ['K10']
         self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
 
-        # self.train_seqs = ['K01']
-        # self.valid_seqs = ['K10']
+        # self.train_seqs = ['K04']
+        # self.valid_seqs = ['K04']
 
         self.img_w = 320
         self.img_h = 96
@@ -160,8 +160,8 @@ class KITTIParams(Parameters):
         self.vis_meas_covar_gamma = 1
 
         # -----------------------------------------
-        self.k1 = 500  # rel loss angle multiplier
-        self.k2 = 2500.  # abs loss angle multiplier
+        self.k1 = 100  # rel loss angle multiplier
+        self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting, not actually used
             0: 0.9,
         }
@@ -188,7 +188,7 @@ class EUROCParams(Parameters):
     def __init__(self):
         Parameters.__init__(self)
 
-        self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01", "V2_02"]
+        self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05', "V1_01", "V1_02", 'V1_03', "V2_01", "V2_02"]
         self.eval_seq = "V1_02"
 
         self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
@@ -237,7 +237,7 @@ class EUROCParams(Parameters):
         self.gaussian_pdf_loss = False
 
         self.data_aug_transforms = AttrDict({
-            "enable": True,
+            "enable": False,
             "lr_flip": True,
             "ud_flip": False,
             "lrud_flip": False,
@@ -248,5 +248,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-# par = KITTIParams()
-par = EUROCParams()
+par = KITTIParams()
+# par = EUROCParams()

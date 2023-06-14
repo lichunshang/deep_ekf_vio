@@ -15,6 +15,7 @@ from eval import EurocErrorCalc, KittiErrorCalc
 from eval.gen_trajectory import gen_trajectory_rel_iter, gen_trajectory_abs_iter
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import StepLR
+from new_loss import scale_pose
 
 class _OnlineDatasetEvaluator(object):
     def __init__(self, model, sequences, eval_length):
@@ -80,6 +81,7 @@ class _TrainAssistant(object):
         # self.criterion = torch.nn.L1Loss()
         self.loss_fn1 = torch.nn.L1Loss()
         self.loss_fn = torch.nn.MSELoss()
+        self.loss_h = torch.nn.HuberLoss()
 
     def get_loss(self, data):
         meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
@@ -106,7 +108,7 @@ class _TrainAssistant(object):
                 vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
 
             # loss = vis_meas_loss_invalid_imu + loss_vis_meas +  loss_abs
-            loss =  vis_meas_loss_invalid_imu +  loss_vis_meas + loss_abs
+            loss =  vis_meas_loss_invalid_imu + loss_vis_meas + loss_abs
         elif par.enable_ekf:
             loss, _, _ = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
@@ -125,10 +127,14 @@ class _TrainAssistant(object):
         # angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
 
-        trans_loss = self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        # trans_loss = self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
         # trans_loss = self.sequence_loss(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
                         # self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-        angle_loss = self.loss_fn1(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
+        gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
+        pred_trans_norm = torch.norm(predicted_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
+        pred_trans_scaled = predicted_rel_poses[:, :, 3:6]/ pred_trans_norm * gt_trans_norm
+        trans_loss = self.loss_h(pred_trans_scaled, gt_rel_poses[:,:,3:6])
+        angle_loss = self.loss_h(predicted_rel_poses[:,:,0:3],gt_rel_poses[:, :, 0:3])
                         # self.loss_fn1(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])) \
         # trans_loss = self.loss_fn1(predicted_rel_poses[:,:,3:6],gt_rel_poses[:,:,3:6])
 
@@ -187,6 +193,8 @@ class _TrainAssistant(object):
         return loss
 
     def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses, vis_meas, vis_meas_covar):
+        est_poses = scale_pose(est_poses,gt_poses).to(device=gt_poses.device)
+        # print(est_poses)
         abs_errors = torch.matmul(est_poses[:, 1:], gt_poses[:, 1:])
         length_div = torch.arange(start=1, end=abs_errors.size(1) + 1, device=abs_errors.device,
                                   dtype=torch.float32).view(1, -1, 1)
@@ -268,6 +276,8 @@ class _TrainAssistant(object):
             add_scalar("imu_noise_diag/ba_z", imu_noise_covar[11], iterations)
             add_scalar("params/k3", k3, iterations)
         return loss, loss_abs, loss_vis_meas
+
+    
 
     def step(self, data, optimizer):
         optimizer.zero_grad()
@@ -369,7 +379,7 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
         state_dict_update = {key: state_dict_update[key] for key in state_dict_update
                              if key not in par.exclude_resume_weights
                              and 'vo_module.extractor' not in key
-                            #  and key != 'vo_module.regressor.conv1.weight'
+                            #  and key != 'vo_module.regressor.firstconv.0.0.weight'
                              }
         state_dict = e2e_vio_model.state_dict()
         state_dict_update = {k: v for k, v in state_dict_update.items() if k in state_dict}

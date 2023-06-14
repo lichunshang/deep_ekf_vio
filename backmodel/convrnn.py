@@ -36,7 +36,7 @@ class ConvGRUCell(nn.Module):
 
 class ConvGRU(nn.Module):
     ''' Initialize a multi-layer Conv GRU '''
-    def __init__(self, input_size, hidden_size, kernel_size, num_layers, dropout=0.1):
+    def __init__(self, input_size, hidden_size, kernel_size, num_layers, dropout=0.2):
         super(ConvGRU, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size

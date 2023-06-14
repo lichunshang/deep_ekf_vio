@@ -8,7 +8,6 @@ import torchvision.models as models
 from torchvision.models import ResNet18_Weights, resnet18, swin_v2_b, Swin_V2_B_Weights
 from torchvision.models.optical_flow import raft_large, Raft_Large_Weights, raft_small, Raft_Small_Weights
 from .common import *
-from backmodel.resnet import resnet18_cbam, ChannelAttention, SpatialAttention, LargeKernelAttn
 
 def conv3x3(in_channels, out_channels, stride=1, 
             padding=1, bias=True, groups=1):    
@@ -280,12 +279,14 @@ class BasicBlock1(nn.Module):
 
         return F.relu(out, inplace=True)
 
+
+
 class Res(nn.Module):
     def __init__(self, inputnum=2):
         super(Res, self).__init__()
 
-        blocknums = [2,2,3,4,6,7,3]
-        outputnums = [32,64,64,128,128,256,256]
+        blocknums = [3,4,6,7,3]
+        outputnums = [64,128,128,256,256]
 
         self.firstconv = nn.Sequential(conv(inputnum, 32, 3, 2, 1, 1, False),
                                        conv(32, 32, 3, 1, 1, 1),
@@ -293,11 +294,11 @@ class Res(nn.Module):
 
         self.inplanes = 32
 
-        self.layer1 = self._make_layer(BasicBlock1, outputnums[2], blocknums[2], 2, 1, 1) # 40 x 28
-        self.layer2 = self._make_layer(BasicBlock1, outputnums[3], blocknums[3], 2, 1, 1) # 20 x 14
-        self.layer3 = self._make_layer(BasicBlock1, outputnums[4], blocknums[4], 2, 1, 1) # 10 x 7
-        self.layer4 = self._make_layer(BasicBlock1, outputnums[5], blocknums[5], 2, 1, 1) # 5 x 4
-        self.layer5 = self._make_layer(BasicBlock1, outputnums[6], blocknums[6], 2, 1, 1) # 3 x 2
+        self.layer1 = self._make_layer(BasicBlock1, outputnums[0], blocknums[0], 2, 1, 1) # 40 x 28
+        self.layer2 = self._make_layer(BasicBlock1, outputnums[1], blocknums[1], 2, 1, 1) # 20 x 14
+        self.layer3 = self._make_layer(BasicBlock1, outputnums[2], blocknums[2], 2, 1, 1) # 10 x 7
+        self.layer4 = self._make_layer(BasicBlock1, outputnums[3], blocknums[3], 2, 1, 1) # 5 x 4
+        self.layer5 = self._make_layer(BasicBlock1, outputnums[4], blocknums[4], 2, 1, 1) # 3 x 2
         
         
     def _make_layer(self, block, planes, blocks, stride, pad, dilation):
@@ -326,7 +327,7 @@ class Res(nn.Module):
 class PoseRegressor(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        fcnum = 256 * 12
+        fcnum = 256 * 10
 
         fc1_trans = linear(fcnum, 128)
         fc2_trans = linear(128,32)

@@ -280,7 +280,7 @@ class E2EVIO(nn.Module):
         super(E2EVIO, self).__init__()
         self.regressor = PoseRegressor()
         self.vo_module = DeepVO(par.img_h, par.img_w, par.batch_norm)
-        self.gru_layer = ConvGRU(input_size=256, hidden_size=256, kernel_size=1, num_layers=1)
+        # self.gru_layer = ConvGRU(input_size=256, hidden_size=256, kernel_size=1, num_layers=1)
         self.imu_noise_covar_weights = torch.nn.Linear(1, 4, bias=False)
         if not par.train_imu_noise_covar:
             for p in self.imu_noise_covar_weights.parameters():
@@ -320,7 +320,7 @@ class E2EVIO(nn.Module):
             prev_covar = torch.diag(self.init_covar_diag_sqrt * self.init_covar_diag_sqrt +
                                     par.init_covar_diag_eps).repeat(images.shape[0], 1, 1)
         features = self.vo_module.encode_image(images)
-        features = self.gru_layer(features)
+        # features = self.gru_layer(features)
         features = self.regressor(features)
         num_timesteps = images.size(1) - 1  # equals to imu_data.size(1) - 1
 
