@@ -132,8 +132,8 @@ class _TrainAssistant(object):
                         # self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
         gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
         pred_trans_norm = torch.norm(predicted_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
-        pred_trans_scaled = predicted_rel_poses[:, :, 3:6]/ pred_trans_norm * gt_trans_norm
-        trans_loss = self.loss_h(pred_trans_scaled, gt_rel_poses[:,:,3:6])
+        pred_trans_scaled = predicted_rel_poses[:, :, 3:6]/ pred_trans_norm
+        trans_loss = self.loss_h(pred_trans_scaled, gt_rel_poses[:,:,3:6]/ gt_trans_norm)
         angle_loss = self.loss_h(predicted_rel_poses[:,:,0:3],gt_rel_poses[:, :, 0:3])
                         # self.loss_fn1(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])) \
         # trans_loss = self.loss_fn1(predicted_rel_poses[:,:,3:6],gt_rel_poses[:,:,3:6])
@@ -151,7 +151,7 @@ class _TrainAssistant(object):
             err_weighted_by_covar = torch.matmul(torch.matmul(err.transpose(-2, -1), vis_meas_covar.inverse()), err)
             loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
         else:
-            loss = (par.k1 * angle_loss + trans_loss)
+            loss = (par.k1 * angle_loss + 100* trans_loss)
             # loss = ( angle_loss + par.k1 * trans_loss)
             # loss = angle_loss + trans_loss
 
@@ -220,7 +220,7 @@ class _TrainAssistant(object):
 
         k3 = self.schedule(par.k3)
 
-        loss_abs = (par.k2 *  abs_angle_loss + abs_trans_loss) * par.k4 ** 2
+        loss_abs = (par.k2 *  abs_angle_loss + 100* abs_trans_loss) * par.k4 ** 2
         # loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
         # loss = k3 * loss_rel + (1 - k3) * loss_abs
         loss_vis_meas = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses)

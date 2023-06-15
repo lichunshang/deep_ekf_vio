@@ -61,7 +61,7 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = True 
+        self.enable_ekf = False
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
