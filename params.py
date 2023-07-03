@@ -42,7 +42,7 @@ class Parameters(object):
         self.results_dir = os.path.join(self.results_coll_dir,
                                         "train" + "_%s" % self.timestamp.strftime('%Y%m%d-%H-%M-%S'))
 
-        self.seq_len = 10
+        
         self.sample_times = 1
 
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
@@ -61,7 +61,7 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = False
+        self.enable_ekf = True
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
@@ -70,15 +70,15 @@ class Parameters(object):
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
-        self.epochs = 25
-        self.batch_size = 32
+        self.epochs = 50
+        
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
         self.optimizer_args = {'lr': 1e-3}
         self.param_specific_lr = {
-            "init_covar_diag_sqrt": 2*1e-1,
-            "imu_noise_covar_weights.*": 2*1e-1
+            "init_covar_diag_sqrt": 1e-1,
+            "imu_noise_covar_weights.*": 1e-1
         }
 
         # data augmentation
@@ -93,12 +93,14 @@ class Parameters(object):
         })
         # Pretrain, Resume training
         # self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/ems_transposenet_7scenes_pretrained.pth')
-        self.pretrained = None
-        # self.pretrained_backbone = os.path.join(self.project_dir, './pretrained/efficientnet-b0.pth' )
+        self.pretrained = '/mnt/data/teamAI/duy/deep_ekf_vio/pretrained/gmflow_chairs-1d776046.pth'
+
+        # self.pretrained = None
         # Choice:
         # None
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
         # './pretrained/flownets_EPE1.951.pth.tar'
+        self.enable_eval = True
 
     def wc(self, seqs):
         available_seqs = [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
@@ -128,12 +130,14 @@ class KITTIParams(Parameters):
 
         self.valid_seqs = ['K10']
         self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
-
-        # self.train_seqs = ['K04']
-        # self.valid_seqs = ['K04']
+    
+        # self.train_seqs = ['K07']
+        # self.valid_seqs = ['K07']
 
         self.img_w = 320
         self.img_h = 96
+        self.batch_size = 8
+        self.seq_len = 8
         self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
@@ -163,7 +167,7 @@ class KITTIParams(Parameters):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting, not actually used
-            0: 0.9,
+            0: 0.5,
         }
         # error scale for covar loss, not really used,
         # but must be 1.0 for self.gaussian_pdf_loss = False
@@ -192,21 +196,26 @@ class EUROCParams(Parameters):
         self.eval_seq = "V1_02"
 
         self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
         # self.train_seqs = ['V2_01']
         self.valid_seqs = [self.eval_seq]
 
-        # self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
+        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
         # self.valid_seqs = ['MH_05', "V1_03", "V2_02"]
+        self.valid_seqs = ['MH_05']
 
         self.img_w = 256
         self.img_h = 160
+
+        self.batch_size = 16
+        self.seq_len = 10
         # self.img_w = 320
         # self.img_h = 96
         self.img_means = (0,)
         self.img_stds = (1,)
         self.minus_point_5 = True
 
-        #
+        
         self.init_covar_diag_sqrt = np.array([1e-1, 1e-1, 1e-1,  # g
                                               0, 0, 0, 0, 0, 0,  # C, r
                                               1e-2, 1e-2, 1e-2,  # v
@@ -241,7 +250,7 @@ class EUROCParams(Parameters):
             "lr_flip": True,
             "ud_flip": False,
             "lrud_flip": False,
-            "reverse": True,
+            "reverse": False,
         })
 
     def dataset(self):

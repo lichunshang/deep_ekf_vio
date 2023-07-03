@@ -85,9 +85,9 @@ class _TrainAssistant(object):
 
     def get_loss(self, data):
         meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
+        # print(gt_rel_poses[0],)
 
         _, _, _, _, _, invalid_imu_list = SubseqDataset.decode_batch_meta_info(meta_data)
-
         vis_meas, vis_meas_covar, poses, ekf_states, ekf_covars = \
             self.model.forward(images.cuda(),
                                imu_data.cuda(),
@@ -127,18 +127,15 @@ class _TrainAssistant(object):
         # angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
 
-        # trans_loss = self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-        # trans_loss = self.sequence_loss(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
-                        # self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-        gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
-        pred_trans_norm = torch.norm(predicted_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
-        pred_trans_scaled = predicted_rel_poses[:, :, 3:6]/ pred_trans_norm
-        trans_loss = self.loss_h(pred_trans_scaled, gt_rel_poses[:,:,3:6]/ gt_trans_norm)
-        angle_loss = self.loss_h(predicted_rel_poses[:,:,0:3],gt_rel_poses[:, :, 0:3])
-                        # self.loss_fn1(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])) \
-        # trans_loss = self.loss_fn1(predicted_rel_poses[:,:,3:6],gt_rel_poses[:,:,3:6])
+        trans_loss = self.loss_h(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
 
-        # angle_loss = self.loss_fn1(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
+        # gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
+        # pred_trans_norm = torch.norm(predicted_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
+        # pred_trans_scaled = predicted_rel_poses[:, :, 3:6]* gt_trans_norm
+        # trans_loss = self.loss_h(pred_trans_scaled, gt_rel_poses[:,:,3:6])
+        # angle_loss = self.loss_h(predicted_rel_poses[:,:,0:3],gt_rel_poses[:, :, 0:3])
+
+        angle_loss = self.loss_h(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # covar_loss = torch.mean(vis_meas_covar)
 
         if par.gaussian_pdf_loss:
@@ -151,7 +148,7 @@ class _TrainAssistant(object):
             err_weighted_by_covar = torch.matmul(torch.matmul(err.transpose(-2, -1), vis_meas_covar.inverse()), err)
             loss = torch.mean(log_Q_norm + torch.squeeze(err_weighted_by_covar))
         else:
-            loss = (par.k1 * angle_loss + 100* trans_loss)
+            loss = (par.k1 * angle_loss + trans_loss)
             # loss = ( angle_loss + par.k1 * trans_loss)
             # loss = angle_loss + trans_loss
 
@@ -193,7 +190,6 @@ class _TrainAssistant(object):
         return loss
 
     def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses, vis_meas, vis_meas_covar):
-        est_poses = scale_pose(est_poses,gt_poses).to(device=gt_poses.device)
         # print(est_poses)
         abs_errors = torch.matmul(est_poses[:, 1:], gt_poses[:, 1:])
         length_div = torch.arange(start=1, end=abs_errors.size(1) + 1, device=abs_errors.device,
@@ -220,7 +216,7 @@ class _TrainAssistant(object):
 
         k3 = self.schedule(par.k3)
 
-        loss_abs = (par.k2 *  abs_angle_loss + 100* abs_trans_loss) * par.k4 ** 2
+        loss_abs = (par.k2 *  abs_angle_loss + abs_trans_loss) * par.k4 ** 2
         # loss_rel = (par.k1 * rel_angle_loss + rel_trans_loss)
         # loss = k3 * loss_rel + (1 - k3) * loss_abs
         loss_vis_meas = self.vis_meas_loss(vis_meas, vis_meas_covar, gt_rel_poses)
@@ -346,11 +342,11 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
         pretrained_w = torch.load(par.pretrained)
         logger.print('Load pretrained model')
 
-        vo_model_dict = e2e_vio_model.vo_module.state_dict()
-        update_dict = {k: v for k, v in pretrained_w['state_dict'].items() if k in vo_model_dict}
+        vo_model_dict = e2e_vio_model.vo_module.extractor.state_dict()
+        update_dict = {k: v for k, v in pretrained_w['model'].items() if k in vo_model_dict}
         assert (len(update_dict) > 0)
         vo_model_dict.update(update_dict)
-        e2e_vio_model.vo_module.load_state_dict(vo_model_dict)
+        e2e_vio_model.vo_module.extractor.load_state_dict(vo_model_dict)
 
     # Create optimizer
     logger.print("Optimizing on parameters:")
@@ -371,15 +367,16 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
 
     optimizer = par.optimizer(optimizer_params, **par.optimizer_args)
 
-    scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
+    # scheduler = StepLR(optimizer, step_size=20, gamma=0.1)
 
     # Load trained DeepVO model and optimizer
     if resume_model_path:
         state_dict_update = logger.clean_state_dict_key(torch.load(resume_model_path))
         state_dict_update = {key: state_dict_update[key] for key in state_dict_update
                              if key not in par.exclude_resume_weights
-                             and 'vo_module.extractor' not in key
-                            #  and key != 'vo_module.regressor.firstconv.0.0.weight'
+                            #  and 'vo_module.extractor' not in key
+                            #  and key != 'vo_module.regressor.reconv.0.0.weight'
+                            #  and key != 'vo_module.regressor.reconv.1.0.weight'
                              }
         state_dict = e2e_vio_model.state_dict()
         state_dict_update = {k: v for k, v in state_dict_update.items() if k in state_dict}
@@ -439,7 +436,7 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
         err_eval = online_evaluator.evaluate()
         logger.tensorboard.add_scalar("epoch/eval_loss", err_eval, epoch)
 
-        scheduler.step()
+        # scheduler.step()
 
         # Save model
         if (epoch + 1) % 5 == 0:

@@ -20,7 +20,7 @@ def gen_trajectory_rel_iter(model, dataloader, initial_pose=np.eye(4, 4)):
 
         # images = data[1].cuda()
         meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
-        gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2).cpu()
+        # gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2).cpu()
         # lstm_states = lstm_states if prop_lstm_states else None
         # we only care about the results from the VO front ends here
         vis_meas, vis_meas_covar,  _, _, _ = model.forward(images.cuda(),
@@ -29,12 +29,12 @@ def gen_trajectory_rel_iter(model, dataloader, initial_pose=np.eye(4, 4)):
                                                                        prev_state.cuda(), None,
                                                                        T_imu_cam.cuda())
         # lstm_states = lstm_states.detach()
-        vis_meas = vis_meas.cpu()
-        vis_meas_rot = vis_meas[:,:,:3]
+        vis_meas = vis_meas.detach().cpu().numpy()
+        # vis_meas_rot = vis_meas[:,:,:3]
         
-        vis_meas_trans_norm = torch.norm(vis_meas[:,:,3:], dim=2).unsqueeze(2).detach().cpu()
-        vis_meas_trans = vis_meas[:,:,3:]/vis_meas_trans_norm * gt_trans_norm
-        vis_meas = torch.cat((vis_meas_rot, vis_meas_trans), dim=2).detach().cpu().numpy()
+        # vis_meas_trans_norm = torch.norm(vis_meas[:,:,3:], dim=2).unsqueeze(2).detach().cpu()
+        # vis_meas_trans = vis_meas[:,:,3:]* gt_trans_norm
+        # vis_meas = torch.cat((vis_meas_rot, vis_meas_trans), dim=2).detach().cpu().numpy()
         vis_meas_covar = vis_meas_covar.detach().cpu().numpy()
 
         for i, rel_pose in enumerate(vis_meas[-1]):  # select the only batch
@@ -73,30 +73,32 @@ def gen_trajectory_abs_iter(model, dataloaders):
         imu_data = torch.stack([torch.squeeze(d[2], 0) for d in data_list]).cuda()
         T_imu_cam = torch.stack([torch.squeeze(d[4], 0) for d in data_list]).cuda()
         gt_poses = torch.stack([torch.squeeze(d[5], 0) for d in data_list]).cuda()
-        gt_rel_poses = torch.stack([torch.squeeze(d[6], 0) for d in data_list]).cuda()
-        gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
+        # gt_rel_poses = torch.stack([torch.squeeze(d[6], 0) for d in data_list]).cuda()
+        # gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
         # use returned states for all iterations after the first
         if i > 0:
             prev_pose = torch.stack([torch.tensor(est_poses_dict[k][-1]) for k in data_keys]).cuda()
             prev_state = torch.stack([torch.tensor(est_states_dict[k][-1]) for k in data_keys]).cuda()
             prev_covar = torch.stack([torch.tensor(est_covars_dict[k][-1]) for k in data_keys]).cuda()
-            # lstm_states = torch.stack([lstm_states_dict[k] for k in data_keys])
+            # prev_vis_meas = torch.stack([torch.tensor(est_vis_meas_dict[k][-1]) for k in data_keys]).cuda()
+            # prev_vis_meas_covar = torch.stack([torch.tensor(vis_meas_covar_dict[k][-1]) for k in data_keys]).cuda()
         else:
-            prev_pose = torch.stack([torch.squeeze(d[5], 0) for d in data_list])[:, 0].inverse().cuda()
+            prev_pose = gt_poses[:, 0].inverse().cuda()
             prev_state = torch.stack([torch.squeeze(d[3], 0) for d in data_list]).cuda()
             prev_covar = None
+            # prev_vis_meas = torch.stack([torch.squeeze(d[6], 0) for d in data_list])[:, 0].cuda()
+            # prev_vis_meas_covar = None
             # lstm_states = None
 
         vis_meas, vis_meas_covar, est_poses, est_ekf_states, est_ekf_covars = \
             model.forward(images, imu_data,  prev_pose, prev_state, prev_covar, T_imu_cam)
 
-        est_poses = scale_pose(est_poses, gt_poses)
 
-        vis_meas_rot = vis_meas[:,:,:3]
+        # vis_meas_rot = vis_meas[:,:,:3]
         
-        vis_meas_trans_norm = torch.norm(vis_meas[:,:,3:], dim=2).unsqueeze(2)
-        vis_meas_trans = vis_meas[:,:,3:]/vis_meas_trans_norm * gt_trans_norm
-        vis_meas = torch.cat((vis_meas_rot, vis_meas_trans), dim=2)
+        # vis_meas_trans_norm = torch.norm(vis_meas[:,:,3:], dim=2).unsqueeze(2)
+        # vis_meas_trans = vis_meas[:,:,3:]/vis_meas_trans_norm * gt_trans_norm
+        # vis_meas = torch.cat((vis_meas_rot, vis_meas_trans), dim=2)
 
         for j, k in enumerate(data):
             # if it is the first estimate, include the initial pose as well, otherwise just 1: onwards

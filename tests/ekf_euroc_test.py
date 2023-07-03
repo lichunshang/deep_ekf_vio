@@ -56,7 +56,7 @@ class Test_EKF_EUROC(unittest.TestCase):
                 gt_rel_poses = gt_rel_poses.view(1, 1, 6, 1)
 
                 if i == 0:
-                    pose, ekf_state, ekf_covar = ekf.forward(imu_data, imu_covar, gt_poses_inv[:, 0], init_state,
+                    pose, ekf_state, ekf_covar = ekf.forward(imu_data, imu_covar, gt_poses_inv[:, 0].inverse(), init_state,
                                                              init_covar,
                                                              gt_rel_poses, vis_meas_covar,
                                                              torch.eye(4, 4).view(1, 4, 4))
