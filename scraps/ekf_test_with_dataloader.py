@@ -27,24 +27,24 @@ for i in range(0, 1):
     data = next(train_dl_iter)
     meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
 
-    gt_rel_poses = np.array(gt_rel_poses.squeeze())
-    gt_poses = np.array(gt_poses.squeeze())
-    gt_rel_mat = []
-    predicted_abs_poses = [gt_poses[0]]
-    for i, rel_pose in enumerate(gt_rel_poses):
-        gt_rel_mat.append(euler_to_matrix_np(rel_pose))
-        T_vkm1_vk = se3.T_from_Ct(se3.exp_SO3(rel_pose[0:3]/np.linalg.norm(rel_pose[0:3])), rel_pose[3:6])
-        T_i_vk = predicted_abs_poses[i].dot(T_vkm1_vk)
-        se3.log_SO3(T_i_vk[0:3, 0:3])  # just here to check for warnings
-        predicted_abs_poses.append(T_i_vk)
+    # gt_rel_poses = np.array(gt_rel_poses.squeeze())
+    # gt_poses = np.array(gt_poses.squeeze())
+    # gt_rel_mat = []
+    # predicted_abs_poses = [gt_poses[0]]
+    # for i, rel_pose in enumerate(gt_rel_poses):
+    #     gt_rel_mat.append(euler_to_matrix_np(rel_pose))
+    #     T_vkm1_vk = se3.T_from_Ct(se3.exp_SO3(rel_pose[0:3]/np.linalg.norm(rel_pose[0:3])), rel_pose[3:6])
+    #     T_i_vk = predicted_abs_poses[i].dot(T_vkm1_vk)
+    #     se3.log_SO3(T_i_vk[0:3, 0:3])  # just here to check for warnings
+    #     predicted_abs_poses.append(T_i_vk)
 
     # pose02 = np.matmul(gt_rel_mat[0],gt_rel_mat[1])
     # pose02_euler = matrix_to_euler(pose02)
     # T_vkm1_vk = se3.T_from_Ct(se3.exp_SO3(pose02_euler[0:3]), pose02_euler[3:6])
     # T_i_vk = predicted_abs_poses[0].dot(T_vkm1_vk)
-    print(gt_poses[1] - predicted_abs_poses[1])
+    # print(gt_poses[1] - predicted_abs_poses[1])
 
-    print('===')
+    # print('===')
 
 
 

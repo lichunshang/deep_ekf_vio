@@ -7,8 +7,6 @@ from params import par
 import torchvision.models as models
 from torchvision.models import ResNet18_Weights, resnet18, swin_b, Swin_B_Weights
 from torchvision.models.optical_flow import raft_large, Raft_Large_Weights, raft_small, Raft_Small_Weights
-from .common import *
-from backmodel.gmflow.transformer import FeatureFlowAttention
 
 def conv3x3(in_channels, out_channels, stride=1, 
             padding=1, bias=True, groups=1):    
@@ -188,7 +186,6 @@ class Res(nn.Module):
 
         # self.reconv = nn.Sequential(conv(256, 128 ,3,1,1,1), #Hard code
         #                             conv(128, 128 ,3, 1, 1, 1))
-        self.flow_attn = FeatureFlowAttention(in_channels=128)
         self.inplanes = 32
 
         self.layer1 = self._make_layer(BasicBlock1, outputnums[0], blocknums[0], 2, 1, 1) # 40 x 28
@@ -211,12 +208,10 @@ class Res(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self,x, feat1):
+    def forward(self,x):
         x = self.firstconv(x)
         x = self.layer1(x)
         x = self.layer2(x)
-        # x = torch.cat((x, feat1), dim=1)
-        x = self.flow_attn(feat1, x, )
         x = self.layer3(x)
         x = self.layer4(x)
         x = self.layer5(x)
@@ -225,7 +220,7 @@ class Res(nn.Module):
 class PoseRegressor(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        fcnum = 2560 
+        fcnum = 1280
 
         fc1_trans = linear(fcnum, 128)
         fc2_trans = linear(128,32)

@@ -11,7 +11,7 @@ np.set_printoptions(linewidth=1024)
 np.random.seed(0)
 torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.benchmark = False
 
 
 class AttrDict(dict):
@@ -44,11 +44,11 @@ class Parameters(object):
 
         
         self.sample_times = 1
-
+        self.iters = 12
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
 
         # VO Model parameters
-        self.fix_vo_weights = False
+        self.fix_vo_weights = True
 
         self.hybrid_recurrency = False
         self.rnn_hidden_size = 1000
@@ -65,8 +65,8 @@ class Parameters(object):
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
-        self.train_init_covar = False
-        self.train_imu_noise_covar = False
+        self.train_init_covar = True
+        self.train_imu_noise_covar = True
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
@@ -92,8 +92,8 @@ class Parameters(object):
             }
         })
         # Pretrain, Resume training
-        # self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/ems_transposenet_7scenes_pretrained.pth')
-        self.pretrained = '/mnt/data/teamAI/duy/deep_ekf_vio/pretrained/gmflow_chairs-1d776046.pth'
+
+        self.pretrained = '/mnt/data/teamAI/duy/deep_ekf_vio/pretrained/raft-kitti.pth'
 
         # self.pretrained = None
         # Choice:
@@ -135,25 +135,27 @@ class KITTIParams(Parameters):
         # self.valid_seqs = ['K07']
 
         self.img_w = 320
-        self.img_h = 96
-        self.batch_size = 8
-        self.seq_len = 8
+        self.img_h = 128
+        self.batch_size = 32
+        self.seq_len = 10
         self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
 
         #
-        self.init_covar_diag_sqrt = np.array([1e-4, 1e-4, 1e-4,  # g
+        self.init_covar_diag_sqrt = np.array([1e-1, 1e-1, 1e-1,  # g
                                               0, 0, 0, 0, 0, 0,  # C, r
                                               1e-2, 1e-2, 1e-2,  # v
-                                              1e-8, 1e-8, 1e-8,  # bw
-                                              1e-1, 1e-1, 1e-1])  # ba
+                                              1e-1, 1e-1, 1e-1,  # bw
+                                              1e1, 1e1, 1e1,
+                                              5e0  # lambd
+                                              ])
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag = np.array([1e-7,  # w
-                                              1e-7,  # bw
-                                              1e-2,  # a
-                                              1e-3])  # ba
+        self.imu_noise_covar_diag = np.array([1e-3,  # w
+                                              1e-5,  # bw
+                                              1e-1,  # a
+                                              1e-2])  # ba
         self.imu_noise_covar_beta = 4
         self.imu_noise_covar_gamma = 1
 
@@ -220,7 +222,9 @@ class EUROCParams(Parameters):
                                               0, 0, 0, 0, 0, 0,  # C, r
                                               1e-2, 1e-2, 1e-2,  # v
                                               1e-1, 1e-1, 1e-1,  # bw
-                                              1e1, 1e1, 1e1])  # ba
+                                              1e1, 1e1, 1e1,
+                                              5e0
+                                              ])  # ba
         self.init_covar_diag_eps = 1e-12
         #
         self.imu_noise_covar_diag = np.array([1e-3,  # w

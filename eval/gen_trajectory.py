@@ -20,7 +20,9 @@ def gen_trajectory_rel_iter(model, dataloader, initial_pose=np.eye(4, 4)):
 
         # images = data[1].cuda()
         meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
-        # gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2).cpu()
+
+        # gt_poses = scale_pose(gt_poses)
+        gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2).cpu()
         # lstm_states = lstm_states if prop_lstm_states else None
         # we only care about the results from the VO front ends here
         vis_meas, vis_meas_covar,  _, _, _ = model.forward(images.cuda(),
@@ -29,12 +31,12 @@ def gen_trajectory_rel_iter(model, dataloader, initial_pose=np.eye(4, 4)):
                                                                        prev_state.cuda(), None,
                                                                        T_imu_cam.cuda())
         # lstm_states = lstm_states.detach()
-        vis_meas = vis_meas.detach().cpu().numpy()
-        # vis_meas_rot = vis_meas[:,:,:3]
+        vis_meas = vis_meas[:,:,-1].detach().cpu().numpy()
+        vis_meas_rot = vis_meas[:,:,:3]
         
-        # vis_meas_trans_norm = torch.norm(vis_meas[:,:,3:], dim=2).unsqueeze(2).detach().cpu()
-        # vis_meas_trans = vis_meas[:,:,3:]* gt_trans_norm
-        # vis_meas = torch.cat((vis_meas_rot, vis_meas_trans), dim=2).detach().cpu().numpy()
+        vis_meas_trans_norm = torch.norm(vis_meas[:,:,3:], dim=2).unsqueeze(2).detach().cpu()
+        vis_meas_trans = vis_meas[:,:,3:] / vis_meas_trans_norm * gt_trans_norm
+        vis_meas = torch.cat((vis_meas_rot, vis_meas_trans), dim=2).detach().cpu().numpy()
         vis_meas_covar = vis_meas_covar.detach().cpu().numpy()
 
         for i, rel_pose in enumerate(vis_meas[-1]):  # select the only batch
@@ -127,7 +129,7 @@ def gen_trajectory(model_file_path, sequences, seq_len):
     model = E2EVIO()
     model = model.cuda()
     logger.print("Loading model from: ", model_file_path)
-    model.load_state_dict(logger.clean_state_dict_key(torch.load(model_file_path)))
+    model.load_state_dict(torch.load(model_file_path))
     model.eval()
 
     logger.log_parameters()

@@ -435,13 +435,13 @@ class Test_EKF(unittest.TestCase):
         plot_ekf_data(os.path.join(output_dir, "K06_gyro_bias"),
                       timestamps[0], gt_poses[0], gt_vels[0], poses[0], states[0])
 
-        init_covar = np.eye(18, 18)
+        init_covar = np.eye(19, 19)
         init_covar[0:3, 0:3] = np.eye(3, 3) * 1e-8  # g
         init_covar[3:9, 3:9] = np.zeros([6, 6])  # C,r
         init_covar[9:12, 9:12] = np.eye(3, 3) * 1e-2  # v
         init_covar[12:15, 12:15] = np.eye(3, 3) * 1e2  # bw
         init_covar[15:18, 15:18] = np.eye(3, 3) * 1e2  # ba
-
+        init_covar[18, 18] = np.eye(1, 1) *5
         timestamps, gt_poses, gt_vels, poses, states, covars = \
             self.ekf_test_case(["K06"], [0, 1091, ], init_covar.reshape(1, 18, 18), imu_covar, vis_meas_covar, device,
                                req_grad,

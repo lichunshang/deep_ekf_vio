@@ -21,10 +21,7 @@ def geo_loss(Ps, Gs, do_scale = True, gamma = 0.9):
 
 def scale_pose(gt):
     assert len(gt.size())==4
-    # if len(gt.size()) != 4:
-    #     print('gt size != 4')
-    #     gt.unsqueeze(1)
-    # # (BxSx4x4)
+
     angle_gt = gt[:,:,:3,:3]
     trans_gt = gt[:,:,:3,3]
     trans_gt_norm = torch.norm(trans_gt, dim=-1).unsqueeze(-1)
@@ -33,6 +30,18 @@ def scale_pose(gt):
     norm_gt_pose[:,:,:3,:3] = angle_gt
     norm_gt_pose[:,:,:3,3] = trans_gt
     return norm_gt_pose
+
+def rescale_pose(est, gt):
+    angle_est = est[:,:,:3,:3]
+    trans_gt = gt[:,:,:3,3]
+    trans_gt_norm = torch.norm(trans_gt, dim=-1).unsqueeze(-1)
+    trans_est = est[:,:,:3,3]
+    trans_est_norm = torch.norm(trans_est, dim=-1).unsqueeze(-1)
+    new_trans_est = trans_est / trans_est_norm * trans_gt_norm
+    new_est = torch.eye(4,4).repeat(est.size(0),gt.size(1),1,1)
+    new_est[:,:,:3,:3] = angle_est
+    new_est[:,:,:3,3] = new_trans_est
+    return new_est
 
 def euler_to_matrix(data):
     data = data.detach().cpu().numpy()
@@ -49,9 +58,14 @@ def matrix_to_euler(mat):
     rot = R.from_matrix(r).as_euler('xyz')
     return np.concatenate([rot,t])
 
-def euler_to_matrix_np(data):
-    roll, pitch,yaw, x,y,z = data
-    mat = np.eye(4,4)
+def euler_to_matrix_torch(data):
+    roll = data[:,0]
+    pitch = data[:,1]
+    yaw = data[:,2]
+    x = data[:,3]
+    y = data[:,4]
+    z = data[:,5]
+    mat = torch.eye(4,4).repeat(data.shape[0],1,1)
     rot = R.from_euler('xyz',(roll,pitch,yaw)).as_matrix()
     mat[:3,:3] = rot
     mat[:3,3] = (x,y,z)

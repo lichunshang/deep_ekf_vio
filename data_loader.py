@@ -331,7 +331,8 @@ class SubseqDataset(Dataset):
                                                         torch.zeros(3),  # r
                                                         gt_velocities[0],  # v
                                                         bw_0,  # bw
-                                                        ba_0)  # ba
+                                                        ba_0,
+                                                        torch.tensor(1, dtype=torch.float32))  # ba
 
         if self.no_image:
             return (subseq.length, subseq.seq, subseq.type, subseq.id, subseq.id_next), \

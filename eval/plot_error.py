@@ -29,10 +29,10 @@ def plot_errors(working_dir):
     logger.print("Found sequences: [%s]" % ", ".join(sequences))
 
     for i, sequence in enumerate(sequences):
-        error_rel = np.load(os.path.join(rel_errors_dir, "%s.npy" % sequence))
-        error_abs = np.load(os.path.join(abs_errors_dir, "%s.npy" % sequence))
-        error_vis_meas = np.load(os.path.join(vis_meas_errors_dir, "%s.npy" % sequence))
-        covar_vis_meas = np.load(os.path.join(vis_meas_covars_dir, "%s.npy" % sequence))
+        error_rel = np.load(os.path.join(rel_errors_dir, "%s.npy" % sequence), allow_pickle=True)
+        error_abs = np.load(os.path.join(abs_errors_dir, "%s.npy" % sequence), allow_pickle=True)
+        error_vis_meas = np.load(os.path.join(vis_meas_errors_dir, "%s.npy" % sequence), allow_pickle=True)
+        covar_vis_meas = np.load(os.path.join(vis_meas_covars_dir, "%s.npy" % sequence), allow_pickle=True)
 
         labels = ["Rot X", "Rot Y", "Rot Z", "Trans X", "Trans Y", "Trans Z"]
 
