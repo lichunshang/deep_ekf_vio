@@ -138,7 +138,7 @@ def exp_SO3_b(phi):
 
 # assumes small rotations, does not handle case when phi is close to pi
 # supports more than one batch dimensions
-def log_SO3_b(C, raise_exeption=True):
+def log_SO3_b(C, raise_exeption=False):
     eps = 1e-6
     eps_pi = 1e-4  # strict eps_pi
 

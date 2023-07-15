@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from .gma import Aggregate
 
 class FlowHead(nn.Module):
     def __init__(self, input_dim=128, hidden_dim=256):
@@ -134,5 +134,32 @@ class BasicUpdateBlock(nn.Module):
         mask = .25 * self.mask(net)
         return net, mask, delta_flow
 
+class GMAUpdateBlock(nn.Module):
+    def __init__(self, hidden_dim=128, corr_levels=4, corr_radius=4):
+        super().__init__()
+        self.encoder = BasicMotionEncoder(corr_levels, corr_radius)
+        self.gru = SepConvGRU(hidden_dim=hidden_dim, input_dim=128+hidden_dim+hidden_dim)
+        self.flow_head = FlowHead(hidden_dim, hidden_dim=256)
+
+        self.mask = nn.Sequential(
+            nn.Conv2d(128, 256, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 64*9, 1, padding=0))
+
+        self.aggregator = Aggregate( dim=128, dim_head=128, heads=1)
+
+    def forward(self, net, inp, corr, flow, attention):
+        motion_features = self.encoder(flow, corr)
+        motion_features_global = self.aggregator(attention, motion_features)
+        inp_cat = torch.cat([inp, motion_features, motion_features_global], dim=1)
+
+        # Attentional update
+        net = self.gru(net, inp_cat)
+
+        delta_flow = self.flow_head(net)
+
+        # scale mask to balence gradients
+        mask = .25 * self.mask(net)
+        return net, mask, delta_flow
 
 

@@ -11,7 +11,7 @@ np.set_printoptions(linewidth=1024)
 np.random.seed(0)
 torch.manual_seed(0)
 torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.benchmark = True
 
 
 class AttrDict(dict):
@@ -44,11 +44,11 @@ class Parameters(object):
 
         
         self.sample_times = 1
-        self.iters = 12
+
         self.exclude_resume_weights = ["imu_noise_covar_weights", "init_covar_diag_sqrt"]
 
         # VO Model parameters
-        self.fix_vo_weights = True
+        self.fix_vo_weights = False
 
         self.hybrid_recurrency = False
         self.rnn_hidden_size = 1000
@@ -61,24 +61,26 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = True
+        self.enable_ekf = True 
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
-        self.train_init_covar = True
-        self.train_imu_noise_covar = True
+        self.train_init_covar = False
+        self.train_imu_noise_covar = False
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
-        self.epochs = 50
-        
+        self.epochs = 30
+        self.batch_size = 64
+        self.seq_len = 6
+        self.iters = 6
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
-        self.optimizer_args = {'lr': 1e-3}
+        self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
-            "init_covar_diag_sqrt": 1e-1,
-            "imu_noise_covar_weights.*": 1e-1
+            "init_covar_diag_sqrt": 2*1e-1,
+            "imu_noise_covar_weights.*": 2*1e-1
         }
 
         # data augmentation
@@ -92,15 +94,13 @@ class Parameters(object):
             }
         })
         # Pretrain, Resume training
-
-        self.pretrained = '/mnt/data/teamAI/duy/deep_ekf_vio/pretrained/raft-kitti.pth'
-
-        # self.pretrained = None
+        # self.pretrained_flownet = os.path.join(self.project_dir, './pretrained/ems_transposenet_7scenes_pretrained.pth')
+        self.pretrained = None
+        # self.pretrained = '/mnt/data/teamAI/duy/deep_ekf_vio/results/train_20230715-01-47-04/saved_model.eval'
         # Choice:
         # None
         # './pretrained/flownets_bn_EPE2.459.pth.tar'
         # './pretrained/flownets_EPE1.951.pth.tar'
-        self.enable_eval = True
 
     def wc(self, seqs):
         available_seqs = [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
@@ -128,34 +128,31 @@ class KITTIParams(Parameters):
         self.eval_seq = 'K10'
 
 
-        self.valid_seqs = ['K10']
-        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
-    
-        # self.train_seqs = ['K07']
-        # self.valid_seqs = ['K07']
+        # self.valid_seqs = ['K10']
+        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
+
+        self.train_seqs = ['K07']
+        self.valid_seqs = ['K07']
 
         self.img_w = 320
-        self.img_h = 128
-        self.batch_size = 32
-        self.seq_len = 10
+        self.img_h = 96
         self.img_means = (-0.138843, -0.119405, -0.123209)
         self.img_stds = (1, 1, 1)
         self.minus_point_5 = True
 
         #
-        self.init_covar_diag_sqrt = np.array([1e-1, 1e-1, 1e-1,  # g
+        self.init_covar_diag_sqrt = np.array([1e-4, 1e-4, 1e-4,  # g
                                               0, 0, 0, 0, 0, 0,  # C, r
                                               1e-2, 1e-2, 1e-2,  # v
-                                              1e-1, 1e-1, 1e-1,  # bw
-                                              1e1, 1e1, 1e1,
-                                              5e0  # lambd
-                                              ])
+                                              1e-8, 1e-8, 1e-8,  # bw
+                                              1e-1, 1e-1, 1e-1,
+                                              5e0])  # ba
         self.init_covar_diag_eps = 1e-12
         #
-        self.imu_noise_covar_diag = np.array([1e-3,  # w
-                                              1e-5,  # bw
-                                              1e-1,  # a
-                                              1e-2])  # ba
+        self.imu_noise_covar_diag = np.array([1e-7,  # w
+                                              1e-7,  # bw
+                                              1e-2,  # a
+                                              1e-3])  # ba
         self.imu_noise_covar_beta = 4
         self.imu_noise_covar_gamma = 1
 
@@ -169,16 +166,16 @@ class KITTIParams(Parameters):
         self.k1 = 100  # rel loss angle multiplier
         self.k2 = 500.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting, not actually used
-            0: 0.5,
+            0: 0.9,
         }
         # error scale for covar loss, not really used,
         # but must be 1.0 for self.gaussian_pdf_loss = False
-        self.k4 = 1.0
+        self.k4 = 10.0
 
         self.gaussian_pdf_loss = False
 
         self.data_aug_transforms = AttrDict({
-            "enable": False,
+            "enable": True,
             "lr_flip": True,
             "ud_flip": False,
             "lrud_flip": False,
@@ -194,37 +191,31 @@ class EUROCParams(Parameters):
     def __init__(self):
         Parameters.__init__(self)
 
-        self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05', "V1_01", "V1_02", 'V1_03', "V2_01", "V2_02"]
+        self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05', "V1_01", "V1_02", 'V1_03', "V2_01", "V2_02", "V2_03"]
         self.eval_seq = "V1_02"
 
-        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
-        # self.train_seqs = ['V2_01']
-        self.valid_seqs = [self.eval_seq]
+        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
+        # self.train_seqs = ['V2_02']
+        # self.valid_seqs = [self.eval_seq]
 
-        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01"]
-        # self.valid_seqs = ['MH_05', "V1_03", "V2_02"]
-        self.valid_seqs = ['MH_05']
+        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01", "V2_02"]
+        self.valid_seqs = ['MH_05', "V1_03"]
 
         self.img_w = 256
         self.img_h = 160
-
-        self.batch_size = 16
-        self.seq_len = 10
         # self.img_w = 320
         # self.img_h = 96
         self.img_means = (0,)
         self.img_stds = (1,)
         self.minus_point_5 = True
 
-        
+        #
         self.init_covar_diag_sqrt = np.array([1e-1, 1e-1, 1e-1,  # g
                                               0, 0, 0, 0, 0, 0,  # C, r
                                               1e-2, 1e-2, 1e-2,  # v
                                               1e-1, 1e-1, 1e-1,  # bw
                                               1e1, 1e1, 1e1,
-                                              5e0
-                                              ])  # ba
+                                              5e0])  # ba
         self.init_covar_diag_eps = 1e-12
         #
         self.imu_noise_covar_diag = np.array([1e-3,  # w
@@ -250,11 +241,11 @@ class EUROCParams(Parameters):
         self.gaussian_pdf_loss = False
 
         self.data_aug_transforms = AttrDict({
-            "enable": False,
+            "enable": True,
             "lr_flip": True,
             "ud_flip": False,
             "lrud_flip": False,
-            "reverse": False,
+            "reverse": True,
         })
 
     def dataset(self):

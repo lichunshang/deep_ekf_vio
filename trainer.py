@@ -85,13 +85,17 @@ class _TrainAssistant(object):
 
     def get_loss(self, data):
         meta_data, images, imu_data, prev_state, T_imu_cam, gt_poses, gt_rel_poses = data
+
         _, _, _, _, _, invalid_imu_list = SubseqDataset.decode_batch_meta_info(meta_data)
+
         vis_meas, vis_meas_covar, poses, ekf_states, ekf_covars = \
             self.model.forward(images.cuda(),
                                imu_data.cuda(),
                                gt_poses[:, 0].inverse().cuda(),
                                prev_state.cuda(), None,
-                               T_imu_cam.cuda())
+                               T_imu_cam.cuda(),
+                               gt_rel_poses[:,0].cuda(),
+                               None)
 
         if par.enable_ekf and not par.gaussian_pdf_loss:
             # note that the estimated poses are already inversed
@@ -124,24 +128,19 @@ class _TrainAssistant(object):
         # Weighted MSE Loss
         # angle_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # trans_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
-        gamma = 0.8
-        gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(-1)
-        trans_loss = 0
-        angle_loss = 0
-        n = predicted_rel_poses.shape[2] # Num Iteration
-        for k in range (n):
-            pred = predicted_rel_poses[:,:,k]
-            trans_loss += gamma**(n - k) * self.loss_h(pred[:, :, 3:6] / torch.norm(pred[:, :, 3:6], dim=2).unsqueeze(-1), gt_rel_poses[:, :, 3:6] / gt_trans_norm)
-            angle_loss = self.loss_h(pred[:, :, 0:3], gt_rel_poses[:, :, 0:3])
-        trans_loss = trans_loss / n
-        angle_loss = angle_loss / n
-        
-        # pred_trans_norm = torch.norm(predicted_rel_poses[:, :, 3:6], dim=2).unsqueeze(-1)
-        # pred_trans_scaled = predicted_rel_poses[:, :, 3:6] /pred_trans_norm * gt_trans_norm
+
+        trans_loss = self.loss_h(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        # trans_loss = self.sequence_loss(predicted_rel_poses[:, :, 0:3],gt_rel_poses[:, :, 0:3])
+                        # self.loss_fn1(predicted_rel_poses[:, :, 3:6], gt_rel_poses[:, :, 3:6])
+        # gt_trans_norm = torch.norm(gt_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
+        # pred_trans_norm = torch.norm(predicted_rel_poses[:, :, 3:6], dim=2).unsqueeze(2)
+        # pred_trans_scaled = predicted_rel_poses[:, :, 3:6]/ pred_trans_norm * gt_trans_norm
         # trans_loss = self.loss_h(pred_trans_scaled, gt_rel_poses[:,:,3:6])
         # angle_loss = self.loss_h(predicted_rel_poses[:,:,0:3],gt_rel_poses[:, :, 0:3])
+                        # self.loss_fn1(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])) \
+        # trans_loss = self.loss_fn1(predicted_rel_poses[:,:,3:6],gt_rel_poses[:,:,3:6])
 
-        # angle_loss = self.loss_h(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
+        angle_loss = self.loss_h(predicted_rel_poses[:, :, 0:3], gt_rel_poses[:, :, 0:3])
         # covar_loss = torch.mean(vis_meas_covar)
 
         if par.gaussian_pdf_loss:
@@ -162,12 +161,12 @@ class _TrainAssistant(object):
         tag_name = "train" if self.model.training else "val"
         iterations = self.num_train_iterations if self.model.training else self.num_val_iterations
         add_scalar = logger.tensorboard.add_scalar
-        rot_x_loss = self.loss_h(predicted_rel_poses[:, :,-1, 0], gt_rel_poses[:, :, 0])
-        rot_y_loss = self.loss_h(predicted_rel_poses[:, :,-1, 1], gt_rel_poses[:, :, 1])
-        rot_z_loss = self.loss_h(predicted_rel_poses[:, :, -1,2], gt_rel_poses[:, :, 2])
-        trans_x_loss = self.loss_h(predicted_rel_poses[:, :,-1, 3], gt_rel_poses[:, :, 3])
-        trans_y_loss = self.loss_h(predicted_rel_poses[:, :,-1, 4], gt_rel_poses[:, :, 4])
-        trans_z_loss = self.loss_h(predicted_rel_poses[:, :,-1, 5], gt_rel_poses[:, :, 5])
+        rot_x_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 0], gt_rel_poses[:, :, 0])
+        rot_y_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 1], gt_rel_poses[:, :, 1])
+        rot_z_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 2], gt_rel_poses[:, :, 2])
+        trans_x_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 3], gt_rel_poses[:, :, 3])
+        trans_y_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 4], gt_rel_poses[:, :, 4])
+        trans_z_loss = torch.nn.functional.mse_loss(predicted_rel_poses[:, :, 5], gt_rel_poses[:, :, 5])
         add_scalar(tag_name + "_vis/total_loss", loss, iterations)
         add_scalar(tag_name + "_vis/rot_loss", angle_loss, iterations)
         add_scalar(tag_name + "_vis/rot_loss/x", rot_x_loss, iterations)
@@ -178,23 +177,26 @@ class _TrainAssistant(object):
         add_scalar(tag_name + "_vis/trans_loss/y", trans_y_loss, iterations)
         add_scalar(tag_name + "_vis/trans_loss/z", trans_z_loss, iterations)
 
+        vis_meas_covar_diag = torch.diagonal(vis_meas_covar, dim1=-2, dim2=-1)
         add_hist = logger.tensorboard.add_histogram
-        add_scalar(tag_name + "_vis_covar/ave/rot_x", torch.mean(vis_meas_covar[:, :, 0]), iterations)
-        add_scalar(tag_name + "_vis_covar/ave/rot_y", torch.mean(vis_meas_covar[:, :, 1]), iterations)
-        add_scalar(tag_name + "_vis_covar/ave/rot_z", torch.mean(vis_meas_covar[:, :, 2]), iterations)
-        add_scalar(tag_name + "_vis_covar/ave/trans_x", torch.mean(vis_meas_covar[:, :, 3]), iterations)
-        add_scalar(tag_name + "_vis_covar/ave/trans_y", torch.mean(vis_meas_covar[:, :, 4]), iterations)
-        add_scalar(tag_name + "_vis_covar/ave/trans_z", torch.mean(vis_meas_covar[:, :, 5]), iterations)
-        add_hist(tag_name + "_vis_covar/hist/rot_x", vis_meas_covar[:, :, 0].view(-1), iterations)
-        add_hist(tag_name + "_vis_covar/hist/rot_y", vis_meas_covar[:, :, 1].view(-1), iterations)
-        add_hist(tag_name + "_vis_covar/hist/rot_z", vis_meas_covar[:, :, 2].view(-1), iterations)
-        add_hist(tag_name + "_vis_covar/hist/trans_x", vis_meas_covar[:, :, 3].view(-1), iterations)
-        add_hist(tag_name + "_vis_covar/hist/trans_y", vis_meas_covar[:, :, 4].view(-1), iterations)
-        add_hist(tag_name + "_vis_covar/hist/trans_z", vis_meas_covar[:, :, 5].view(-1), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_x", torch.mean(vis_meas_covar_diag[:, :, 0]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_y", torch.mean(vis_meas_covar_diag[:, :, 1]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/rot_z", torch.mean(vis_meas_covar_diag[:, :, 2]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/trans_x", torch.mean(vis_meas_covar_diag[:, :, 3]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/trans_y", torch.mean(vis_meas_covar_diag[:, :, 4]), iterations)
+        add_scalar(tag_name + "_vis_covar/ave/trans_z", torch.mean(vis_meas_covar_diag[:, :, 5]), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_x", vis_meas_covar_diag[:, :, 0].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_y", vis_meas_covar_diag[:, :, 1].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/rot_z", vis_meas_covar_diag[:, :, 2].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_x", vis_meas_covar_diag[:, :, 3].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_y", vis_meas_covar_diag[:, :, 4].view(-1), iterations)
+        add_hist(tag_name + "_vis_covar/hist/trans_z", vis_meas_covar_diag[:, :, 5].view(-1), iterations)
 
         return loss
 
     def ekf_loss(self, est_poses, gt_poses, ekf_states, gt_rel_poses, vis_meas, vis_meas_covar):
+        est_poses = scale_pose(est_poses,gt_poses).to(device=gt_poses.device)
+        # print(est_poses)
         abs_errors = torch.matmul(est_poses[:, 1:], gt_poses[:, 1:])
         length_div = torch.arange(start=1, end=abs_errors.size(1) + 1, device=abs_errors.device,
                                   dtype=torch.float32).view(1, -1, 1)
@@ -338,19 +340,19 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     #     param.requires_grad = True
     # for param in e2e_vio_model.vo_module.regressor.extractor.parameters():
     #     param.requires_grad = False
-    online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, 50)
+    online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, par.seq_len)
 
     # Load FlowNet weights pretrained with FlyingChairs
     # NOTE: the pretrained model assumes image rgb values in range [-0.5, 0.5]
     if par.pretrained and not resume_model_path:
         pretrained_w = torch.load(par.pretrained)
         logger.print('Load pretrained model')
-        vo_model_dict = e2e_vio_model.state_dict()
-        update_dict = {k: v for k, v in pretrained_w.items() if k in vo_model_dict
-                                                                }
+
+        vo_model_dict = e2e_vio_model.vo_module.state_dict()
+        update_dict = {k: v for k, v in pretrained_w.items() if k in vo_model_dict}
         assert (len(update_dict) > 0)
         vo_model_dict.update(update_dict)
-        e2e_vio_model.load_state_dict(vo_model_dict)
+        e2e_vio_model.vo_module.load_state_dict(vo_model_dict)
 
     # Create optimizer
     logger.print("Optimizing on parameters:")
@@ -375,16 +377,14 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
 
     # Load trained DeepVO model and optimizer
     if resume_model_path:
-        state_dict_update = torch.load(resume_model_path)
+        state_dict_update = logger.clean_state_dict_key(torch.load(resume_model_path))
         state_dict_update = {key: state_dict_update[key] for key in state_dict_update
                              if key not in par.exclude_resume_weights
-                            #  and 'vo_module.extractor' not in key
-                            #  and key != 'module.update_block.encoder.convc1.weight'
-                            #  and key != 'vo_module.regressor.reconv.1.0.weight'
+                             and 'vo_module.extractor' not in key
+                            #  and key != 'vo_module.regressor.firstconv.0.0.weight'
                              }
         state_dict = e2e_vio_model.state_dict()
         state_dict_update = {k: v for k, v in state_dict_update.items() if k in state_dict}
-        assert (len(state_dict_update) > 0)
         state_dict.update(state_dict_update)
         e2e_vio_model.load_state_dict(state_dict)
         logger.print('Load model from: %s' % resume_model_path)

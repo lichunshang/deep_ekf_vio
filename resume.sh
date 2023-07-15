@@ -1,4 +1,4 @@
-folder='/mnt/data/teamAI/duy/deep_ekf_vio/results/train_20230707-01-52-23'
+folder='/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_save1'
 
 python main.py --gpu_id=0\
                 --resume_model_from $folder/saved_model.eval\

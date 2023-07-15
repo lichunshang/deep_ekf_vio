@@ -14,7 +14,7 @@ top_level_arg_parsed, args = top_level_arg_parser.parse_known_args()
 
 if top_level_arg_parsed.script == "gen_trajectory":
     default_sequences = par.train_seqs + par.valid_seqs
-    default_seq_len = 8
+    default_seq_len = par.seq_len
     arg_parser = argparse.ArgumentParser(description='Generate trajectory')
     arg_parser.add_argument('model_file_path', type=str, help='path to the saved model state dict')
     arg_parser.add_argument('--sequences', type=str, nargs="+", help="Select the sequences", default=default_sequences)

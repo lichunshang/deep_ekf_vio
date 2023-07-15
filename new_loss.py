@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+from liegroups.torch import SO3
 
 def fit_scale(Ps, Gs):
     b = Ps.shape[0]
@@ -19,17 +20,17 @@ def geo_loss(Ps, Gs, do_scale = True, gamma = 0.9):
             s = fit_scale(Ps, Gs)
     return 
 
-def scale_pose(gt):
-    assert len(gt.size())==4
-
-    angle_gt = gt[:,:,:3,:3]
-    trans_gt = gt[:,:,:3,3]
-    trans_gt_norm = torch.norm(trans_gt, dim=-1).unsqueeze(-1)
-    trans_gt = trans_gt / trans_gt_norm 
-    norm_gt_pose = torch.eye(4,4).repeat(gt.size(0),gt.size(1),1,1)
-    norm_gt_pose[:,:,:3,:3] = angle_gt
-    norm_gt_pose[:,:,:3,3] = trans_gt
-    return norm_gt_pose
+def scale_pose(est,gt):
+    # (BxSx4x4)
+    angle_est = est[:,:,:3,:3]
+    trans_est = est[:,:,:3,3]
+    trans_gt_norm = torch.norm(gt[:,:,:3,3], dim=2).unsqueeze(2)
+    trans_est_norm = torch.norm(trans_est, dim=2).unsqueeze(2)
+    trans_est = trans_est / trans_est_norm * trans_gt_norm
+    norm_est_pose = torch.eye(4,4).repeat(est.size(0),est.size(1),1,1)
+    norm_est_pose[:,:,:3,:3] = angle_est
+    norm_est_pose[:,:,:3,3] = trans_est
+    return norm_est_pose
 
 def rescale_pose(est, gt):
     angle_est = est[:,:,:3,:3]
@@ -83,6 +84,7 @@ if __name__ == '__main__':
     out = matrix_to_euler(d)
     c = torch.tensor([[9.4073580e-04,  1.3585356e-03,  1.7236921e-04,  1.3084458e+00, -2.3419287e-03 , 8.3899405e-03],
                       [9.4073580e-04,  1.3585356e-03,  1.7236921e-04,  1.3084458e+00, -2.3419287e-03 , 8.3899405e-03]])
-    print(euler_to_matrix(c))
-    # out = euler_to_matrix(c)
-    # print(out)
+    # print(euler_to_matrix(c))
+    
+    c9 = SO3.from_rpy(c[:,:3])
+    print(torch.Tensor(c9))
