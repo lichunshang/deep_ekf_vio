@@ -123,7 +123,7 @@ class Test_EKF(unittest.TestCase):
         output_dir = os.path.join(par.results_coll_dir, "ekf_test_predict_plotted")
         logger.initialize(output_dir, use_tensorboard=False)
 
-        seqs = ["K01", "K06", ]
+        seqs = ["K01", "K04", "K06", "K07", "K08", "K09", "K10"]
         timestamps, gt_poses, gt_vels, poses, states, covars, precomp_covars = \
             self.predict_test_case(seqs, (0, 1091,), "cpu", False)
 
@@ -231,12 +231,13 @@ class Test_EKF(unittest.TestCase):
                                                            torch.zeros(3),  # r
                                                            torch.tensor(gt_vels[i, 0], dtype=torch.float32),  # v
                                                            torch.zeros(3),  # bw
-                                                           torch.zeros(3)).to(device))  # ba
+                                                           torch.zeros(3),
+                                                           torch.eye(1,1)*1).to(device))
         states = [torch.stack(init_state)]
         poses = [torch.tensor([np.linalg.inv(p[0]) for p in gt_poses], dtype=torch.float32).to(device)]
-        covars = [torch.zeros(timestamps.shape[0], 18, 18).to(device)]
+        covars = [torch.zeros(timestamps.shape[0], 19, 19).to(device)]
         imu_noise = torch.eye(12, 12).to(device)
-        precomp_covars = [torch.zeros(timestamps.shape[0], 18, 18).to(device)]
+        precomp_covars = [torch.zeros(timestamps.shape[0], 19, 19).to(device)]
 
         states[0].requires_grad = req_grad
         covars[0].requires_grad = req_grad
@@ -380,12 +381,12 @@ class Test_EKF(unittest.TestCase):
                                              1e-3, 1e-3, 1e-3])).to(device)
         vis_meas_covar = torch.diag(torch.tensor([1e-2, 1e-2, 1e-2,
                                                   1e0, 1e0, 1e0])).to(device)
-        init_covar = np.eye(18, 18)
+        init_covar = np.eye(19, 19)
         init_covar[0:3, 0:3] = np.eye(3, 3) * 1e-4  # g
         init_covar[3:9, 3:9] = np.zeros([6, 6])  # C,r
         init_covar[9:12, 9:12] = np.eye(3, 3) * 1e-2  # v
         init_covar[12:15, 12:15] = np.eye(3, 3) * 1e-8  # bw
-        # init_covar[15:18, 15:18] = np.eye(3, 3) * 1e-2  # ba
+        init_covar[15:18, 15:18] = np.eye(3, 3) * 1e-2  # ba
         init_covar = np.tile(init_covar, (len(seqs), 1, 1,))
 
         timestamps, gt_poses, gt_vels, poses, states, covars = \
@@ -518,7 +519,8 @@ class Test_EKF(unittest.TestCase):
                                                            torch.zeros(3),  # r
                                                            torch.tensor(gt_vels[i, 0], dtype=torch.float32),  # v
                                                            torch.zeros(3),  # bw
-                                                           torch.zeros(3)).to(device))  # ba
+                                                           torch.zeros(3),
+                                                           torch.eye(1,1)).to(device))  # ba
         init_state = torch.stack(init_state)
         init_pose = torch.tensor([np.linalg.inv(p[0]) for p in gt_poses], dtype=torch.float32).to(device)
         init_covar = torch.tensor(init_covar, dtype=torch.float32).to(device)

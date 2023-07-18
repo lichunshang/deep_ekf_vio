@@ -27,7 +27,9 @@ def gen_trajectory_rel_iter(model, dataloader, initial_pose=np.eye(4, 4)):
                                                                        imu_data.cuda(),
                                                                        gt_poses[:, 0].inverse().cuda(),
                                                                        prev_state.cuda(), None,
-                                                                       T_imu_cam.cuda())
+                                                                       T_imu_cam.cuda(),
+                                                                       gt_rel_poses[:,0].cuda(),
+                                                                       None)
         # lstm_states = lstm_states.detach()
         vis_meas = vis_meas.cpu()
         vis_meas_rot = vis_meas[:,:,:3]

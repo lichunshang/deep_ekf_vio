@@ -110,7 +110,7 @@ class _TrainAssistant(object):
                 vis_meas_loss_invalid_imu = self.vis_meas_loss(vis_meas[s], vis_meas_covar[s], gt_rel_poses[s].cuda())
 
             # loss = vis_meas_loss_invalid_imu + loss_vis_meas +  loss_abs
-            loss =  vis_meas_loss_invalid_imu + loss_vis_meas + loss_abs
+            loss =  vis_meas_loss_invalid_imu + 10 * loss_vis_meas + loss_abs
         elif par.enable_ekf:
             loss, _, _ = self.ekf_loss(poses, gt_poses.cuda(), ekf_states, gt_rel_poses.cuda(), vis_meas, vis_meas_covar)
         else:
@@ -334,12 +334,13 @@ def train(resume_model_path, resume_optimizer_path, train_description ='train'):
     # Model
     e2e_vio_model = E2EVIO()
     e2e_vio_model = e2e_vio_model.cuda()
-    # for param in e2e_vio_model.vo_module.parameters():
-    #     param.requires_grad = False
-    # for param in e2e_vio_model.vo_module.extractor.model.parameters():
-    #     param.requires_grad = True
-    # for param in e2e_vio_model.vo_module.regressor.extractor.parameters():
-    #     param.requires_grad = False
+    for param in e2e_vio_model.vo_module.parameters():
+        param.requires_grad = True
+    for param in e2e_vio_model.vo_module.extractor.model.feature_encoder.parameters():
+        param.requires_grad = False
+    for param in e2e_vio_model.vo_module.extractor.model.context_encoder.parameters():
+        param.requires_grad = False
+    
     online_evaluator = _OnlineDatasetEvaluator(e2e_vio_model, par.valid_seqs, par.seq_len)
 
     # Load FlowNet weights pretrained with FlyingChairs

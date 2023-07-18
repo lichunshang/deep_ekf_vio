@@ -12,17 +12,18 @@ from eval import EurocErrorCalc, KittiErrorCalc
 
 class Test_EKF_EUROC(unittest.TestCase):
     def test_ekf_euroc(self):
-        output_dir = os.path.join(par.results_coll_dir, "test_ekf_euroc")
+        output_dir = os.path.join(par.results_coll_dir, "test_ekf_euroc0")
         logger.initialize(output_dir, use_tensorboard=False)
 
-        seqs = [ "K09","K10"]
-        # seqs = ["MH_01", "MH_02", "MH_03", "MH_04", "MH_05", "V1_01", "V1_02", "V1_03", "V2_01", "V2_02", "V2_03"]
+        # seqs = [ "K09","K10"]
+        seqs = ["MH_01", "MH_02", "MH_03", "MH_04", "MH_05", "V1_01", "V1_02", "V1_03", "V2_01", "V2_02", "V2_03"]
+        # seqs = ["MH_01",  "V1_01", "V1_02", "V1_03", "V2_01", "V2_02", "V2_03"]
         # seqs2 = ["MH_01_eval", "MH_02_eval", "MH_03_eval", "MH_04_eval", "MH_05_eval",
         #          "V1_01_eval", "V1_02_eval", "V1_03_eval", "V2_01_eval", "V2_02_eval", "V2_03_eval"]
         # seqs = seqs + seqs2
 
-        # error_calc = EurocErrorCalc(seqs)
-        error_calc = KittiErrorCalc(seqs)
+        error_calc = EurocErrorCalc(seqs)
+        # error_calc = KittiErrorCalc(seqs)
         imu_covar = torch.diag(torch.tensor([1e-3, 1e-3, 1e-3,
                                              1e-5, 1e-5, 1e-5,
                                              1e-1, 1e-1, 1e-1,
@@ -35,7 +36,7 @@ class Test_EKF_EUROC(unittest.TestCase):
         init_covar[9:12, 9:12] = np.eye(3, 3) * 1e-2  # v
         init_covar[12:15, 12:15] = np.eye(3, 3) * 1e-1  # bw
         init_covar[15:18, 15:18] = np.eye(3, 3) * 1e1  # ba
-        init_covar[18, 18] = np.eye(1, 1) *5 # ba
+        init_covar[18, 18] = np.eye(1, 1) * 5 
         init_covar = torch.tensor(init_covar, dtype=torch.float32).view(1, 19, 19)
         ekf = IMUKalmanFilter()
 

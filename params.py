@@ -61,7 +61,7 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = True 
+        self.enable_ekf = True
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
@@ -71,9 +71,9 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 30
-        self.batch_size = 64
+        self.batch_size = 32
         self.seq_len = 6
-        self.iters = 6
+        self.iters = 12
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -128,11 +128,11 @@ class KITTIParams(Parameters):
         self.eval_seq = 'K10'
 
 
-        # self.valid_seqs = ['K10']
-        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
+        self.valid_seqs = [ 'K09', 'K10']
+        self.train_seqs = [x for x in self.all_seqs if not x == 'K10']
 
-        self.train_seqs = ['K07']
-        self.valid_seqs = ['K07']
+        # self.train_seqs = ['K07']
+        # self.valid_seqs = ['K07']
 
         self.img_w = 320
         self.img_h = 96
@@ -163,8 +163,8 @@ class KITTIParams(Parameters):
         self.vis_meas_covar_gamma = 1
 
         # -----------------------------------------
-        self.k1 = 100  # rel loss angle multiplier
-        self.k2 = 500.  # abs loss angle multiplier
+        self.k1 = 1000  # rel loss angle multiplier
+        self.k2 = 5000.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting, not actually used
             0: 0.9,
         }
@@ -195,7 +195,7 @@ class EUROCParams(Parameters):
         self.eval_seq = "V1_02"
 
         # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
-        # self.train_seqs = ['V2_02']
+        # self.train_seqs = ['MH_01']
         # self.valid_seqs = [self.eval_seq]
 
         self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01", "V2_02"]
