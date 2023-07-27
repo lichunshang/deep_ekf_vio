@@ -190,16 +190,12 @@ class IMUKalmanFilter(nn.Module):
         poses_over_timesteps = [prev_pose]
         states_over_timesteps = [prev_state]
         covars_over_timesteps = [prev_covar]
-        temp_state = []
         for k in range(0, num_timesteps):
             pred_states, pred_covars = self.predict(imu_data[:, k], imu_noise_covar,
                                                     states_over_timesteps[-1], covars_over_timesteps[-1])
-            temp_state.append(pred_states[-1])
-            for _ in range(6):
-                est_state, est_covar = self.update(temp_state[-1], pred_covars[-1],
+            est_state, est_covar = self.update(pred_states[-1], pred_covars[-1],
                                                vis_meas[:, k], vis_meas_covar[:, k], T_imu_cam)
-                temp_state.append(est_state)
-            new_pose, new_state, new_covar = self.composition(poses_over_timesteps[-1], temp_state[-1], est_covar)
+            new_pose, new_state, new_covar = self.composition(poses_over_timesteps[-1], est_state, est_covar)
 
             poses_over_timesteps.append(new_pose)
             states_over_timesteps.append(new_state)
@@ -208,7 +204,6 @@ class IMUKalmanFilter(nn.Module):
         return torch.stack(poses_over_timesteps, 1), \
                torch.stack(states_over_timesteps, 1), \
                torch.stack(covars_over_timesteps, 1)
-
 
     @staticmethod
     def decode_state_b(state_vector):

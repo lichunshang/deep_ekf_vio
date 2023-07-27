@@ -326,7 +326,7 @@ class Res(nn.Module):
 class PoseRegressor(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        fcnum = 256 * 10
+        fcnum = 256 * 12
 
         fc1_trans = linear(fcnum, 128)
         fc2_trans = linear(128,32)
@@ -360,8 +360,11 @@ class PoseRegressor(nn.Module):
 
 
 if __name__ == '__main__':
-    a = torch.rand(6,96,320)
-    h = torch.rand(6,32,320)
-    gru = SepConvGRU()
-    b = gru(h,a)
-    print(b.shape)
+    import torchvision
+    img1= '/mnt/data/teamAI/duy/data/kitti/2011_10_03/2011_10_03_drive_0034_extract/image_02/data/0000000000.png'
+    img2 = '/mnt/data/teamAI/duy/data/kitti/2011_10_03/2011_10_03_drive_0034_extract/image_02/data/0000000001.png'
+    model = RAFT()
+    i1 = torchvision.io.read_image(img1).to(float)
+    i2 = torchvision.io.read_image(img2).to(float)
+    output = model(torch.cat((i1,i2),dim=0).unsqueeze(0))
+    print(len(output))

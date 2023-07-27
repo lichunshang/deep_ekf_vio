@@ -13,14 +13,14 @@ def pfind(*path):
     return p[0]
 
 
-seq = "K01"
-base_dir = "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results"
-gt_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
-vanilla_poses = np.load(os.path.join(pfind(base_dir, "KITTI_nogloss", seq + "_train"), "saved_model.eval.traj/est_poses", seq + ".npy"))
+seq = "K08"
+base_dir = "/mnt/data/teamAI/duy/deep_ekf_vio/results"
+gt_poses = np.load(os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_saved3/saved_model.eval.traj_EKF/gt_poses", seq + ".npy"))
+vanilla_poses = np.load(os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_saved3/saved_model.eval.traj_EKF/est_poses", seq + ".npy"))
 vision_only_poses = np.load(
-        os.path.join(pfind(base_dir, "KITTI_vision_only_aug", seq), "saved_model.eval.traj/est_poses", seq + ".npy"))
-msf_fusion_poses = np.load(os.path.join(base_dir, "KITTI_msf", seq, "est_shifted.npy"))
-imu_only_poses = np.load(os.path.join(base_dir, "KITTI_imu_only", seq, "est.npy"))
+        os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_saved3/saved_model.eval.traj/est_poses", seq + ".npy"))
+# msf_fusion_poses = np.load(os.path.join(base_dir, "KITTI_msf", seq, "est_shifted.npy"))
+# imu_only_poses = np.load(os.path.join(base_dir, "KITTI_imu_only", seq, "est.npy"))
 
 plotter = Plotter(os.path.join(base_dir, "KITTI_figures"))
 
@@ -30,33 +30,15 @@ def plot_callback(fig, ax):
     ax.plot()
     ax.legend(numpoints=1, prop={'size': 8})
 
-    #K07
-    if seq == "K07":
-        ax.arrow(75, 195, -20, -20, head_width=5, head_length=5, fc='r', ec='r')
-        circle = plt.Circle((45, 170), 20, color='r', fill=False, linestyle="--")
-        ax.add_artist(circle)
 
-        plot_margin = 25
-        x0, x1, y0, y1 = ax.axis()
-        ax.axis((x0 - plot_margin,
-                 x1 + plot_margin,
-                 y0 - plot_margin,
-                 y1 + plot_margin))
-
-    #K08
-    if seq == "K08":
-        ax.axis((0,1000,-600,400))
-
-
-plotter.plot(([imu_only_poses[:, 0, 3], imu_only_poses[:, 1, 3]],
+plotter.plot((
               [vision_only_poses[:, 0, 3], vision_only_poses[:, 1, 3]],
-              [msf_fusion_poses[:, 0, 3], msf_fusion_poses[:, 1, 3]],
               [gt_poses[:, 0, 3], gt_poses[:, 1, 3]],
               [vanilla_poses[:, 0, 3], vanilla_poses[:, 1, 3]],
               ),
              "x [m]", "y [m]", None,
-             labels=["IMU",  "vision", "ORB+MSF", "ground truth", "proposed"],
-             colors=["turquoise", "gold", "green", "blue", "red"],
+             labels=[  "vision", "ground truth", "proposed"],
+             colors=[ "green", "blue", "red"],
              equal_axes=True, filename=seq+".svg", callback=plot_callback)
 
 # plotter.plot(([gt_poses[:, 0, 3], gt_poses[:, 1, 3]],

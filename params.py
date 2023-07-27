@@ -61,7 +61,7 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = True
+        self.enable_ekf = False
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
@@ -70,10 +70,10 @@ class Parameters(object):
         self.vis_meas_covar_use_fixed = False
 
         # Training parameters
-        self.epochs = 30
-        self.batch_size = 32
-        self.seq_len = 6
-        self.iters = 12
+        self.epochs = 50
+        self.batch_size = 64
+        self.seq_len = 4
+        self.iters = 1
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.Adam
@@ -128,11 +128,11 @@ class KITTIParams(Parameters):
         self.eval_seq = 'K10'
 
 
-        self.valid_seqs = [ 'K09', 'K10']
-        self.train_seqs = [x for x in self.all_seqs if not x == 'K10']
+        # self.valid_seqs = ['K10']
+        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
 
-        # self.train_seqs = ['K07']
-        # self.valid_seqs = ['K07']
+        self.train_seqs = ['K07']
+        self.valid_seqs = ['K07']
 
         self.img_w = 320
         self.img_h = 96
@@ -170,7 +170,7 @@ class KITTIParams(Parameters):
         }
         # error scale for covar loss, not really used,
         # but must be 1.0 for self.gaussian_pdf_loss = False
-        self.k4 = 10.0
+        self.k4 = 1.0
 
         self.gaussian_pdf_loss = False
 
@@ -192,14 +192,14 @@ class EUROCParams(Parameters):
         Parameters.__init__(self)
 
         self.all_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', 'MH_05', "V1_01", "V1_02", 'V1_03', "V2_01", "V2_02", "V2_03"]
-        self.eval_seq = "V1_02"
+        self.eval_seq = "V1_03"
 
         # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
         # self.train_seqs = ['MH_01']
         # self.valid_seqs = [self.eval_seq]
 
-        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01", "V2_02"]
-        self.valid_seqs = ['MH_05', "V1_03"]
+        self.train_seqs = ['MH_01', 'MH_02', 'MH_03', 'MH_04', "V1_01", "V1_02", "V2_01", "V2_02",'MH_05']
+        self.valid_seqs = [ "V1_03"]
 
         self.img_w = 256
         self.img_h = 160
@@ -231,8 +231,8 @@ class EUROCParams(Parameters):
         self.vis_meas_covar_beta = 3
         self.vis_meas_covar_gamma = 1
 
-        self.k1 = 500  # rel loss angle multiplier
-        self.k2 = 2500.  # abs loss angle multiplier
+        self.k1 = 1000  # rel loss angle multiplier
+        self.k2 = 5000.  # abs loss angle multiplier
         self.k3 = {  # (1-k3)*abs + k3*rel weighting
             0: 0.1,
         }
@@ -252,5 +252,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-par = KITTIParams()
-# par = EUROCParams()
+# par = KITTIParams()
+par = EUROCParams()
