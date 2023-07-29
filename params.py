@@ -61,7 +61,7 @@ class Parameters(object):
         self.stateful_training = True
 
         # EKF parameters
-        self.enable_ekf = False
+        self.enable_ekf = True
         self.T_imu_cam_override = np.eye(4, 4)
         self.cal_override_enable = True
 
@@ -71,12 +71,12 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 50
-        self.batch_size = 64
-        self.seq_len = 4
+        self.batch_size = 32
+        self.seq_len = 6
         self.iters = 1
         self.pin_mem = True
         self.cache_image = True
-        self.optimizer = torch.optim.Adam
+        self.optimizer = torch.optim.AdamW
         self.optimizer_args = {'lr': 1e-4}
         self.param_specific_lr = {
             "init_covar_diag_sqrt": 2*1e-1,
@@ -128,11 +128,11 @@ class KITTIParams(Parameters):
         self.eval_seq = 'K10'
 
 
-        # self.valid_seqs = ['K10']
-        # self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq and x not in self.valid_seqs]
+        self.valid_seqs = ['K10']
+        self.train_seqs = [x for x in self.all_seqs]
 
-        self.train_seqs = ['K07']
-        self.valid_seqs = ['K07']
+        # self.train_seqs = ['K07']
+        # self.valid_seqs = ['K07']
 
         self.img_w = 320
         self.img_h = 96
@@ -252,5 +252,5 @@ class EUROCParams(Parameters):
         return "EUROC"
 
 
-# par = KITTIParams()
-par = EUROCParams()
+par = KITTIParams()
+# par = EUROCParams()
