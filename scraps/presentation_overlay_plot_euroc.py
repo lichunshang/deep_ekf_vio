@@ -25,14 +25,14 @@ def read_tum(vins_mono_poses):
     return trajectory.PoseTrajectory3D(positions_xyz=xyz, orientations_quat_wxyz=wxyz, timestamps=ts)
 
 seq = "MH_05"
-base_dir = "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results"
-timestamps_rel = np.load(os.path.join(pfind(base_dir, "EUROC", seq + "_train"), "saved_model.eval.traj/timestamps", seq + ".npy"))
-# gt_poses = np.load(os.path.join(pfind(base_dir, "EUROC", seq + "_train"), "saved_model.eval.traj/gt_poses", seq + ".npy"))
-gt_poses = np.loadtxt(os.path.join(base_dir, "EUROC_vins_mono", seq, "gt.tum"))
-vanilla_poses = np.load(os.path.join(pfind(base_dir, "EUROC", seq + "_train"), "saved_model.checkpoint.traj/est_poses", seq + ".npy"))
-vision_only_poses = np.load(
-        os.path.join(pfind(base_dir, "EUROC_vision_only", seq), "saved_model.eval.traj/est_poses", seq + ".npy"))
-vins_mono_poses = np.loadtxt(os.path.join(base_dir, "EUROC_vins_mono", seq, "vinsmono_output.tum"))
+base_dir = "/mnt/data/teamAI/duy/deep_ekf_vio/results"
+timestamps_rel = np.load(os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterate_euroc_ekf2/saved_model.eval.traj/timestamps", seq + ".npy"))
+# gt_poses = np.load("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterate_euroc_ekf2/saved_model.eval.traj/gt_poses", seq + ".npy")
+gt_poses = np.loadtxt(os.path.join("/mnt/data/teamAI/quyen/deep_vio/deep_ekf_vio/data", seq, "data.tum"))
+vanilla_poses = np.load(os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterate_euroc_ekf2/saved_model.eval.traj/est_poses", seq + ".npy"))
+vision_only_poses = np.load(os.path.join(
+        "/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_euroc_noEKF_2/saved_model.valid.traj/est_poses", seq + ".npy"))
+# vins_mono_poses = np.loadtxt(os.path.join(base_dir, "EUROC_vins_mono", seq, "vinsmono_output.tum"))
 # imu_only_poses = np.load(os.path.join(base_dir, "KITTI_imu_only", seq, "est.npy"))
 seq_data = SequenceData(seq)
 raw_timestamps = np.array(seq_data.df.loc[:, "timestamp_raw"])
@@ -42,15 +42,15 @@ gt_traj = read_tum(gt_poses)
 vanilla_traj = trajectory.PoseTrajectory3D(poses_se3=vanilla_poses, timestamps=timestamps)
 vision_only_traj = trajectory.PoseTrajectory3D(poses_se3=vision_only_poses, timestamps=timestamps)
 
-vins_mono_traj = read_tum(vins_mono_poses)
+# vins_mono_traj = read_tum(vins_mono_poses)
 
 gt_traj_synced_vanilla, vanilla_traj_synced = sync.associate_trajectories(gt_traj, vanilla_traj, max_diff=0.01)
 gt_traj_synced_vision_only, vision_only_traj_synced = sync.associate_trajectories(gt_traj, vision_only_traj, max_diff=0.01)
-gt_traj_synced_vins_mono, vins_mono_traj_synced = sync.associate_trajectories(gt_traj, vins_mono_traj, max_diff=0.01)
+# gt_traj_synced_vins_mono, vins_mono_traj_synced = sync.associate_trajectories(gt_traj, vins_mono_traj, max_diff=0.01)
 
 vanilla_traj_aligned = trajectory.align_trajectory(vanilla_traj_synced, gt_traj_synced_vanilla,correct_scale=False, correct_only_scale=False)
 vision_only_traj_aligned = trajectory.align_trajectory(vision_only_traj_synced, gt_traj_synced_vision_only,correct_scale=False, correct_only_scale=False)
-vins_mono_traj_aligned = trajectory.align_trajectory(vins_mono_traj_synced, gt_traj_synced_vins_mono,correct_scale=False, correct_only_scale=False)
+# vins_mono_traj_aligned = trajectory.align_trajectory(vins_mono_traj_synced, gt_traj_synced_vins_mono,correct_scale=False, correct_only_scale=False)
 
 plotter = Plotter(os.path.join(base_dir, "KITTI_figures"))
 
@@ -77,7 +77,7 @@ def plot_callback(fig, ax):
 
 
 plotter.plot(([vision_only_traj_aligned.positions_xyz[:, 0], vision_only_traj_aligned.positions_xyz[:, 1]],
-              [vins_mono_traj_aligned.positions_xyz[:, 0], vins_mono_traj_aligned.positions_xyz[:, 1]],
+            #   [vins_mono_traj_aligned.positions_xyz[:, 0], vins_mono_traj_aligned.positions_xyz[:, 1]],
               [gt_traj_synced_vanilla.positions_xyz[:, 0], gt_traj_synced_vanilla.positions_xyz[:, 1]],
               [vanilla_traj_aligned.positions_xyz[:, 0], vanilla_traj_aligned.positions_xyz[:, 1]],
               ),

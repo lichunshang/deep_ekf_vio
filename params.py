@@ -71,9 +71,9 @@ class Parameters(object):
 
         # Training parameters
         self.epochs = 50
-        self.batch_size = 32
+        self.batch_size = 64
         self.seq_len = 6
-        self.iters = 1
+        self.iters = 12
         self.pin_mem = True
         self.cache_image = True
         self.optimizer = torch.optim.AdamW
@@ -129,7 +129,7 @@ class KITTIParams(Parameters):
 
 
         self.valid_seqs = ['K10']
-        self.train_seqs = [x for x in self.all_seqs]
+        self.train_seqs = [x for x in self.all_seqs if not x == self.eval_seq]
 
         # self.train_seqs = ['K07']
         # self.valid_seqs = ['K07']

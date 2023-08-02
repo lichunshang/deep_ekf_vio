@@ -32,9 +32,9 @@ import matplotlib.pyplot as plt
 
 
 gt = np.load(
-        "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_nogloss/K10_train_20200131-15-31-04/saved_model.eval.traj/gt_poses/K10.npy")
+        "/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_saved3/saved_model.eval.traj/gt_poses/K10.npy")
 est = np.load(
-        "/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_nogloss/K10_train_20200131-15-31-04/saved_model.eval.traj/est_poses/K10.npy")
+        "/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_saved3/saved_model.eval.traj/est_poses/K10.npy")
 
 _, error_by_length, _ = calc_kitti_seq_errors(gt, est)
 
@@ -84,7 +84,7 @@ sz = plt.gcf().get_size_inches()
 sz[1] /= 2
 plt.gcf().set_size_inches(sz)
 
-plt.savefig("/home/cs4li/Dev/deep_ekf_vio/results/final_thesis_results/KITTI_figures/vinet.svg",  format='svg', bbox_inches='tight', pad_inches=0)
+plt.savefig("/mnt/data/teamAI/duy/deep_ekf_vio/results/KITTI_figures/vinet.svg",  format='svg', bbox_inches='tight', pad_inches=0)
 
 for i in range(100, 801, 100):
     e = np.array(error_by_length[i])

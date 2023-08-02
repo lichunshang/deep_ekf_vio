@@ -13,12 +13,12 @@ def pfind(*path):
     return p[0]
 
 
-seq = "K08"
+seq = "V2_01"
 base_dir = "/mnt/data/teamAI/duy/deep_ekf_vio/results"
-gt_poses = np.load(os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_saved3/saved_model.eval.traj_EKF/gt_poses", seq + ".npy"))
-vanilla_poses = np.load(os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_saved3/saved_model.eval.traj_EKF/est_poses", seq + ".npy"))
+gt_poses = np.load(os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterate_euroc_ekf2/saved_model.eval.traj/gt_poses", seq + ".npy"))
+vanilla_poses = np.load(os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterate_euroc_ekf2/saved_model.eval.traj/est_poses", seq + ".npy"))
 vision_only_poses = np.load(
-        os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_saved3/saved_model.eval.traj/est_poses", seq + ".npy"))
+        os.path.join("/mnt/data/teamAI/duy/deep_ekf_vio/results/iterated_euroc_noEKF_2/saved_model.valid.traj/est_poses", seq + ".npy"))
 # msf_fusion_poses = np.load(os.path.join(base_dir, "KITTI_msf", seq, "est_shifted.npy"))
 # imu_only_poses = np.load(os.path.join(base_dir, "KITTI_imu_only", seq, "est.npy"))
 
